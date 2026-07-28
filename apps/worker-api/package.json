@@ -1,0 +1,12 @@
+{
+  "name": "@seller-intelligence/worker-api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "eslint src test",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run test",
+    "health": "vitest run test/health.test.ts"
+  }
+}

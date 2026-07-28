@@ -1,0 +1,13 @@
+name: Deploy Scrapy Cloud Disabled
+
+on:
+  workflow_dispatch:
+
+jobs:
+  blocked:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "Scrapy Cloud deployment is blocked until Phase 10B."
+          echo "Zyte entitlement confirmation and zero-charge verification are required."
+          exit 1

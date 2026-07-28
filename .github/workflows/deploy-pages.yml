@@ -1,0 +1,13 @@
+name: Deploy Pages Disabled
+
+on:
+  workflow_dispatch:
+
+jobs:
+  blocked:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "Pages deployment is blocked in Phase 0."
+          echo "Do not deploy without the specification release flow and operator approval."
+          exit 1

@@ -1,0 +1,2 @@
+SPIDER_NAME = "revalidation"
+LIVE_CRAWL_IMPLEMENTED = False

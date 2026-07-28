@@ -1,0 +1,7 @@
+BOT_NAME = "sellerintel"
+SPIDER_MODULES = ["sellerintel.spiders"]
+NEWSPIDER_MODULE = "sellerintel.spiders"
+ROBOTSTXT_OBEY = True
+CONCURRENT_REQUESTS_PER_DOMAIN = 1
+DOWNLOAD_DELAY = 2.0
+LOG_LEVEL = "INFO"

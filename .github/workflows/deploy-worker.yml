@@ -1,0 +1,13 @@
+name: Deploy Worker Disabled
+
+on:
+  workflow_dispatch:
+
+jobs:
+  blocked:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "Worker deployment is blocked in Phase 0."
+          echo "Use the provider gates in SELLER_INTELLIGENCE_MASTER_SPEC.md before enabling deployment."
+          exit 1

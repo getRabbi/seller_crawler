@@ -1,0 +1,22 @@
+name: CI Python
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: uv sync --dev
+      - run: uv run ruff check crawler
+      - run: uv run mypy crawler/sellerintel crawler/tests
+      - run: uv run pytest crawler/tests
+      - run: uv run bandit -r crawler/sellerintel
+      - run: uv run pip-audit

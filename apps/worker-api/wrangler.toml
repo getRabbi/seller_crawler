@@ -1,0 +1,17 @@
+name = "seller-intelligence-api-local"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+workers_dev = false
+
+[vars]
+APP_ENV = "local"
+RUNNER_MODE = "development_locked"
+LIVE_CRAWL_ENABLED = "false"
+PAID_SERVICES_ALLOWED = "false"
+MAX_EXTERNAL_MONTHLY_SPEND_AUD = "0"
+SCRAPY_CLOUD_DEPLOY_ENABLED = "false"
+SCRAPY_CLOUD_MAX_UNITS = "1"
+ZYTE_STUDENT_ENTITLEMENT_CONFIRMED = "false"
+ZYTE_API_ENABLED = "false"
+GITHUB_ACTIONS_CRAWLER_ENABLED = "false"
+CREDIT_RUNNER_ENABLED = "false"

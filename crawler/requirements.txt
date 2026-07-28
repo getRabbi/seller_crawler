@@ -1,0 +1,2 @@
+# Phase 0 has no runtime crawler dependencies.
+# Scrapy and provider-specific packages are added in later approved phases.

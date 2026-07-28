@@ -1,0 +1,2 @@
+PROVIDER_NAME = "local"
+DEFAULT_ENABLED = False
