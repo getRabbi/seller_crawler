@@ -15,5 +15,6 @@ declaring a task complete.
 
 ## Provider Safety
 
-Provider activation is out of scope for Phase 0. Do not deploy, crawl, use Zyte
-API, enable Amazon, or add an automatic paid fallback.
+Provider activation is out of scope while Phase 7 remains partially complete.
+Do not deploy, crawl, use Zyte API, enable Amazon, add an extra Scrapy Cloud
+unit, or add an automatic paid fallback.

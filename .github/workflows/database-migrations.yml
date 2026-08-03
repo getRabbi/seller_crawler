@@ -8,6 +8,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          echo "Database migrations are not implemented in Phase 0."
-          echo "Phase 1 owns local D1 schema and migrations."
+          echo "Hosted database migrations are blocked during local phase reconciliation."
+          echo "Phase 1 local D1-compatible schema and migrations are validated locally only."
           exit 1

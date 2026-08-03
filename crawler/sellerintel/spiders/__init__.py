@@ -1,1 +1,1 @@
-"""Spider placeholders. Live crawling is not implemented in Phase 0."""
+"""Spider placeholders. Live crawling is not implemented in the current local phase."""

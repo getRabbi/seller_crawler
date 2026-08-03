@@ -7,4 +7,4 @@ jobs:
   disabled:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "Health checks are local only in Phase 0; no deployed endpoint is configured."
+      - run: echo "Health checks are local only; no deployed endpoint is configured."

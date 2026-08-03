@@ -1,4 +1,5 @@
-import { isIngestionRoute, rejectPhaseZeroIngestion } from "./auth";
+import { isIngestionRoute } from "./auth";
+import { ingestBatchResponse } from "./ingestion/route";
 import { healthResponse } from "./routes/health";
 import type { RuntimeEnv } from "./validation/startup";
 
@@ -13,7 +14,7 @@ function notFound(): Response {
 }
 
 export default {
-  fetch(request: Request, env: RuntimeEnv = {}): Response {
+  async fetch(request: Request, env: RuntimeEnv = {}): Promise<Response> {
     const url = new URL(request.url);
 
     if (request.method === "GET" && url.pathname === "/v1/health") {
@@ -21,7 +22,7 @@ export default {
     }
 
     if (request.method === "POST" && isIngestionRoute(url.pathname)) {
-      return rejectPhaseZeroIngestion();
+      return ingestBatchResponse(request, env);
     }
 
     return notFound();

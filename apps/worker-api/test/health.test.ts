@@ -5,7 +5,7 @@ import { buildHealthPayload } from "../src/observability/health";
 import { readRuntimeState, startupGateViolations } from "../src/validation/startup";
 
 describe("Worker health", () => {
-  it("returns 200 in the default Phase 0 locked configuration", async () => {
+  it("returns 200 in the default locked configuration", async () => {
     const response = await worker.fetch(new Request("http://local.test/v1/health"));
     const payload = await response.json();
 

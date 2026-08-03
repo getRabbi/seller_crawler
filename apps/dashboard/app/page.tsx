@@ -1,49 +1,86 @@
-import { runtimePanels } from "../lib/runtime";
+import Link from "next/link";
 
-export default function DashboardPage() {
+import { DashboardShell } from "../components/dashboard-shell";
+import { MetricGrid, ScoreBar, StateBlock, StatusPill, TableShell } from "../components/status";
+import { overviewMetrics, reviewQueue, sellers, workerApiPaths } from "../lib/dashboard-data";
+
+export default function OverviewPage() {
   return (
-    <main className="shell">
-      <section className="topbar" aria-label="System status">
-        <div>
-          <p className="eyebrow">Seller Intelligence</p>
-          <h1>Operations Dashboard</h1>
-        </div>
-        <span className="lock-badge">PAID SERVICES LOCKED</span>
+    <DashboardShell active="overview" eyebrow="Overview" title="Operations Overview">
+      <MetricGrid metrics={overviewMetrics} />
+
+      <section className="split-grid">
+        <TableShell title="Recent Sellers">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Seller</th>
+                <th scope="col">Domain</th>
+                <th scope="col">Identity</th>
+                <th scope="col">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sellers.map((seller) => (
+                <tr key={seller.id}>
+                  <td>
+                    <Link href={`/sellers/${seller.id}`}>{seller.canonicalName}</Link>
+                    <small>
+                      {seller.city}, {seller.countryCode}
+                    </small>
+                  </td>
+                  <td>{seller.domain}</td>
+                  <td>
+                    <ScoreBar value={seller.identityConfidence} />
+                  </td>
+                  <td>
+                    <StatusPill value={seller.status} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableShell>
+
+        <TableShell title="Review Queue">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Type</th>
+                <th scope="col">Score</th>
+                <th scope="col">Priority</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reviewQueue.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.reviewType}</td>
+                  <td>
+                    <ScoreBar value={item.score} />
+                  </td>
+                  <td>{item.priority}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableShell>
       </section>
 
-      <section className="status-grid" aria-label="Runtime locks">
-        {runtimePanels.map((panel) => (
-          <article className="status-panel" key={panel.label}>
-            <span className="panel-label">{panel.label}</span>
-            <strong>{panel.value}</strong>
-            <p>{panel.detail}</p>
-          </article>
-        ))}
+      <section className="state-grid">
+        <StateBlock
+          title="Worker API"
+          detail={`Dashboard data boundary is ${workerApiPaths.overview}.`}
+        />
+        <StateBlock
+          title="Loading State"
+          detail="The interface reserves stable table and metric space while data is pending."
+        />
+        <StateBlock
+          title="Error State"
+          detail="Worker failures render a non-secret status message and keep cached masked values hidden."
+          tone="warn"
+        />
       </section>
-
-      <section className="work-surface" aria-label="Phase zero readiness">
-        <div>
-          <h2>Phase 0 Scope</h2>
-          <p>
-            Repository bootstrap, local health checks, and locked provider gates are present.
-            Crawling, production deployment, Zyte API, and provider activation remain disabled.
-          </p>
-        </div>
-        <dl className="audit-list">
-          <div>
-            <dt>Runner mode</dt>
-            <dd>development_locked</dd>
-          </div>
-          <div>
-            <dt>Activation history</dt>
-            <dd>No provider activation events</dd>
-          </div>
-          <div>
-            <dt>Next permitted phase</dt>
-            <dd>Phase 1 after explicit task approval</dd>
-          </div>
-        </dl>
-      </section>
-    </main>
+    </DashboardShell>
   );
 }

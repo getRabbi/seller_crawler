@@ -13,8 +13,10 @@ node_modules/
 .next/
 out/
 coverage/
+.coverage
 .wrangler/
 .dev.vars
 spool/
+.sellerintel/
 *.log
 *.tsbuildinfo

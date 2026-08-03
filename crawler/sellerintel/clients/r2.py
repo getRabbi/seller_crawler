@@ -6,4 +6,4 @@ class R2DisabledError(RuntimeError):
 
 
 def upload_evidence() -> None:
-    raise R2DisabledError("R2 uploads are not implemented in Phase 0.")
+    raise R2DisabledError("R2 uploads are not implemented in the current local phase.")

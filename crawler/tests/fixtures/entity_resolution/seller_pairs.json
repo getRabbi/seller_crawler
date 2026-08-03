@@ -1,0 +1,50 @@
+{
+  "auto_merge": {
+    "candidate": {
+      "seller_id": "018f2d5e-7b3c-7a1d-8f2e-223456789aaa",
+      "canonical_name": "Acme Industrial Co., Ltd.",
+      "official_domain": "www.acme-industrial.testmail",
+      "country_code": "US",
+      "city": "Austin"
+    },
+    "existing": {
+      "seller_id": "018f2d5e-7b3c-7a1d-8f2e-223456789aab",
+      "canonical_name": "Acme Industrial Limited",
+      "official_domain": "acme-industrial.testmail",
+      "country_code": "United States",
+      "city": "Austin"
+    }
+  },
+  "review_queue": {
+    "candidate": {
+      "seller_id": "018f2d5e-7b3c-7a1d-8f2e-223456789aac",
+      "canonical_name": "Acme Industrial LLC",
+      "country_code": "US",
+      "city": "Austin",
+      "contact_hashes": ["hash-public-sales"]
+    },
+    "existing": {
+      "seller_id": "018f2d5e-7b3c-7a1d-8f2e-223456789aad",
+      "canonical_name": "Acme Industrial Limited",
+      "country_code": "US",
+      "city": "Austin",
+      "contact_hashes": ["hash-public-sales"]
+    }
+  },
+  "no_merge": {
+    "candidate": {
+      "seller_id": "018f2d5e-7b3c-7a1d-8f2e-223456789aae",
+      "canonical_name": "Acme Industrial",
+      "official_domain": "acme-industrial.testmail",
+      "country_code": "US",
+      "city": "Austin"
+    },
+    "existing": {
+      "seller_id": "018f2d5e-7b3c-7a1d-8f2e-223456789aaf",
+      "canonical_name": "Beta Trading",
+      "official_domain": "beta-trading.testmail",
+      "country_code": "CN",
+      "city": "Shenzhen"
+    }
+  }
+}

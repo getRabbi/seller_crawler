@@ -1,0 +1,2000 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://seller-intelligence.local/schemas/ingestion-batch.schema.json",
+  "$defs": {
+    "AuditEventRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "event_type": {
+          "minLength": 1,
+          "title": "Event Type",
+          "type": "string"
+        },
+        "entity_type": {
+          "minLength": 1,
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "entity_id": {
+          "minLength": 1,
+          "title": "Entity Id",
+          "type": "string"
+        },
+        "actor_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Actor Id"
+        },
+        "old_value_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Old Value Hash"
+        },
+        "new_value_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "New Value Hash"
+        },
+        "old_value_masked": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Old Value Masked"
+        },
+        "new_value_masked": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "New Value Masked"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reason"
+        },
+        "metadata_json": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Metadata Json"
+        },
+        "created_at": {
+          "minLength": 1,
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "event_type",
+        "entity_type",
+        "entity_id",
+        "created_at"
+      ],
+      "title": "AuditEventRecord",
+      "type": "object"
+    },
+    "ContactRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "minimum": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "parser_version": {
+          "minLength": 1,
+          "title": "Parser Version",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "seller_id": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+          "title": "Seller Id",
+          "type": "string"
+        },
+        "contact_type": {
+          "minLength": 1,
+          "title": "Contact Type",
+          "type": "string"
+        },
+        "contact_value_ciphertext": {
+          "minLength": 1,
+          "title": "Contact Value Ciphertext",
+          "type": "string"
+        },
+        "normalized_hash": {
+          "minLength": 1,
+          "title": "Normalized Hash",
+          "type": "string"
+        },
+        "display_value_masked": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Value Masked"
+        },
+        "classification": {
+          "minLength": 1,
+          "title": "Classification",
+          "type": "string"
+        },
+        "confidence": {
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "integer"
+        },
+        "source_id": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+          "title": "Source Id",
+          "type": "string"
+        },
+        "first_seen_at": {
+          "minLength": 1,
+          "title": "First Seen At",
+          "type": "string"
+        },
+        "last_seen_at": {
+          "minLength": 1,
+          "title": "Last Seen At",
+          "type": "string"
+        },
+        "last_verified_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Verified At"
+        },
+        "status": {
+          "default": "active",
+          "minLength": 1,
+          "title": "Status",
+          "type": "string"
+        },
+        "outreach_eligible": {
+          "default": false,
+          "title": "Outreach Eligible",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "schema_version",
+        "parser_version",
+        "id",
+        "seller_id",
+        "contact_type",
+        "contact_value_ciphertext",
+        "normalized_hash",
+        "classification",
+        "confidence",
+        "source_id",
+        "first_seen_at",
+        "last_seen_at"
+      ],
+      "title": "ContactRecord",
+      "type": "object"
+    },
+    "CrawlRunRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "job_type": {
+          "minLength": 1,
+          "title": "Job Type",
+          "type": "string"
+        },
+        "zyte_job_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Zyte Job Id"
+        },
+        "started_at": {
+          "minLength": 1,
+          "title": "Started At",
+          "type": "string"
+        },
+        "finished_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Finished At"
+        },
+        "status": {
+          "minLength": 1,
+          "title": "Status",
+          "type": "string"
+        },
+        "requests_total": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Requests Total",
+          "type": "integer"
+        },
+        "responses_success": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Responses Success",
+          "type": "integer"
+        },
+        "candidates_found": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Candidates Found",
+          "type": "integer"
+        },
+        "records_created": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Records Created",
+          "type": "integer"
+        },
+        "records_updated": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Records Updated",
+          "type": "integer"
+        },
+        "contacts_verified": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Contacts Verified",
+          "type": "integer"
+        },
+        "blocked_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Blocked Count",
+          "type": "integer"
+        },
+        "error_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Error Count",
+          "type": "integer"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        }
+      },
+      "required": [
+        "id",
+        "job_type",
+        "started_at",
+        "status"
+      ],
+      "title": "CrawlRunRecord",
+      "type": "object"
+    },
+    "FeatureFlagRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "flag_name": {
+          "minLength": 1,
+          "title": "Flag Name",
+          "type": "string"
+        },
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "source": {
+          "default": "env_default",
+          "minLength": 1,
+          "title": "Source",
+          "type": "string"
+        },
+        "updated_at": {
+          "minLength": 1,
+          "title": "Updated At",
+          "type": "string"
+        },
+        "operator_notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Operator Notes"
+        }
+      },
+      "required": [
+        "flag_name",
+        "updated_at"
+      ],
+      "title": "FeatureFlagRecord",
+      "type": "object"
+    },
+    "FieldHistoryRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "entity_type": {
+          "minLength": 1,
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "entity_id": {
+          "minLength": 1,
+          "title": "Entity Id",
+          "type": "string"
+        },
+        "field_name": {
+          "minLength": 1,
+          "title": "Field Name",
+          "type": "string"
+        },
+        "old_value_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Old Value Hash"
+        },
+        "new_value_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "New Value Hash"
+        },
+        "old_value_masked": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Old Value Masked"
+        },
+        "new_value_masked": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "New Value Masked"
+        },
+        "source_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Id"
+        },
+        "observed_at": {
+          "minLength": 1,
+          "title": "Observed At",
+          "type": "string"
+        },
+        "crawl_run_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Crawl Run Id"
+        },
+        "actor_type": {
+          "default": "crawler",
+          "minLength": 1,
+          "title": "Actor Type",
+          "type": "string"
+        },
+        "actor_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Actor Id"
+        },
+        "change_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Change Reason"
+        },
+        "diff_json": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Diff Json"
+        },
+        "schema_version": {
+          "minimum": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "entity_type",
+        "entity_id",
+        "field_name",
+        "observed_at",
+        "schema_version"
+      ],
+      "title": "FieldHistoryRecord",
+      "type": "object"
+    },
+    "MarketplaceAccountRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "seller_id": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+          "title": "Seller Id",
+          "type": "string"
+        },
+        "marketplace": {
+          "minLength": 1,
+          "title": "Marketplace",
+          "type": "string"
+        },
+        "merchant_token": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Merchant Token"
+        },
+        "display_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Display Name"
+        },
+        "profile_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Profile Url"
+        },
+        "storefront_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Storefront Url"
+        },
+        "rating": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rating"
+        },
+        "feedback_count": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Feedback Count"
+        },
+        "positive_feedback_percent": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Positive Feedback Percent"
+        },
+        "country_hint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Country Hint"
+        },
+        "first_seen_at": {
+          "minLength": 1,
+          "title": "First Seen At",
+          "type": "string"
+        },
+        "last_seen_at": {
+          "minLength": 1,
+          "title": "Last Seen At",
+          "type": "string"
+        },
+        "status": {
+          "default": "active",
+          "minLength": 1,
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "seller_id",
+        "marketplace",
+        "first_seen_at",
+        "last_seen_at"
+      ],
+      "title": "MarketplaceAccountRecord",
+      "type": "object"
+    },
+    "OutreachStateRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "minimum": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "parser_version": {
+          "minLength": 1,
+          "title": "Parser Version",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "seller_id": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+          "title": "Seller Id",
+          "type": "string"
+        },
+        "contact_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Contact Id"
+        },
+        "outreach_status": {
+          "default": "not_started",
+          "minLength": 1,
+          "title": "Outreach Status",
+          "type": "string"
+        },
+        "channel": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Channel"
+        },
+        "last_outreach_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Outreach At"
+        },
+        "next_allowed_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Allowed At"
+        },
+        "operator_notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Operator Notes"
+        },
+        "updated_at": {
+          "minLength": 1,
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "parser_version",
+        "id",
+        "seller_id",
+        "updated_at"
+      ],
+      "title": "OutreachStateRecord",
+      "type": "object"
+    },
+    "ProductLinkRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "minimum": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "parser_version": {
+          "minLength": 1,
+          "title": "Parser Version",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "seller_id": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+          "title": "Seller Id",
+          "type": "string"
+        },
+        "product_name": {
+          "minLength": 1,
+          "title": "Product Name",
+          "type": "string"
+        },
+        "normalized_product_name": {
+          "minLength": 1,
+          "title": "Normalized Product Name",
+          "type": "string"
+        },
+        "brand": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Brand"
+        },
+        "normalized_brand": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Normalized Brand"
+        },
+        "category": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Category"
+        },
+        "product_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Product Url"
+        },
+        "source_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Id"
+        },
+        "first_seen_at": {
+          "minLength": 1,
+          "title": "First Seen At",
+          "type": "string"
+        },
+        "last_seen_at": {
+          "minLength": 1,
+          "title": "Last Seen At",
+          "type": "string"
+        },
+        "status": {
+          "default": "active",
+          "minLength": 1,
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "parser_version",
+        "id",
+        "seller_id",
+        "product_name",
+        "normalized_product_name",
+        "first_seen_at",
+        "last_seen_at"
+      ],
+      "title": "ProductLinkRecord",
+      "type": "object"
+    },
+    "QuotaStateRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "quota_name": {
+          "minLength": 1,
+          "title": "Quota Name",
+          "type": "string"
+        },
+        "window_start": {
+          "minLength": 1,
+          "title": "Window Start",
+          "type": "string"
+        },
+        "used": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Used",
+          "type": "integer"
+        },
+        "soft_limit": {
+          "minimum": 0,
+          "title": "Soft Limit",
+          "type": "integer"
+        },
+        "hard_limit": {
+          "minimum": 0,
+          "title": "Hard Limit",
+          "type": "integer"
+        },
+        "updated_at": {
+          "minLength": 1,
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "quota_name",
+        "window_start",
+        "soft_limit",
+        "hard_limit",
+        "updated_at"
+      ],
+      "title": "QuotaStateRecord",
+      "type": "object"
+    },
+    "RecentDiffMetadataRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "entity_type": {
+          "minLength": 1,
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "entity_id": {
+          "minLength": 1,
+          "title": "Entity Id",
+          "type": "string"
+        },
+        "latest_field_history_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Latest Field History Id"
+        },
+        "diff_count_30d": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Diff Count 30D",
+          "type": "integer"
+        },
+        "last_observed_at": {
+          "minLength": 1,
+          "title": "Last Observed At",
+          "type": "string"
+        },
+        "schema_version": {
+          "minimum": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "updated_at": {
+          "minLength": 1,
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "entity_type",
+        "entity_id",
+        "last_observed_at",
+        "schema_version",
+        "updated_at"
+      ],
+      "title": "RecentDiffMetadataRecord",
+      "type": "object"
+    },
+    "ReviewQueueRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "review_type": {
+          "minLength": 1,
+          "title": "Review Type",
+          "type": "string"
+        },
+        "entity_id": {
+          "minLength": 1,
+          "title": "Entity Id",
+          "type": "string"
+        },
+        "priority": {
+          "default": 2,
+          "minimum": 0,
+          "title": "Priority",
+          "type": "integer"
+        },
+        "payload_json": {
+          "minLength": 1,
+          "title": "Payload Json",
+          "type": "string"
+        },
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "status": {
+          "default": "pending",
+          "minLength": 1,
+          "title": "Status",
+          "type": "string"
+        },
+        "created_at": {
+          "minLength": 1,
+          "title": "Created At",
+          "type": "string"
+        },
+        "reviewed_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reviewed At"
+        },
+        "reviewed_by": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reviewed By"
+        }
+      },
+      "required": [
+        "id",
+        "review_type",
+        "entity_id",
+        "payload_json",
+        "reason",
+        "created_at"
+      ],
+      "title": "ReviewQueueRecord",
+      "type": "object"
+    },
+    "ScoreComponentRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "seller_id": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+          "title": "Seller Id",
+          "type": "string"
+        },
+        "score_type": {
+          "minLength": 1,
+          "title": "Score Type",
+          "type": "string"
+        },
+        "rule_code": {
+          "minLength": 1,
+          "title": "Rule Code",
+          "type": "string"
+        },
+        "points": {
+          "title": "Points",
+          "type": "integer"
+        },
+        "evidence_source_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidence Source Id"
+        },
+        "explanation": {
+          "minLength": 1,
+          "title": "Explanation",
+          "type": "string"
+        },
+        "observed_at": {
+          "minLength": 1,
+          "title": "Observed At",
+          "type": "string"
+        },
+        "parser_version": {
+          "minLength": 1,
+          "title": "Parser Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "seller_id",
+        "score_type",
+        "rule_code",
+        "points",
+        "explanation",
+        "observed_at",
+        "parser_version"
+      ],
+      "title": "ScoreComponentRecord",
+      "type": "object"
+    },
+    "SellerAliasRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "seller_id": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+          "title": "Seller Id",
+          "type": "string"
+        },
+        "alias": {
+          "minLength": 1,
+          "title": "Alias",
+          "type": "string"
+        },
+        "normalized_alias": {
+          "minLength": 1,
+          "title": "Normalized Alias",
+          "type": "string"
+        },
+        "language_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Language Code"
+        },
+        "alias_type": {
+          "minLength": 1,
+          "title": "Alias Type",
+          "type": "string"
+        },
+        "source_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Id"
+        },
+        "first_seen_at": {
+          "minLength": 1,
+          "title": "First Seen At",
+          "type": "string"
+        },
+        "last_seen_at": {
+          "minLength": 1,
+          "title": "Last Seen At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "seller_id",
+        "alias",
+        "normalized_alias",
+        "alias_type",
+        "first_seen_at",
+        "last_seen_at"
+      ],
+      "title": "SellerAliasRecord",
+      "type": "object"
+    },
+    "SellerRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "minimum": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "parser_version": {
+          "minLength": 1,
+          "title": "Parser Version",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "canonical_name": {
+          "minLength": 1,
+          "title": "Canonical Name",
+          "type": "string"
+        },
+        "normalized_name": {
+          "minLength": 1,
+          "title": "Normalized Name",
+          "type": "string"
+        },
+        "legal_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Legal Name"
+        },
+        "legal_name_local": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Legal Name Local"
+        },
+        "country_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Country Code"
+        },
+        "province": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Province"
+        },
+        "city": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "City"
+        },
+        "address_private": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Address Private"
+        },
+        "address_public_masked": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Address Public Masked"
+        },
+        "official_domain": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Official Domain"
+        },
+        "china_confidence": {
+          "default": 0,
+          "minimum": 0,
+          "title": "China Confidence",
+          "type": "integer"
+        },
+        "identity_confidence": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Identity Confidence",
+          "type": "integer"
+        },
+        "manufacturer_score": {
+          "default": 0,
+          "title": "Manufacturer Score",
+          "type": "integer"
+        },
+        "trader_score": {
+          "default": 0,
+          "title": "Trader Score",
+          "type": "integer"
+        },
+        "quality_score": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Quality Score",
+          "type": "integer"
+        },
+        "status": {
+          "default": "active",
+          "minLength": 1,
+          "title": "Status",
+          "type": "string"
+        },
+        "first_seen_at": {
+          "minLength": 1,
+          "title": "First Seen At",
+          "type": "string"
+        },
+        "last_seen_at": {
+          "minLength": 1,
+          "title": "Last Seen At",
+          "type": "string"
+        },
+        "last_material_change_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Material Change At"
+        },
+        "created_at": {
+          "minLength": 1,
+          "title": "Created At",
+          "type": "string"
+        },
+        "updated_at": {
+          "minLength": 1,
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "parser_version",
+        "id",
+        "canonical_name",
+        "normalized_name",
+        "first_seen_at",
+        "last_seen_at",
+        "created_at",
+        "updated_at"
+      ],
+      "title": "SellerRecord",
+      "type": "object"
+    },
+    "SourceRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "minimum": 1,
+          "title": "Schema Version",
+          "type": "integer"
+        },
+        "parser_version": {
+          "minLength": 1,
+          "title": "Parser Version",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "seller_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seller Id"
+        },
+        "source_url": {
+          "minLength": 1,
+          "title": "Source Url",
+          "type": "string"
+        },
+        "canonical_url": {
+          "minLength": 1,
+          "title": "Canonical Url",
+          "type": "string"
+        },
+        "source_domain": {
+          "minLength": 1,
+          "title": "Source Domain",
+          "type": "string"
+        },
+        "source_type": {
+          "minLength": 1,
+          "title": "Source Type",
+          "type": "string"
+        },
+        "robots_status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Robots Status"
+        },
+        "terms_risk": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Terms Risk"
+        },
+        "http_status": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Http Status"
+        },
+        "content_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Content Hash"
+        },
+        "r2_object_key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "R2 Object Key"
+        },
+        "first_seen_at": {
+          "minLength": 1,
+          "title": "First Seen At",
+          "type": "string"
+        },
+        "last_fetched_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Fetched At"
+        },
+        "last_success_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Success At"
+        },
+        "next_allowed_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Next Allowed At"
+        },
+        "status": {
+          "default": "active",
+          "minLength": 1,
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema_version",
+        "parser_version",
+        "id",
+        "source_url",
+        "canonical_url",
+        "source_domain",
+        "source_type",
+        "first_seen_at"
+      ],
+      "title": "SourceRecord",
+      "type": "object"
+    },
+    "SourceRegistryRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "adapter_name": {
+          "minLength": 1,
+          "title": "Adapter Name",
+          "type": "string"
+        },
+        "source_family": {
+          "minLength": 1,
+          "title": "Source Family",
+          "type": "string"
+        },
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "risk_level": {
+          "minLength": 1,
+          "title": "Risk Level",
+          "type": "string"
+        },
+        "robots_policy": {
+          "minLength": 1,
+          "title": "Robots Policy",
+          "type": "string"
+        },
+        "terms_review_status": {
+          "minLength": 1,
+          "title": "Terms Review Status",
+          "type": "string"
+        },
+        "daily_request_budget": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Daily Request Budget",
+          "type": "integer"
+        },
+        "concurrency_per_domain": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Concurrency Per Domain",
+          "type": "integer"
+        },
+        "minimum_delay_seconds": {
+          "default": 2.5,
+          "title": "Minimum Delay Seconds",
+          "type": "number"
+        },
+        "blocked_until": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Blocked Until"
+        },
+        "parser_version": {
+          "minLength": 1,
+          "title": "Parser Version",
+          "type": "string"
+        },
+        "last_success_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Success At"
+        },
+        "last_failure_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Failure At"
+        },
+        "operator_notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Operator Notes"
+        }
+      },
+      "required": [
+        "adapter_name",
+        "source_family",
+        "risk_level",
+        "robots_policy",
+        "terms_review_status",
+        "parser_version"
+      ],
+      "title": "SourceRegistryRecord",
+      "type": "object"
+    },
+    "SuppressionRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+          "title": "Id",
+          "type": "string"
+        },
+        "seller_id": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seller Id"
+        },
+        "contact_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Contact Hash"
+        },
+        "domain": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Domain"
+        },
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        },
+        "created_at": {
+          "minLength": 1,
+          "title": "Created At",
+          "type": "string"
+        },
+        "expires_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expires At"
+        }
+      },
+      "required": [
+        "id",
+        "reason",
+        "created_at"
+      ],
+      "title": "SuppressionRecord",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "minimum": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "parser_version": {
+      "minLength": 1,
+      "title": "Parser Version",
+      "type": "string"
+    },
+    "crawl_run_id": {
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-7[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+      "title": "Crawl Run Id",
+      "type": "string"
+    },
+    "batch_number": {
+      "minimum": 0,
+      "title": "Batch Number",
+      "type": "integer"
+    },
+    "generated_at": {
+      "minLength": 1,
+      "title": "Generated At",
+      "type": "string"
+    },
+    "sellers": {
+      "items": {
+        "$ref": "#/$defs/SellerRecord"
+      },
+      "title": "Sellers",
+      "type": "array"
+    },
+    "marketplace_accounts": {
+      "items": {
+        "$ref": "#/$defs/MarketplaceAccountRecord"
+      },
+      "title": "Marketplace Accounts",
+      "type": "array"
+    },
+    "seller_aliases": {
+      "items": {
+        "$ref": "#/$defs/SellerAliasRecord"
+      },
+      "title": "Seller Aliases",
+      "type": "array"
+    },
+    "score_components": {
+      "items": {
+        "$ref": "#/$defs/ScoreComponentRecord"
+      },
+      "title": "Score Components",
+      "type": "array"
+    },
+    "product_links": {
+      "items": {
+        "$ref": "#/$defs/ProductLinkRecord"
+      },
+      "title": "Product Links",
+      "type": "array"
+    },
+    "contacts": {
+      "items": {
+        "$ref": "#/$defs/ContactRecord"
+      },
+      "title": "Contacts",
+      "type": "array"
+    },
+    "suppressions": {
+      "items": {
+        "$ref": "#/$defs/SuppressionRecord"
+      },
+      "title": "Suppressions",
+      "type": "array"
+    },
+    "outreach_states": {
+      "items": {
+        "$ref": "#/$defs/OutreachStateRecord"
+      },
+      "title": "Outreach States",
+      "type": "array"
+    },
+    "audit_events": {
+      "items": {
+        "$ref": "#/$defs/AuditEventRecord"
+      },
+      "title": "Audit Events",
+      "type": "array"
+    },
+    "sources": {
+      "items": {
+        "$ref": "#/$defs/SourceRecord"
+      },
+      "title": "Sources",
+      "type": "array"
+    },
+    "crawl_runs": {
+      "items": {
+        "$ref": "#/$defs/CrawlRunRecord"
+      },
+      "title": "Crawl Runs",
+      "type": "array"
+    },
+    "review_queue_items": {
+      "items": {
+        "$ref": "#/$defs/ReviewQueueRecord"
+      },
+      "title": "Review Queue Items",
+      "type": "array"
+    },
+    "source_registry": {
+      "items": {
+        "$ref": "#/$defs/SourceRegistryRecord"
+      },
+      "title": "Source Registry",
+      "type": "array"
+    },
+    "quota_states": {
+      "items": {
+        "$ref": "#/$defs/QuotaStateRecord"
+      },
+      "title": "Quota States",
+      "type": "array"
+    },
+    "feature_flags": {
+      "items": {
+        "$ref": "#/$defs/FeatureFlagRecord"
+      },
+      "title": "Feature Flags",
+      "type": "array"
+    },
+    "field_history": {
+      "items": {
+        "$ref": "#/$defs/FieldHistoryRecord"
+      },
+      "title": "Field History",
+      "type": "array"
+    },
+    "recent_diff_metadata": {
+      "items": {
+        "$ref": "#/$defs/RecentDiffMetadataRecord"
+      },
+      "title": "Recent Diff Metadata",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema_version",
+    "parser_version",
+    "crawl_run_id",
+    "batch_number",
+    "generated_at"
+  ],
+  "title": "Seller Intelligence Ingestion Batch",
+  "type": "object"
+}

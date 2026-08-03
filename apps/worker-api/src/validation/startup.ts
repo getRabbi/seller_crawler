@@ -1,3 +1,5 @@
+import type { D1Database } from "../repositories/d1";
+
 export type RunnerMode =
   | "development_locked"
   | "zyte_entitlement_pending"
@@ -10,6 +12,18 @@ export type RunnerMode =
   | "paused_by_quota";
 
 export interface RuntimeEnv {
+  CORE_DB?: D1Database;
+  CONTACTS_DB?: D1Database;
+  OPS_DB?: D1Database;
+  HISTORY_DB?: D1Database;
+  INGESTION_HMAC_SECRET?: string;
+  MAX_BATCH_SELLERS?: string;
+  MAX_BATCH_CONTACTS?: string;
+  MAX_BATCH_D1_STATEMENTS?: string;
+  MAX_COMPRESSED_BODY_BYTES?: string;
+  MAX_UNCOMPRESSED_BODY_BYTES?: string;
+  INGESTION_ALLOWED_SOURCE_DOMAINS?: string;
+  APP_ENV?: string;
   RUNNER_MODE?: string;
   LIVE_CRAWL_ENABLED?: string;
   PAID_SERVICES_ALLOWED?: string;

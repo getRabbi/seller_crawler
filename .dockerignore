@@ -1,0 +1,14 @@
+.git
+.coverage
+.env
+.env.*
+!.env.example
+.sellerintel
+node_modules
+apps/dashboard/.next
+apps/dashboard/out
+__pycache__
+*.pyc
+*.pyo
+*.tmp
+*.log

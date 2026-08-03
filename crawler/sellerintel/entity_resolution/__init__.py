@@ -1,1 +1,47 @@
-"""Entity resolution package placeholder."""
+from sellerintel.entity_resolution.models import (
+    AUTO_MERGE_THRESHOLD,
+    PARSER_VERSION,
+    REVIEW_QUEUE_THRESHOLD,
+    SCHEMA_VERSION,
+    MarketplaceIdentity,
+    MergeAuditTrail,
+    ResolutionAction,
+    ResolutionDecision,
+    ResolutionScoreComponent,
+    RollbackStep,
+    SellerIdentity,
+)
+from sellerintel.entity_resolution.resolver import (
+    build_merge_audit_trail,
+    classify_resolution_score,
+    decision_id,
+    decision_payload,
+    merge_audit_payload,
+    resolve_best_match,
+    resolve_pair,
+    review_queue_payload,
+    score_breakdown,
+)
+
+__all__ = [
+    "AUTO_MERGE_THRESHOLD",
+    "PARSER_VERSION",
+    "REVIEW_QUEUE_THRESHOLD",
+    "SCHEMA_VERSION",
+    "MarketplaceIdentity",
+    "MergeAuditTrail",
+    "ResolutionAction",
+    "ResolutionDecision",
+    "ResolutionScoreComponent",
+    "RollbackStep",
+    "SellerIdentity",
+    "build_merge_audit_trail",
+    "classify_resolution_score",
+    "decision_id",
+    "decision_payload",
+    "merge_audit_payload",
+    "resolve_best_match",
+    "resolve_pair",
+    "review_queue_payload",
+    "score_breakdown",
+]

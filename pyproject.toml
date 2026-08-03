@@ -4,7 +4,10 @@ version = "0.0.0"
 description = "Zero-cost hybrid runner seller intelligence platform bootstrap."
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "phonenumbers>=8.13,<9",
+    "pydantic>=2.8,<3",
+]
 
 [dependency-groups]
 dev = [
@@ -12,6 +15,7 @@ dev = [
     "mypy>=1.11.0",
     "pip-audit>=2.7.3",
     "pytest>=8.0.0",
+    "pytest-cov>=5.0.0,<7",
     "ruff>=0.6.0",
 ]
 
@@ -34,3 +38,10 @@ python_version = "3.12"
 strict = true
 mypy_path = "crawler"
 files = ["crawler/sellerintel", "crawler/tests"]
+
+[tool.coverage.run]
+source = ["crawler/sellerintel/extractors"]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
