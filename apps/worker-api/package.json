@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "dependencies": {
+    "@seller-intelligence/shared-types": "0.0.0"
+  },
   "scripts": {
     "lint": "eslint src test",
     "typecheck": "tsc -p tsconfig.json --noEmit",

@@ -24,6 +24,14 @@ describe("Worker health", () => {
         githubActionsCrawlerEnabled: false,
         creditRunnerEnabled: false
       },
+      bindings: {
+        coreDb: false,
+        contactsDb: false,
+        operationsDb: false,
+        historyDb: false,
+        ingestionHmac: false,
+        access: false
+      },
       violations: []
     });
   });
@@ -45,6 +53,21 @@ describe("Worker health", () => {
     expect(payload.status).toBe("blocked");
     expect(payload.violations).toContain(
       "Actions burst requires confirmed included-minute availability."
+    );
+  });
+
+  it("blocks staging health until D1, ingestion, and Access bindings are present", () => {
+    const payload = buildHealthPayload({ APP_ENV: "staging" });
+
+    expect(payload.status).toBe("blocked");
+    expect(payload.violations[0]).toContain("Required deployment bindings are missing");
+  });
+
+  it("keeps Amazon disabled in Solo v1", () => {
+    const state = readRuntimeState({ ENABLE_AMAZON: "true" });
+
+    expect(startupGateViolations(state)).toContain(
+      "Amazon crawling is outside the Solo v1 scope and must remain disabled."
     );
   });
 });

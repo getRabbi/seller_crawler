@@ -42,6 +42,10 @@ export interface RuntimeEnv {
   CREDIT_RUNNER_ENABLED?: string;
   CREDIT_RUNNER_MONTHLY_CAP_AUD?: string;
   CREDIT_RUNNER_AUTO_SHUTDOWN?: string;
+  ENABLE_AMAZON?: string;
+  ACCESS_AUTH_REQUIRED?: string;
+  ACCESS_ALLOWED_EMAIL?: string;
+  DASHBOARD_ORIGIN?: string;
 }
 
 export interface RuntimeState {
@@ -63,6 +67,7 @@ export interface RuntimeState {
   creditRunnerEnabled: boolean;
   creditRunnerMonthlyCapAud: number;
   creditRunnerAutoShutdown: boolean;
+  amazonEnabled: boolean;
 }
 
 const runnerModes: ReadonlySet<string> = new Set([
@@ -121,7 +126,8 @@ export function readRuntimeState(env: RuntimeEnv = {}): RuntimeState {
     ),
     creditRunnerEnabled: readBool(env.CREDIT_RUNNER_ENABLED, false),
     creditRunnerMonthlyCapAud: readNumber(env.CREDIT_RUNNER_MONTHLY_CAP_AUD, 0),
-    creditRunnerAutoShutdown: readBool(env.CREDIT_RUNNER_AUTO_SHUTDOWN, true)
+    creditRunnerAutoShutdown: readBool(env.CREDIT_RUNNER_AUTO_SHUTDOWN, true),
+    amazonEnabled: readBool(env.ENABLE_AMAZON, false)
   };
 }
 
@@ -155,6 +161,10 @@ export function startupGateViolations(state: RuntimeState): string[] {
 
   if (state.runnerMode === "development_locked" && state.liveCrawlEnabled) {
     violations.push("Live crawling cannot be enabled while RUNNER_MODE is development_locked.");
+  }
+
+  if (state.amazonEnabled) {
+    violations.push("Amazon crawling is outside the Solo v1 scope and must remain disabled.");
   }
 
   if (state.runnerMode === "zyte_student_active") {
