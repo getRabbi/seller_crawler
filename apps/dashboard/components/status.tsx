@@ -10,6 +10,7 @@ interface StateBlockProps {
   title: string;
   detail: string;
   tone?: "neutral" | "warn" | "danger";
+  action?: ReactNode;
 }
 
 interface TableShellProps {
@@ -32,11 +33,12 @@ export function MetricGrid({ metrics }: MetricGridProps) {
   );
 }
 
-export function StateBlock({ title, detail, tone = "neutral" }: StateBlockProps) {
+export function StateBlock({ title, detail, tone = "neutral", action }: StateBlockProps) {
   return (
     <section className={`state-block tone-${tone}`} aria-label={title}>
       <strong>{title}</strong>
       <p>{detail}</p>
+      {action ? <div className="state-action">{action}</div> : null}
     </section>
   );
 }

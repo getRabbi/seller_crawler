@@ -1,0 +1,60 @@
+import type { ApiErrorPayload } from "@seller-intelligence/shared-types/dashboard";
+
+export class WorkerApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code: string
+  ) {
+    super(message);
+    this.name = "WorkerApiError";
+  }
+
+  get locked(): boolean {
+    return this.status === 401 || this.status === 403;
+  }
+}
+
+export function workerApiBaseUrl(): string {
+  return (process.env.NEXT_PUBLIC_WORKER_API_BASE_URL ?? "http://127.0.0.1:8787").replace(
+    /\/$/,
+    ""
+  );
+}
+
+export function workerApiUrl(path: string): string {
+  if (!path.startsWith("/")) {
+    throw new Error("Worker API paths must start with '/'.");
+  }
+  return `${workerApiBaseUrl()}${path}`;
+}
+
+export async function fetchWorkerApi<T>(path: string, signal?: AbortSignal): Promise<T> {
+  const response = await fetch(workerApiUrl(path), {
+    method: "GET",
+    credentials: "include",
+    headers: { accept: "application/json" },
+    cache: "no-store",
+    signal
+  });
+  if (!response.ok) {
+    const payload = await readError(response);
+    throw new WorkerApiError(payload.message, response.status, payload.code);
+  }
+  return (await response.json()) as T;
+}
+
+async function readError(response: Response): Promise<{ code: string; message: string }> {
+  try {
+    const payload = (await response.json()) as ApiErrorPayload;
+    if (payload.error?.code && payload.error.message) {
+      return payload.error;
+    }
+  } catch {
+    // The browser receives a stable generic error when a gateway returns non-JSON content.
+  }
+  return {
+    code: "worker_request_failed",
+    message: `Worker request failed with status ${response.status}.`
+  };
+}

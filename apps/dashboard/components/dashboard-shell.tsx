@@ -33,7 +33,6 @@ export function DashboardShell({ active, title, eyebrow, children }: DashboardSh
               key={item.route}
             >
               <span>{item.label}</span>
-              {item.count === undefined ? null : <b>{item.count}</b>}
             </Link>
           ))}
         </nav>

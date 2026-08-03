@@ -70,6 +70,25 @@ button:hover {
   color: var(--accent-dark);
 }
 
+.button-link {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: #ffffff;
+  padding: 6px 12px;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.button-link:hover {
+  background: var(--accent-dark);
+  color: #ffffff;
+  text-decoration: none;
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: 248px minmax(0, 1fr);
@@ -484,6 +503,16 @@ tbody tr:last-child td {
 .state-block strong {
   display: block;
   font-size: 15px;
+}
+
+.state-action {
+  margin-top: 12px;
+}
+
+.hash-cell {
+  max-width: 240px;
+  overflow-wrap: anywhere;
+  font-family: Consolas, "Courier New", monospace;
 }
 
 .definition-list {
