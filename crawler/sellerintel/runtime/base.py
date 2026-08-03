@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Protocol
 
 
@@ -27,6 +27,8 @@ class DeploymentResult:
 class CrawlJob:
     job_id: str
     page_budget: int
+    spider_name: str = "official_website"
+    arguments: tuple[tuple[str, str], ...] = field(default_factory=tuple)
 
 
 @dataclass(frozen=True, slots=True)

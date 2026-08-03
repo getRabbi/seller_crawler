@@ -1,13 +1,58 @@
-name: Deploy Scrapy Cloud Disabled
+name: Deploy Scrapy Cloud (Manual One-Unit Gate)
 
 on:
   workflow_dispatch:
+    inputs:
+      project_id:
+        description: Numeric Scrapy Cloud project ID
+        required: true
+        type: string
+      confirmation:
+        description: Type DEPLOY_VERIFIED_STUDENT_PROJECT
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scrapy-cloud-deployment
+  cancel-in-progress: false
 
 jobs:
-  blocked:
+  deploy:
+    if: >-
+      inputs.confirmation == 'DEPLOY_VERIFIED_STUDENT_PROJECT' &&
+      vars.ZYTE_STUDENT_ENTITLEMENT_CONFIRMED == 'true' &&
+      vars.SCRAPY_CLOUD_DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
+    environment: scrapy-cloud
+    env:
+      SHUB_APIKEY: ${{ secrets.SCRAPY_CLOUD_API_KEY }}
+      SCRAPY_CLOUD_MAX_UNITS: "1"
+      ZYTE_API_ENABLED: "false"
+      PAID_SERVICES_ALLOWED: "false"
+      MAX_EXTERNAL_MONTHLY_SPEND_AUD: "0"
+      ALLOW_EXTRA_SCRAPY_UNITS: "false"
+      ENABLE_AMAZON: "false"
     steps:
-      - run: |
-          echo "Scrapy Cloud deployment is blocked until Phase 10B."
-          echo "Zyte entitlement confirmation and zero-charge verification are required."
-          exit 1
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate zero-charge deployment gates
+        shell: bash
+        run: |
+          test "$SCRAPY_CLOUD_MAX_UNITS" = "1"
+          test "$ZYTE_API_ENABLED" = "false"
+          test "$PAID_SERVICES_ALLOWED" = "false"
+          test "$MAX_EXTERNAL_MONTHLY_SPEND_AUD" = "0"
+          test "$ALLOW_EXTRA_SCRAPY_UNITS" = "false"
+          test "$ENABLE_AMAZON" = "false"
+          test -n "$SHUB_APIKEY"
+          [[ "${{ inputs.project_id }}" =~ ^[0-9]+$ ]]
+      - name: Install pinned shub client
+        run: python -m pip install shub==2.18.1
+      - name: Deploy crawler code only
+        working-directory: crawler
+        run: shub deploy "${{ inputs.project_id }}"
