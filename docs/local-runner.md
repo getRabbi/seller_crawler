@@ -4,6 +4,12 @@ Phase 10A is partially complete and prepares the provider-neutral local runner
 without enabling live crawling, scheduling, provider deployment, or paid
 services. The reconciled active phase remains Phase 7.
 
+In Solo Mode v1, the local runner is the only launch fallback. It must use the
+same crawler package, contracts, local spool, and signed ingestion path as the
+verified one-unit Zyte runner. GitHub Actions crawler fallback, credit-backed
+fallback, automatic provider orchestration, browser profiles, cookies, and Zyte
+API remain out of scope.
+
 ## Default Smoke Command
 
 Run from the repository root with `PYTHONPATH=crawler` set in the shell:

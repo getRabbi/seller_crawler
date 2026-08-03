@@ -4,6 +4,19 @@ The frozen architecture is provider-neutral: runners emit signed idempotent
 batches to a Cloudflare Worker API, while D1 owns canonical state and R2 owns
 evidence.
 
+Solo Mode v1 is a single-operator launch profile, not a replacement for the
+tested foundation. It keeps the provider-neutral crawler, Worker ingestion, four
+D1 partitions, local fallback runner, and verified one-unit Zyte path, but it
+defers the broader hybrid runner matrix until after launch. GitHub Actions
+crawler fallback, credit-backed fallback, automatic provider orchestration,
+Zyte API, and extra Scrapy Cloud units are out of scope for Solo v1.
+
+For Solo v1, R2 is optional. D1 must store compact evidence provenance for each
+accepted source: source URL, canonical URL, masked evidence snippet or
+extraction context, content hash, timestamps, parser version, and schema
+version. R2 can be added later for full HTML, screenshots, batch archives, and
+longer evidence retention.
+
 Current reconciled phase state: Phases 0-6 are complete and verified; Phase 7 is
 the active partially complete phase; Phase 8 is complete and verified ahead of
 order; Phase 9 and Phase 10A are partially complete; Phase 10B and later
@@ -93,3 +106,13 @@ future provider runners, but provider-specific deployments remain blocked until
 their separate activation phases. Spool replay verifies stored checksums,
 re-signs the original compressed body with a fresh nonce, preserves
 idempotency, and deletes records only after Worker acceptance.
+
+The shortest Solo v1 architecture path is:
+
+1. Finish Phase 7 for approved official websites only.
+2. Persist compact evidence provenance in D1.
+3. Add Worker read/search/export APIs for the simple private dashboard.
+4. Protect dashboard access with single-user Cloudflare Access.
+5. Verify basic four-D1 backup and restore.
+6. Verify local fallback.
+7. Activate Zyte only through the one-unit Phase 10B smoke gate.

@@ -3,6 +3,12 @@
 The current local phases have no live source adapters. Amazon, Alibaba, 1688,
 search discovery, Zyte API, and live crawling remain disabled.
 
+Solo Mode v1 narrows the first launch source scope to official company websites
+only. The allowed contact types are public business email, phone, WhatsApp, and
+WeChat. Marketplace crawling, Amazon, Alibaba, 1688, supplier directories,
+registry crawling, broad search discovery, paid search APIs, paid proxies, and
+Zyte API are deferred.
+
 The reconciled active phase is Phase 7. It is partially complete and remains
 local-only; Phases 8, 9, and 10A are implemented ahead of order but do not
 activate any source.
@@ -25,6 +31,12 @@ to the canonical same domain, a fixed page budget, static official business
 paths, and sitemap-discovered business pages. Evidence envelopes are prepared
 with deterministic object keys, but R2 uploads and approved live crawling remain
 unimplemented.
+
+For Solo v1, accepted official-site evidence should be compact in D1 first:
+source URL, canonical URL, masked evidence snippet or extraction context,
+content hash, first seen, last fetched, last success, parser version, and schema
+version. Full raw HTML, screenshot capture, and long-retention archives can move
+to R2 after launch.
 
 Phase 8 entity resolution does not add a live source. It compares already
 collected seller identities, aliases, domains, marketplace identifiers, public

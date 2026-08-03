@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased - Solo Mode v1 Planning
+
+- Added `SOLO_MODE_IMPLEMENTATION_PLAN.md` as a documentation-only
+  single-operator launch overlay.
+- Documented the minimum Solo v1 scope: one verified Zyte Student Scrapy Cloud
+  unit, one local fallback runner, official-website crawling, contact
+  extraction, normalization, basic entity resolution, Worker ingestion, four D1
+  databases, private dashboard, CSV export, basic backup, and single-user
+  Cloudflare Access.
+- Documented Solo v1 deferrals, including Zyte API, extra Scrapy Cloud units,
+  GitHub Actions crawler fallback, credit-backed fallback, automatic provider
+  orchestration, AI summaries, outreach automation, team roles, advanced
+  monitoring, complex approvals, and full raw-evidence R2 storage.
+
 ## Unreleased - Stabilization And Phase Reconciliation
 
 - Accepted the audit-determined phase state: Phases 0-6 are complete and

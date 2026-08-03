@@ -5,6 +5,18 @@ and it remains partially complete. Phases 8, 9, and 10A have local implementatio
 ahead of order, but provider activation is not ready. Do not deploy, schedule,
 crawl, activate providers, or connect production ingestion.
 
+Solo Mode v1 keeps operations to one operator and one active runner at a time.
+The launch target is one verified Zyte Student Scrapy Cloud unit plus one local
+fallback runner. GitHub Actions crawler fallback, credit-backed fallback,
+automatic provider orchestration, Zyte API, extra Scrapy Cloud units, Amazon,
+AI summaries, outreach automation, team roles, advanced monitoring, and complex
+approval workflows are post-launch deferrals.
+
+R2 is optional for Solo v1. During launch, D1 evidence provenance is sufficient
+when it includes source URL, canonical URL, masked evidence snippet or extraction
+context, content hash, timestamps, parser version, and schema version. Full HTML
+or screenshot archives can be added to R2 later.
+
 Database migrations are D1-compatible SQL files tested through local SQLite.
 Restore partitioned databases in this order: core, contacts, operations, then
 history. After restoring core canonical tables, run
@@ -88,3 +100,15 @@ in `docs/local-runner.md`. The local smoke command validates startup gates,
 global kill switch state, one-job lock paths, spool paths, and forbidden browser
 profile variables. Scheduling instructions for Windows Task Scheduler and Linux
 cron are documented for later approval, but no schedule is enabled in this phase.
+
+Solo v1 launch operations must add these before staging:
+
+1. Worker-backed seller search, seller detail, contact, source health, review,
+   suppression, and CSV export routes.
+2. Single-user Cloudflare Access before any dashboard exposure.
+3. Basic logical backup and local restore validation for core, contacts,
+   operations, and history.
+4. Local fallback verification with live crawling still disabled until the
+   approved official-site crawl gate.
+5. Zyte Phase 10B no-network smoke verification with exactly one Scrapy Cloud
+   unit and `ZYTE_API_ENABLED=false`.

@@ -25,6 +25,38 @@ applied and that exactly one Scrapy Cloud unit is free. Repository defaults now
 record that entitlement while still keeping Scrapy Cloud deployment, live
 crawling, Zyte API, extra units, Amazon, and paid services disabled.
 
+## Solo Mode v1 Launch Profile
+
+Solo Mode v1 is the single-operator minimum launch path documented in
+`SOLO_MODE_IMPLEMENTATION_PLAN.md`. It preserves the tested Phase 0-8
+foundations and narrows launch to one verified Zyte Student Scrapy Cloud unit,
+one local fallback runner, official-website crawling, public business email,
+phone, WhatsApp, and WeChat extraction, normalization, basic entity resolution,
+Worker ingestion, the existing four D1 databases, a simple searchable private
+dashboard, CSV export, basic backup, and single-user Cloudflare Access.
+
+R2 is optional for Solo v1. The launch profile stores source URL, evidence
+snippet or masked extraction context, content hash, parser/schema versions, and
+timestamps in D1. Full HTML, screenshot archives, batch archives, and longer R2
+retention are deferred until after launch.
+
+Deferred from Solo v1: Zyte API, extra Scrapy Cloud units, GitHub Actions
+crawler fallback, credit-backed fallback, automatic provider orchestration, AI
+summaries, outreach automation, team roles, advanced monitoring, complex
+approval workflows, full raw-evidence R2 storage, Amazon, marketplaces, supplier
+directories, and broad search discovery.
+
+Required safety posture remains:
+
+```text
+ZYTE_STUDENT_ENTITLEMENT_CONFIRMED=true
+SCRAPY_CLOUD_MAX_UNITS=1
+ZYTE_API_ENABLED=false
+PAID_SERVICES_ALLOWED=false
+ALLOW_EXTRA_SCRAPY_UNITS=false
+ENABLE_AMAZON=false
+```
+
 ## Local Setup Commands
 
 Run these commands from the repository root.
