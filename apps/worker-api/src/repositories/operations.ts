@@ -22,13 +22,14 @@ export class OperationsRepository {
 
     return runStatement(
       this.db,
-      `INSERT INTO sources (
+       `INSERT INTO sources (
          id, seller_id, source_url, canonical_url, source_domain, source_type,
-         robots_status, terms_risk, http_status, content_hash, r2_object_key,
-         first_seen_at, last_fetched_at, last_success_at, next_allowed_at,
-         schema_version, parser_version, status
+         robots_status, terms_risk, http_status, page_title, evidence_snippet,
+         content_hash, r2_object_key, detected_at, last_seen_at, first_seen_at,
+         last_fetched_at, last_success_at, next_allowed_at, schema_version,
+         parser_version, status
        )
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
          seller_id = excluded.seller_id,
          source_url = excluded.source_url,
@@ -38,8 +39,12 @@ export class OperationsRepository {
          robots_status = excluded.robots_status,
          terms_risk = excluded.terms_risk,
          http_status = excluded.http_status,
+         page_title = excluded.page_title,
+         evidence_snippet = excluded.evidence_snippet,
          content_hash = excluded.content_hash,
          r2_object_key = excluded.r2_object_key,
+         detected_at = COALESCE(sources.detected_at, excluded.detected_at),
+         last_seen_at = excluded.last_seen_at,
          last_fetched_at = excluded.last_fetched_at,
          last_success_at = excluded.last_success_at,
          next_allowed_at = excluded.next_allowed_at,
@@ -56,8 +61,12 @@ export class OperationsRepository {
         nullable(record.robotsStatus),
         nullable(record.termsRisk),
         nullable(record.httpStatus),
+        nullable(record.pageTitle),
+        nullable(record.evidenceSnippet),
         nullable(record.contentHash),
         nullable(record.r2ObjectKey),
+        nullable(record.detectedAt),
+        nullable(record.lastSeenAt),
         record.firstSeenAt,
         nullable(record.lastFetchedAt),
         nullable(record.lastSuccessAt),

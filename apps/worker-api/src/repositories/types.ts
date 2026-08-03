@@ -148,8 +148,12 @@ export interface SourceWrite extends VersionedWrite {
   robotsStatus?: string | null;
   termsRisk?: string | null;
   httpStatus?: number | null;
+  pageTitle?: string | null;
+  evidenceSnippet?: string | null;
   contentHash?: string | null;
   r2ObjectKey?: string | null;
+  detectedAt?: string | null;
+  lastSeenAt?: string | null;
   firstSeenAt: string;
   lastFetchedAt?: string | null;
   lastSuccessAt?: string | null;

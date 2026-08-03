@@ -3,6 +3,7 @@ from __future__ import annotations
 import posixpath
 import re
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from urllib.parse import urljoin, urlparse, urlunparse
 
 from sellerintel.extractors import ContactCandidate, extract_contacts
@@ -55,8 +56,12 @@ class OfficialSiteCrawlPlan:
 class EvidenceEnvelope:
     canonical_url: str
     source_domain: str
+    page_title: str
+    evidence_snippet: str
     content_hash: str
-    object_key: str
+    detected_at: str
+    last_seen_at: str
+    object_key: str | None
     upload_status: str
 
 
@@ -64,7 +69,11 @@ class EvidenceEnvelope:
 class OfficialPageEnrichment:
     canonical_url: str
     source_domain: str
+    page_title: str
+    evidence_snippet: str
     content_hash: str
+    detected_at: str
+    last_seen_at: str
     evidence: EvidenceEnvelope
     contacts: tuple[ContactCandidate, ...]
 
@@ -89,7 +98,7 @@ def build_official_site_crawl_plan(
 
     if html:
         document = parse_contact_document(html)
-        candidates.extend((link, False) for link in document.links)
+        candidates.extend((link, True) for link in document.links)
     if sitemap_text:
         candidates.extend((url, True) for url in _urls_from_sitemap(sitemap_text))
 
@@ -121,6 +130,7 @@ def enrich_official_page(
     *,
     page_url: str,
     default_region: str | None = None,
+    observed_at: str | None = None,
 ) -> OfficialPageEnrichment:
     canonical_url = canonicalize_official_url(page_url)
     if canonical_url is None:
@@ -128,22 +138,68 @@ def enrich_official_page(
     source_domain = _domain_for_url(canonical_url)
     payload = html.encode()
     content_hash = sha256_hex(payload)
+    timestamp = observed_at or datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    page_title = extract_page_title(html)
+    contacts = extract_contacts(html, source_url=canonical_url, default_region=default_region)
+    evidence_snippet = compact_evidence_snippet(contacts, page_title=page_title)
     evidence = EvidenceEnvelope(
         canonical_url=canonical_url,
         source_domain=source_domain,
+        page_title=page_title,
+        evidence_snippet=evidence_snippet,
         content_hash=content_hash,
-        object_key=f"evidence/official_site/{source_domain}/{content_hash}.html",
-        upload_status="not_uploaded_local_phase",
+        detected_at=timestamp,
+        last_seen_at=timestamp,
+        object_key=None,
+        upload_status="compact_d1_only",
     )
-    contacts = extract_contacts(html, source_url=canonical_url, default_region=default_region)
 
     return OfficialPageEnrichment(
         canonical_url=canonical_url,
         source_domain=source_domain,
+        page_title=page_title,
+        evidence_snippet=evidence_snippet,
         content_hash=content_hash,
+        detected_at=timestamp,
+        last_seen_at=timestamp,
         evidence=evidence,
         contacts=tuple(contacts),
     )
+
+
+def extract_page_title(html: str) -> str:
+    match = re.search(r"<title[^>]*>(.*?)</title>", html, flags=re.I | re.S)
+    if match is None:
+        return "Untitled page"
+    title = re.sub(r"<[^>]+>", " ", match.group(1))
+    title = re.sub(r"\s+", " ", title).strip()
+    return title[:200] or "Untitled page"
+
+
+def compact_evidence_snippet(
+    contacts: list[ContactCandidate],
+    *,
+    page_title: str,
+    max_length: int = 500,
+) -> str:
+    contexts: list[str] = []
+    seen: set[str] = set()
+    for contact in contacts:
+        context = re.sub(r"\s+", " ", contact.evidence_context).strip()
+        if context and context not in seen:
+            seen.add(context)
+            contexts.append(context)
+    value = " | ".join(contexts) if contexts else page_title
+    for contact in contacts:
+        for raw_value in {contact.raw_value, contact.normalized_value}:
+            if raw_value:
+                value = re.sub(
+                    re.escape(raw_value),
+                    contact.display_value_masked,
+                    value,
+                    flags=re.I,
+                )
+    return value[:max_length]
 
 
 def canonicalize_official_url(url: str, *, base_url: str | None = None) -> str | None:

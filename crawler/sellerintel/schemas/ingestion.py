@@ -175,8 +175,12 @@ class SourceRecord(VersionedRecord):
     robots_status: str | None = None
     terms_risk: str | None = None
     http_status: NonNegativeInt | None = None
+    page_title: str | None = None
+    evidence_snippet: str | None = None
     content_hash: str | None = None
     r2_object_key: str | None = None
+    detected_at: str | None = None
+    last_seen_at: str | None = None
     first_seen_at: NonEmptyStr
     last_fetched_at: str | None = None
     last_success_at: str | None = None

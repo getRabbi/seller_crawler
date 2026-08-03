@@ -54,6 +54,7 @@ def test_builds_same_domain_budgeted_crawl_plan_from_html_and_sitemap() -> None:
         "https://acme-industrial.testmail/distributor",
         "https://acme-industrial.testmail/privacy",
         "https://acme-industrial.testmail/terms",
+        "https://acme-industrial.testmail/wholesale/exports",
         "https://acme-industrial.testmail/company/export-sales",
     )
 
@@ -84,10 +85,13 @@ def test_enrich_official_page_hashes_evidence_and_extracts_contacts() -> None:
     assert enrichment.canonical_url == "https://acme-industrial.testmail/contact-us"
     assert enrichment.source_domain == "acme-industrial.testmail"
     assert enrichment.content_hash == content_hash
-    assert enrichment.evidence.object_key == (
-        f"evidence/official_site/acme-industrial.testmail/{content_hash}.html"
-    )
-    assert enrichment.evidence.upload_status == "not_uploaded_local_phase"
+    assert enrichment.evidence.object_key is None
+    assert enrichment.evidence.upload_status == "compact_d1_only"
+    assert enrichment.page_title == "Acme Industrial Export Sales"
+    assert enrichment.evidence_snippet
+    assert "sales@acme-industrial.testmail" not in enrichment.evidence_snippet
+    assert "+14155552671" not in enrichment.evidence_snippet
+    assert "AcmeExport_88" not in enrichment.evidence_snippet
     assert contacts[("email", "sales@acme-industrial.testmail")].confidence >= 80
     assert contacts[("phone", "+14155552671")].confidence >= 80
     assert contacts[("whatsapp", "+14155552672")].confidence >= 80

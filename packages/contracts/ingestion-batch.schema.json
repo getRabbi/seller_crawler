@@ -1,6 +1,4 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://seller-intelligence.local/schemas/ingestion-batch.schema.json",
   "$defs": {
     "AuditEventRecord": {
       "additionalProperties": false,
@@ -1564,6 +1562,30 @@
           "default": null,
           "title": "Http Status"
         },
+        "page_title": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Page Title"
+        },
+        "evidence_snippet": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidence Snippet"
+        },
         "content_hash": {
           "anyOf": [
             {
@@ -1587,6 +1609,30 @@
           ],
           "default": null,
           "title": "R2 Object Key"
+        },
+        "detected_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Detected At"
+        },
+        "last_seen_at": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Seen At"
         },
         "first_seen_at": {
           "minLength": 1,
@@ -1995,6 +2041,6 @@
     "batch_number",
     "generated_at"
   ],
-  "title": "Seller Intelligence Ingestion Batch",
+  "title": "IngestionBatch",
   "type": "object"
 }

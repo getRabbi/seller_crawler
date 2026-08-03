@@ -2,7 +2,7 @@
 
 Phase 10A is partially complete and prepares the provider-neutral local runner
 without enabling live crawling, scheduling, provider deployment, or paid
-services. The reconciled active phase remains Phase 7.
+services. The reconciled active phase is Phase 9.
 
 In Solo Mode v1, the local runner is the only launch fallback. It must use the
 same crawler package, contracts, local spool, and signed ingestion path as the
@@ -29,9 +29,11 @@ LOCAL_RUNNER_DRY_RUN=true
 ```
 
 The smoke command validates startup gates, the global kill switch, local lock
-path, spool path, and forbidden personal browser profile variables. It emits a
-JSON status payload and does not call the Worker unless `LOCAL_RUNNER_DRY_RUN`
-is explicitly set to `false` with ingestion endpoint and HMAC settings.
+path, spool path, and forbidden personal browser profile variables. It then
+runs the real official-site Scrapy spider against sanitized fixtures, producing
+all four supported contact types and compact evidence without network access.
+It does not call the Worker unless `LOCAL_RUNNER_DRY_RUN` is explicitly set to
+`false` with ingestion endpoint and HMAC settings.
 
 ## Docker Artifact
 

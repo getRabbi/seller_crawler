@@ -17,10 +17,9 @@ extraction context, content hash, timestamps, parser version, and schema
 version. R2 can be added later for full HTML, screenshots, batch archives, and
 longer evidence retention.
 
-Current reconciled phase state: Phases 0-6 are complete and verified; Phase 7 is
-the active partially complete phase; Phase 8 is complete and verified ahead of
-order; Phase 9 and Phase 10A are partially complete; Phase 10B and later
-provider phases are not ready.
+Current reconciled phase state: Phases 0-8 are complete and verified; Phase 9 is
+active and partially complete; Phase 10A is partially complete; Phase 10B and
+later provider phases are not ready.
 
 Phase 1 implements the local D1 data boundary:
 
@@ -72,15 +71,13 @@ Marketplace, supplier-directory, and search-discovery adapters remain disabled
 by default. Blocked-page detection stops the affected adapter/domain path; the
 framework does not rotate providers or bypass access controls.
 
-Phase 7 is active and partially complete. The official-site adapter
-builds local crawl plans from a seed URL, supplied HTML links, and supplied
-sitemap text, then canonicalizes URLs, enforces same-domain scope, applies the
-page budget, and allows only static official business paths or
-sitemap-discovered business pages. Page enrichment computes a deterministic
-content hash, prepares an evidence envelope with the intended R2 object key, and
-runs confidence-scored contact extraction without live fetching or uploading
-evidence. Evidence upload and approved crawling behavior remain Phase 7
-requirements and are not implemented.
+Phase 7 is complete and verified for Solo v1. The official-site Scrapy spider
+uses explicit seeds, robots.txt, same-domain canonical URLs, a sequential
+per-domain queue, strict page/depth/request limits, block detection, sitemap and
+common business-page discovery, deterministic records, and confidence-scored
+contact extraction. A no-network downloader middleware provides full fixture
+execution. Compact masked evidence is persisted through the ingestion contract;
+raw R2 evidence is deferred by the Solo amendment.
 
 Phase 8 is complete and verified ahead of order. Exact identifiers,
 canonical domains, normalized company names, public contact hashes, country/city
@@ -109,10 +106,8 @@ idempotency, and deletes records only after Worker acceptance.
 
 The shortest Solo v1 architecture path is:
 
-1. Finish Phase 7 for approved official websites only.
-2. Persist compact evidence provenance in D1.
-3. Add Worker read/search/export APIs for the simple private dashboard.
-4. Protect dashboard access with single-user Cloudflare Access.
-5. Verify basic four-D1 backup and restore.
-6. Verify local fallback.
-7. Activate Zyte only through the one-unit Phase 10B smoke gate.
+1. Add Worker read/search/export APIs for the simple private dashboard.
+2. Protect dashboard access with single-user Cloudflare Access.
+3. Verify basic four-D1 backup and restore.
+4. Verify the local Docker fallback artifact.
+5. Activate Zyte only through the one-unit Phase 10B smoke gate.

@@ -147,6 +147,8 @@ describe("POST /v1/ingest/batch", () => {
     expect(state.sellers.has(sellerId)).toBe(true);
     expect(state.contacts.has(contactId)).toBe(true);
     expect(state.sources.has(sourceId)).toBe(true);
+    expect(state.sources.get(sourceId)).toContain("Fixture seller contact page");
+    expect(state.sources.get(sourceId)).toContain("Masked business contact evidence");
     expect(state.idempotencyKeys.has(`${runId}:1`)).toBe(true);
   });
 
@@ -374,6 +376,11 @@ function validBatch(): {
         canonical_url: "https://example.invalid/seller",
         source_domain: "example.invalid",
         source_type: "official_site",
+        page_title: "Fixture seller contact page",
+        evidence_snippet: "Masked business contact evidence",
+        content_hash: "fixture-content-hash",
+        detected_at: nowIso,
+        last_seen_at: nowIso,
         schema_version: 1,
         parser_version: "parser-1",
         first_seen_at: nowIso

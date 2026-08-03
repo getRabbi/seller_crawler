@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased - Solo Mode v1 Implementation
+
+- Approved the Solo Mode v1 delivery overlay and amended the authoritative master
+  specification to version 2.1.0 before implementation.
+- Kept live crawling, Scrapy Cloud deployment, Zyte API, paid services, extra units,
+  and Amazon disabled while local implementation proceeds.
+- Completed and verified Phase 7 for Solo v1 with a real bounded Scrapy
+  official-site spider, contact/sitemap discovery, compact D1 evidence, deterministic
+  ingestion records, and a no-network end-to-end fixture crawl.
+- Added operations migration `0004_compact_evidence.sql` and regenerated the strict
+  ingestion JSON Schema contract.
+
 ## Unreleased - Solo Mode v1 Planning
 
 - Added `SOLO_MODE_IMPLEMENTATION_PLAN.md` as a documentation-only

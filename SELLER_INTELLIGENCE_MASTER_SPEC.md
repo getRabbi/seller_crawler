@@ -1,7 +1,7 @@
 # Seller Intelligence Platform — Zero-Cost Hybrid Runner Master Specification v2.0
 
-**Document status:** FROZEN FOR IMPLEMENTATION WITH PROVIDER ACTIVATION GATES  
-**Specification version:** 2.0.0  
+**Document status:** FROZEN FOR IMPLEMENTATION WITH SOLO MODE V1 AMENDMENT
+**Specification version:** 2.1.0
 **Target builder:** OpenAI Codex  
 **Primary use:** Internal B2B product and supplier research  
 **Target throughput:** Up to 500 useful new or materially updated intelligence events per day  
@@ -9,9 +9,66 @@
 **Primary crawler runtime:** Zyte Scrapy Cloud Student unit, only after entitlement confirmation  
 **Guaranteed fallback runtime:** Local Docker/Scrapy runner using the same codebase  
 **Additional bounded fallbacks:** GitHub Actions burst runner and operator-approved credit-backed container  
-**Current activation state:** `ZYTE_ENTITLEMENT_PENDING`; all live runners disabled  
+**Current activation state:** `ZYTE_STUDENT_CONFIRMED`; deploy and live-crawl gates disabled
 **Freeze date:** 28 July 2026  
+**Solo Mode amendment date:** 4 August 2026
 **Change authority:** Architecture changes require an explicit specification amendment before code changes  
+
+---
+
+## Solo Mode v1 implementation amendment
+
+This amendment authorizes the single-operator launch scope in
+`SOLO_MODE_IMPLEMENTATION_PLAN.md`. It supersedes conflicting v2.0 requirements only
+for the Solo Mode v1 launch. The tested Phase 0-8 foundations remain valid and the
+larger v2.0 architecture remains the post-launch roadmap.
+
+Solo Mode v1 requires:
+
+- official company website crawling from explicit operator-approved seed URLs;
+- email, phone, WhatsApp, and WeChat extraction;
+- company/contact normalization and basic deterministic entity resolution;
+- signed, idempotent Worker ingestion into the existing core, contacts, operations,
+  and history D1 databases;
+- compact D1 evidence containing source URL, page title, short evidence snippet,
+  content hash, `detected_at`, and `last_seen_at`;
+- a simple searchable private dashboard, CSV export, basic four-D1 backup/restore,
+  and single-user Cloudflare Access;
+- one verified Zyte Student Scrapy Cloud unit and one local Docker/Scrapy fallback,
+  selected manually and never active through automatic provider switching.
+
+R2 is optional for Solo Mode v1. Full HTML, screenshots, long-term raw evidence,
+and R2-hosted backup archives are deferred. Compact evidence in D1 is sufficient for
+the initial launch. Sections that require immediate R2 evidence upload or raw-evidence
+viewer support apply after Solo Mode v1 unless a later amendment restores them to the
+launch gate.
+
+The following are deferred until after Solo Mode v1: Zyte API, extra Scrapy Cloud
+units, GitHub Actions crawler fallback, credit-backed fallback, automatic provider
+orchestration, marketplace and supplier-directory crawlers, AI summaries, outreach
+automation, team roles, advanced monitoring, complex approval workflows, and full
+raw-evidence R2 storage.
+
+Confirmed zero-charge controls are:
+
+```text
+ZYTE_STUDENT_ENTITLEMENT_CONFIRMED=true
+SCRAPY_CLOUD_MAX_UNITS=1
+ZYTE_API_ENABLED=false
+PAID_SERVICES_ALLOWED=false
+MAX_EXTERNAL_MONTHLY_SPEND_AUD=0
+ALLOW_EXTRA_SCRAPY_UNITS=false
+ENABLE_AMAZON=false
+```
+
+`SCRAPY_CLOUD_DEPLOY_ENABLED` and `LIVE_CRAWL_ENABLED` remain false until their
+controlled smoke-test gates. No implementation step may allocate a second unit,
+call Zyte API, or select a provider automatically.
+
+The older entitlement-pending statements below are retained as historical context
+from the 28 July freeze. Zyte Support confirmed the Student entitlement on 4 August
+2026: exactly one Scrapy Cloud unit is free, no paid Scrapy Cloud subscription is
+enabled, and charges are possible only if another unit is added or Zyte API is used.
 
 ---
 

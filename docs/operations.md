@@ -1,9 +1,9 @@
 # Operations
 
-Operations are local validation commands only while the active phase is Phase 7
-and it remains partially complete. Phases 8, 9, and 10A have local implementation
-ahead of order, but provider activation is not ready. Do not deploy, schedule,
-crawl, activate providers, or connect production ingestion.
+Operations remain local while Phase 9 is active. Phases 0-8 are complete and
+verified; Phase 10A is partial and provider activation is not ready. Do not
+deploy, schedule live crawling, activate providers, or connect production
+ingestion before their gates.
 
 Solo Mode v1 keeps operations to one operator and one active runner at a time.
 The launch target is one verified Zyte Student Scrapy Cloud unit plus one local
@@ -67,11 +67,11 @@ returned by the registry. A blocked response, CAPTCHA/challenge marker, or
 restricted terms/robots policy must stop that adapter path; do not rotate to
 another provider to work around the block.
 
-Official-site enrichment creates local crawl plans and enrichment records only.
-Use supplied HTML and supplied sitemap text when testing the planner; do not
-retrieve live pages or sitemaps during this phase. Evidence envelopes include
-the canonical URL, source domain, content hash, and intended R2 key, but uploads
-are marked `not_uploaded_local_phase` and no R2 writes occur.
+Official-site fixture execution runs the real Scrapy spider without network
+access. It emits compact D1 evidence with canonical URL, source domain, page
+title, masked snippet, content hash, detection time, and last-seen time. R2
+writes do not occur. Local-live execution remains double-gated by runner mode
+and `LIVE_CRAWL_ENABLED=true` plus explicit seeds.
 
 Entity resolution runs in the crawler/runner layer, not in request-time Worker
 queries. Use deterministic fixture tests for exact and fuzzy matching. Decisions
@@ -95,7 +95,8 @@ npm.cmd run build --workspace @seller-intelligence/dashboard
 ```
 
 Phase 10A local runner readiness is partially complete and fixture-only by
-default. Runbook details are
+default. The real spider and signed/spooled batch path work locally; Docker
+verification remains. Runbook details are
 in `docs/local-runner.md`. The local smoke command validates startup gates,
 global kill switch state, one-job lock paths, spool paths, and forbidden browser
 profile variables. Scheduling instructions for Windows Task Scheduler and Linux

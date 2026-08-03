@@ -9,9 +9,8 @@ WeChat. Marketplace crawling, Amazon, Alibaba, 1688, supplier directories,
 registry crawling, broad search discovery, paid search APIs, paid proxies, and
 Zyte API are deferred.
 
-The reconciled active phase is Phase 7. It is partially complete and remains
-local-only; Phases 8, 9, and 10A are implemented ahead of order but do not
-activate any source.
+Phase 7 is complete and verified in no-network fixture mode. Phase 9 is active;
+Phase 10A remains partial. No live source is activated.
 
 Phase 4 contact extractor tests use sanitized local HTML fixtures only. These
 fixtures cover an official contact page, a multilingual contact page, and a
@@ -23,14 +22,11 @@ Phase 6 adapter policies are local metadata only. `official_site` and
 Amazon, Alibaba, 1688, and search discovery remain disabled until explicit
 phase work and source review allow them.
 
-Phase 7 official-site enrichment is still local only and partially complete.
-Crawl plans use a supplied
-official seed URL, supplied HTML, and supplied sitemap text in tests or later
-runner code; the module does not fetch homepages or sitemaps. It restricts URLs
-to the canonical same domain, a fixed page budget, static official business
-paths, and sitemap-discovered business pages. Evidence envelopes are prepared
-with deterministic object keys, but R2 uploads and approved live crawling remain
-unimplemented.
+Phase 7 implements a real Scrapy official-site engine. In its default fixture
+mode, a downloader middleware serves sanitized pages and robots.txt without a
+network connection. In gated local-live or Zyte modes, the same spider fetches
+only explicit approved domains and bounded business pages. It stops on explicit
+blocks and never switches providers. R2 uploads remain deferred.
 
 For Solo v1, accepted official-site evidence should be compact in D1 first:
 source URL, canonical URL, masked evidence snippet or extraction context,
@@ -45,6 +41,6 @@ contact hashes, and location hints in deterministic local fixtures.
 Phase 9 dashboard data is local fixture data only. It does not call live Worker
 endpoints, direct D1, R2, crawlers, source adapters, or provider APIs.
 
-Phase 10A local runner smoke mode emits an empty fixture ingestion batch by
-default. It does not fetch source pages, run Scrapy spiders against live URLs,
-load personal browser profiles, or read cookies.
+Phase 10A local runner smoke mode executes the official-site spider against the
+sanitized fixture site and emits deterministic ingestion batches. It does not
+fetch live URLs, load personal browser profiles, or read cookies.

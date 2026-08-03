@@ -1,13 +1,14 @@
 # Solo Mode Implementation Plan v1
 
-Status: planning overlay only.
+Status: approved implementation overlay for Solo Mode v1 as of 2026-08-04.
 Authoritative specification: `SELLER_INTELLIGENCE_MASTER_SPEC.md`.
 Audit baseline: `PROJECT_STATUS_REPORT.md` and `STABILIZATION_REPORT.md`.
 Current accepted phase state: Phases 0-6 complete and verified, Phase 7 active and partially complete, Phase 8 complete and verified ahead of order, Phase 9 partially complete, Phase 10A partially complete, Phase 10B and later provider phases not ready.
 
 This plan converts the remaining implementation path into a single-operator launch profile. It does not delete, rewrite, or invalidate the already tested Phase 0-8 foundations. It narrows the first usable launch to the smallest private system that can collect official-website contact intelligence safely and without recurring charges.
 
-No deployment, live crawling, Zyte API call, Cloudflare resource creation, new spider work, or provider activation is part of this planning pass.
+The operator has authorized implementation of this scope. Deployment and live crawling
+remain gated by credentials, no-network smoke verification, and explicit seed approval.
 
 ## 1. Exact Simplified Scope
 
@@ -74,7 +75,8 @@ Frozen specification sections that need a formal amendment before implementation
 - Section 42.3, coding order: align the shortest Solo v1 sequence with the accepted Phase 7 active state.
 - Section 44 through Section 46, fallback matrix and provider activation runbooks: mark Actions, credit-backed container, and automatic orchestration as post-launch deferrals for Solo v1.
 
-The master specification was not modified by this pass. Until a formal spec amendment is approved, this plan is a documented launch overlay under the existing frozen architecture.
+The master specification now contains a Solo Mode v1 amendment that authorizes this
+launch overlay while preserving the larger post-launch architecture.
 
 ## 3. Existing Code Reused
 
@@ -106,7 +108,7 @@ Solo v1 still requires:
 
 | Work item | Why it is required |
 |---|---|
-| Formal spec amendment or approved Solo v1 overlay decision | AGENTS.md requires frozen architecture changes to be reflected in the master spec before code changes. |
+| Solo v1 architecture amendment | Completed in master specification version 2.1.0 before implementation. |
 | Phase 7 official-site fetch execution | Current Phase 7 plans and enriches supplied HTML but does not fetch approved official-site pages or robots/sitemap data. |
 | Phase 7 D1 compact evidence field support | Solo v1 needs source URL, evidence snippet/context, content hash, and timestamps in D1. Existing sources store URL/hash/timestamps but not a dedicated evidence snippet field. |
 | Phase 7 evidence tests | Add local/mock tests for compact D1 evidence and any optional R2 boundary without live crawling. |
@@ -121,18 +123,17 @@ Solo v1 still requires:
 
 ## 5. Shortest Implementation Sequence To Working Solo v1
 
-1. Approve a Solo v1 spec amendment or explicitly accept this plan as a launch overlay before code changes.
-2. Finish Phase 7 for official websites only: robots-aware fetch planning, approved page fetch execution, page budget enforcement, content hash, compact D1 evidence snippet/context, and local/mock tests.
-3. Add any required D1 migration and contract changes for compact evidence snippets, preserving existing source URL, content hash, timestamps, parser version, and schema version fields.
-4. Connect Worker dashboard read APIs for seller search, seller detail, contacts, source/crawl health, review basics, suppression state, and CSV export.
-5. Convert the dashboard from static fixture data to Worker-backed data while keeping masked contact display and no browser secrets.
-6. Add a basic four-D1 backup and local restore validation command or runbook.
-7. Verify the local Docker/Scrapy fallback artifact without live crawling, then run one approved local official-site dry-run path.
-8. Configure Cloudflare staging resources manually: four D1 bindings, Worker, Pages, single-user Access, and `INGESTION_HMAC_SECRET`.
-9. Run staging smoke tests with live crawling still disabled.
-10. Implement Phase 10B no-network Zyte Scrapy Cloud smoke deployment, verify exactly one free unit, confirm no Zyte API usage, and keep Amazon disabled.
-11. Run one tiny approved official-website Zyte test only after the no-network smoke and operator approval.
-12. Complete production hardening, backup/restore check, zero-charge review, and launch gate.
+1. Finish Phase 7 for official websites only: robots-aware fetch planning, approved page fetch execution, page budget enforcement, content hash, compact D1 evidence snippet/context, and local/mock tests.
+2. Add any required D1 migration and contract changes for compact evidence snippets, preserving existing source URL, content hash, timestamps, parser version, and schema version fields.
+3. Connect Worker dashboard read APIs for seller search, seller detail, contacts, source/crawl health, review basics, suppression state, and CSV export.
+4. Convert the dashboard from static fixture data to Worker-backed data while keeping masked contact display and no browser secrets.
+5. Add a basic four-D1 backup and local restore validation command or runbook.
+6. Verify the local Docker/Scrapy fallback artifact without live crawling, then run one approved local official-site dry-run path.
+7. Configure Cloudflare staging resources manually: four D1 bindings, Worker, Pages, single-user Access, and `INGESTION_HMAC_SECRET`.
+8. Run staging smoke tests with live crawling still disabled.
+9. Implement Phase 10B no-network Zyte Scrapy Cloud smoke deployment, verify exactly one free unit, confirm no Zyte API usage, and keep Amazon disabled.
+10. Run one tiny approved official-website Zyte test only after the no-network smoke and operator approval.
+11. Complete production hardening, backup/restore check, zero-charge review, and launch gate.
 
 The next immediate task is not provider activation. The next safe implementation task is the Phase 7 compact-evidence and official-site execution design, still local-safe and disabled by default.
 
@@ -176,10 +177,8 @@ Stop before any of the following:
 
 ## 8. Operator Actions Required Before Solo v1 Launch
 
-- Approve whether Solo Mode v1 becomes a formal master-spec amendment or remains a scoped launch overlay.
 - Provide `INGESTION_HMAC_SECRET` before non-dry-run ingestion.
 - Create or confirm Cloudflare staging D1 databases, Worker, Pages, and Access only when the Cloudflare phase is reached.
 - Confirm the single allowed Cloudflare Access user before dashboard exposure.
 - Keep Zyte Scrapy Cloud at exactly one free unit and do not add a Zyte API key.
 - Approve the first official-site live crawl seed list when the code reaches that gate.
-

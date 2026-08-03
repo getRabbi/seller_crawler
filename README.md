@@ -5,10 +5,8 @@ architecture in `SELLER_INTELLIGENCE_MASTER_SPEC.md`.
 
 ## Current Phase Status
 
-- Active phase: `7 - official website enrichment`
-- Phase 7 status: partially complete
-- Phases 0-6: complete and verified
-- Phase 8: complete and verified ahead of order
+- Active phase: `9 - dashboard and Worker query APIs`
+- Phases 0-8: complete and verified
 - Phase 9: partially complete
 - Phase 10A: partially complete
 - Phase 10B and later provider phases: not ready
@@ -149,23 +147,22 @@ search-discovery adapters remain disabled by default.
 
 ## Official Website Enrichment
 
-Phase 7 is the active phase and is partially complete. It adds local
-official-site crawl planning and page enrichment under
-`crawler/sellerintel/adapters/official_site`. Crawl plans canonicalize the seed
-URL, enforce same-domain URLs, apply the official-site page budget, include only
-homepage/about/contact/support/wholesale/distributor/privacy/terms paths plus
-sitemap-discovered business pages, and reject blocked account/cart/login paths.
+Phase 7 is complete and verified for Solo v1. The real `official_website`
+Scrapy spider accepts explicit seeds, obeys robots.txt, stays on the approved
+domain, discovers bounded business/contact pages and sitemaps, canonicalizes
+and deduplicates URLs, stops a domain after explicit blocks, and applies strict
+page, depth, concurrency, retry, timeout, response-size, and cookie limits.
 
-Page enrichment computes a deterministic content hash, builds a local evidence
-envelope with the intended R2 object key, and runs the Phase 4 contact
-extractors with masked evidence and confidence scoring. This phase does not
-perform live fetching, sitemap retrieval, R2 upload, or provider activation.
-The remaining Phase 7 requirements are evidence upload and approved crawling
-behavior; they are intentionally not implemented by this stabilization pass.
+The no-network fixture transport exercises the same spider and produces
+deterministic seller, contact, source/evidence, and crawl-run batches. Compact
+D1 evidence includes source URL, page title, masked evidence snippet, content
+hash, `detected_at`, and `last_seen_at`. Full raw-evidence R2 storage remains
+deferred by the Solo v1 amendment. Live crawling and provider activation remain
+disabled.
 
 ## Entity Resolution
 
-Phase 8 is complete and verified ahead of the first incomplete phase. It adds
+Phase 8 is complete and verified. It adds
 runner-side exact and fuzzy entity resolution under
 `crawler/sellerintel/entity_resolution`. Decisions include transparent score
 components, deterministic IDs, and fixed thresholds: auto-merge at `>= 92`,
@@ -199,8 +196,9 @@ readiness layer under
 `crawler/sellerintel/runtime/local.py`, a shared crawler `Dockerfile`, and the
 runbook at `docs/local-runner.md`. The runner validates startup gates, honors the
 global kill switch, rejects personal browser profile and cookie inputs, enforces
-one-job execution with an exclusive lock, and supports fixture-only dry-run smoke
-batches.
+one-job execution with an exclusive lock, and executes the real official-site
+Scrapy spider in fixture-only dry-run mode. The Docker artifact is not yet
+verified because the local Docker daemon was unavailable.
 
 Durable spool replay verifies stored checksums, re-signs the same compressed body
 with a fresh nonce and timestamp, preserves the idempotency key, and deletes a

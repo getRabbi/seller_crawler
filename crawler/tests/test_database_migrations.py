@@ -215,6 +215,19 @@ def test_core_entity_resolution_tables_store_audit_and_rollback_metadata() -> No
     )
 
 
+def test_operations_sources_store_solo_v1_compact_evidence() -> None:
+    connection = apply_partition_migrations("operations")
+
+    assert {
+        "source_url",
+        "page_title",
+        "evidence_snippet",
+        "content_hash",
+        "detected_at",
+        "last_seen_at",
+    }.issubset(table_columns(connection, "sources"))
+
+
 def insert_core_fixture(connection: sqlite3.Connection, seller_id: str) -> None:
     connection.execute(
         """
