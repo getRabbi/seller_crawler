@@ -25,4 +25,4 @@ RUN python -m pip install --no-cache-dir uv \
 
 COPY crawler ./crawler
 
-CMD ["uv", "run", "python", "-m", "sellerintel.runtime.local"]
+CMD ["uv", "run", "--no-sync", "python", "-m", "sellerintel.runtime.local"]

@@ -199,6 +199,22 @@ def compact_evidence_snippet(
                     value,
                     flags=re.I,
                 )
+    value = re.sub(
+        r"(?i)(?:https?://)?(?:api\.)?wa\.me/[+()\d.\s-]{7,}",
+        "wa.me/<masked>",
+        value,
+    )
+    value = re.sub(
+        r"(?i)\b[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}\b",
+        "<masked-email>",
+        value,
+    )
+    value = re.sub(
+        r"(?i)(\b(?:wechat|weixin)(?:\s+id)?\s*[:=]?\s*)[a-z][a-z0-9_-]{5,19}\b",
+        r"\1<masked>",
+        value,
+    )
+    value = re.sub(r"(?<!\w)\+?(?:[\d().\s-]*\d){7,}(?!\w)", "<masked-phone>", value)
     return value[:max_length]
 
 

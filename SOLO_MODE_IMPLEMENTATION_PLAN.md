@@ -1,9 +1,13 @@
 # Solo Mode Implementation Plan v1
 
-Status: approved implementation overlay for Solo Mode v1 as of 2026-08-04.
+Status: implemented locally; external staging/production handoff as of 2026-08-04.
 Authoritative specification: `SELLER_INTELLIGENCE_MASTER_SPEC.md`.
 Audit baseline: `PROJECT_STATUS_REPORT.md` and `STABILIZATION_REPORT.md`.
-Current accepted phase state: Phases 0-6 complete and verified, Phase 7 active and partially complete, Phase 8 complete and verified ahead of order, Phase 9 partially complete, Phase 10A partially complete, Phase 10B and later provider phases not ready.
+Current phase state: Phases 0-8, the Solo v1 Phase 9 API/dashboard surface, and
+Phase 10A are complete and verified locally. Phase 10B code and exact one-unit
+controls are complete; hosted deployment and job behavior remain blocked on the
+consolidated external values in `OPERATOR_INPUTS_REQUIRED.md`. Later providers
+remain deferred.
 
 This plan converts the remaining implementation path into a single-operator launch profile. It does not delete, rewrite, or invalidate the already tested Phase 0-8 foundations. It narrows the first usable launch to the smallest private system that can collect official-website contact intelligence safely and without recurring charges.
 
@@ -72,7 +76,7 @@ Frozen specification sections that need a formal amendment before implementation
 - Section 17, Cloudflare deployment: make R2 optional for Solo v1 launch and require single-user Access before exposure.
 - Section 28 and Section 41, backup and restore: allow a basic four-D1 logical backup first, with R2 archive/weekly restore automation after launch.
 - Section 36, evidence: allow compact D1 evidence snippets and hashes for Solo v1 while deferring full raw HTML/screenshot archives.
-- Section 42.3, coding order: align the shortest Solo v1 sequence with the accepted Phase 7 active state.
+- Section 42.3, coding order: align the shortest Solo v1 sequence with the official-site-first launch path.
 - Section 44 through Section 46, fallback matrix and provider activation runbooks: mark Actions, credit-backed container, and automatic orchestration as post-launch deferrals for Solo v1.
 
 The master specification now contains a Solo Mode v1 amendment that authorizes this
@@ -94,9 +98,9 @@ Solo v1 should reuse these tested foundations:
 | Contact extraction | `crawler/sellerintel/extractors/email.py`, `phone.py`, `whatsapp.py`, `wechat.py`, `contacts.py` |
 | Normalization | `crawler/sellerintel/normalization/*` |
 | Source adapter framework | `crawler/sellerintel/adapters/base.py`, `registry.py`, `crawler/sellerintel/config/sources.py` |
-| Official-site planning | `crawler/sellerintel/adapters/official_site/enrichment.py` |
+| Official-site crawler | `crawler/sellerintel/spiders/website_contacts.py`, `crawler/sellerintel/adapters/official_site/*`, `crawler/sellerintel/pipelines.py` |
 | Entity resolution | `crawler/sellerintel/entity_resolution/*`, `database/migrations/core/0004_entity_resolution.sql` |
-| Static dashboard shell | `apps/dashboard/app/*`, `apps/dashboard/components/*`, `apps/dashboard/lib/dashboard-data.ts` |
+| Worker-backed static dashboard | `apps/dashboard/app/*`, `apps/dashboard/components/*`, `apps/dashboard/lib/api.ts`, `apps/dashboard/lib/use-api-resource.ts` |
 | Local runner artifact | `Dockerfile`, `.dockerignore`, `docs/local-runner.md`, `infra/local-runner/README.md` |
 | Safety configuration | `.env.example`, `apps/worker-api/wrangler.toml`, `Dockerfile`, `SECURITY.md` |
 
@@ -108,34 +112,29 @@ Solo v1 still requires:
 
 | Work item | Why it is required |
 |---|---|
-| Solo v1 architecture amendment | Completed in master specification version 2.1.0 before implementation. |
-| Phase 7 official-site fetch execution | Current Phase 7 plans and enriches supplied HTML but does not fetch approved official-site pages or robots/sitemap data. |
-| Phase 7 D1 compact evidence field support | Solo v1 needs source URL, evidence snippet/context, content hash, and timestamps in D1. Existing sources store URL/hash/timestamps but not a dedicated evidence snippet field. |
-| Phase 7 evidence tests | Add local/mock tests for compact D1 evidence and any optional R2 boundary without live crawling. |
-| Worker read APIs for dashboard | Dashboard currently uses static fixture data; Solo v1 needs Worker-backed seller search, seller detail, contacts, source/crawl health, review basics, suppression, and export routes. |
-| CSV export implementation | Existing dashboard route is static; Solo v1 needs Worker-mediated CSV export with masking and suppression controls. |
-| Single-user Cloudflare Access runbook/config notes | No Access resource is configured yet; staging must be protected before exposure. |
-| Basic backup scripts or runbook validation | Solo v1 needs a tested logical export/restore path for all four D1 databases before launch. |
-| Local fallback verification | Phase 10A dry-run works, but Docker artifact and real local Scrapy execution path still need verification before fallback-local launch. |
-| Zyte Phase 10B no-network smoke path | Entitlement is configured, but Scrapy Cloud deployment remains blocked until a no-network smoke spider and one-unit verification are implemented. |
-| Cloudflare staging proof | Worker, Pages, D1 bindings, Access, and secrets must be configured and tested before production. |
-| Production hardening review | Required before production launch, even for single-user mode. |
+| Cloudflare resource values | Supply eight hosted D1 names/IDs, Worker and Pages hosts/projects, the zone, and staging/production routes. |
+| Hosted secrets | Configure separate staging/production ingestion HMAC secrets and the exact Access allowed email without storing them in git. |
+| Single-user Access deployment | Create the Access applications/policies, JWT audiences, team-domain configuration, and exact ingestion-path bypass described in the runbook. |
+| Cloudflare staging proof | Apply all four remote migrations, deploy Worker/dashboard, and verify health, bindings, Access, search, detail, contacts, review, runs, and CSV. |
+| Zyte external proof | Supply the verified project ID and Scrapy Cloud API credential, deploy the no-network spider, and verify one-unit start/status/completion/cancellation. |
+| Approved seed | Supply one explicit policy-reviewed HTTPS seed for the tightly bounded staging smoke. |
+| Backup drill | Export all four staging D1 databases, verify checksums, and complete the restore/FTS verification steps. |
+| Production promotion | Repeat the verified staging sequence with distinct production databases, secrets, Access audience, and backup. |
 
 ## 5. Shortest Implementation Sequence To Working Solo v1
 
-1. Finish Phase 7 for official websites only: robots-aware fetch planning, approved page fetch execution, page budget enforcement, content hash, compact D1 evidence snippet/context, and local/mock tests.
-2. Add any required D1 migration and contract changes for compact evidence snippets, preserving existing source URL, content hash, timestamps, parser version, and schema version fields.
-3. Connect Worker dashboard read APIs for seller search, seller detail, contacts, source/crawl health, review basics, suppression state, and CSV export.
-4. Convert the dashboard from static fixture data to Worker-backed data while keeping masked contact display and no browser secrets.
-5. Add a basic four-D1 backup and local restore validation command or runbook.
-6. Verify the local Docker/Scrapy fallback artifact without live crawling, then run one approved local official-site dry-run path.
-7. Configure Cloudflare staging resources manually: four D1 bindings, Worker, Pages, single-user Access, and `INGESTION_HMAC_SECRET`.
-8. Run staging smoke tests with live crawling still disabled.
-9. Implement Phase 10B no-network Zyte Scrapy Cloud smoke deployment, verify exactly one free unit, confirm no Zyte API usage, and keep Amazon disabled.
-10. Run one tiny approved official-website Zyte test only after the no-network smoke and operator approval.
-11. Complete production hardening, backup/restore check, zero-charge review, and launch gate.
+1. Complete the single checklist in `OPERATOR_INPUTS_REQUIRED.md`.
+2. Populate untracked staging environment/Wrangler files and verify Cloudflare authentication.
+3. Apply the four staging D1 migrations and deploy the Worker behind Access, with only the HMAC ingestion path bypassed.
+4. Build/deploy the static dashboard and verify every Worker-backed state and CSV export.
+5. Export the four staging D1 databases and verify the checksummed backup/restore procedure.
+6. Deploy and run the no-network Scrapy Cloud smoke with exactly one unit; verify status, completion, and cancellation.
+7. Temporarily open the live gate for one explicitly approved official-site seed, verify signed ingestion end to end, then close it immediately.
+8. Promote the same verified build to production with distinct resources and secrets.
 
-The next immediate task is not provider activation. The next safe implementation task is the Phase 7 compact-evidence and official-site execution design, still local-safe and disabled by default.
+The next exact task is the consolidated external-input checklist, followed by
+the staging sequence in `DEPLOYMENT_RUNBOOK.md`. No additional feature phase is
+required for Solo v1 launch.
 
 ## 6. Features Deferred Until After Launch
 

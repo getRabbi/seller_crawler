@@ -34,7 +34,12 @@ export function buildHealthPayload(env: RuntimeEnv = {}): HealthPayload {
     operationsDb: env.OPS_DB !== undefined,
     historyDb: env.HISTORY_DB !== undefined,
     ingestionHmac: Boolean(env.INGESTION_HMAC_SECRET),
-    access: Boolean(env.ACCESS_ALLOWED_EMAIL && env.ACCESS_AUTH_REQUIRED === "true")
+    access: Boolean(
+      env.ACCESS_ALLOWED_EMAIL &&
+        env.ACCESS_AUTH_REQUIRED === "true" &&
+        env.TEAM_DOMAIN &&
+        env.POLICY_AUD
+    )
   };
 
   if ((env.APP_ENV ?? "local") !== "local") {

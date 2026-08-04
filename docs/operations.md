@@ -1,9 +1,9 @@
 # Operations
 
-Operations remain local while Phase 9 is active. Phases 0-8 are complete and
-verified; Phase 10A is partial and provider activation is not ready. Do not
-deploy, schedule live crawling, activate providers, or connect production
-ingestion before their gates.
+Operations remain local at the external deployment boundary. The Solo v1
+crawler, Worker APIs, four local D1 partitions, dashboard, local runner, Docker
+artifact, backups, and one-unit provider controls are implemented and verified
+locally. No hosted resource or provider job has been deployed.
 
 Solo Mode v1 keeps operations to one operator and one active runner at a time.
 The launch target is one verified Zyte Student Scrapy Cloud unit plus one local
@@ -81,10 +81,10 @@ persistence is later connected. Merge rollback is forward-only: create a
 rollback decision, restore source-seller links from audit metadata, and never
 delete canonical or historical rows to undo a merge.
 
-The dashboard is a static Next.js export in Phase 9. It uses local masked
-fixture data and records intended Worker `/v1` route boundaries for future live
-integration. Do not put secrets, direct D1/R2 bindings, raw contact values, or
-Cloudflare Access configuration in browser code. The local dashboard validation
+The dashboard is a static Next.js export backed by Worker `/v1` APIs. Contacts
+remain masked, and Access configuration is enforced at the Worker rather than
+embedded in browser code. Do not put secrets, direct D1/R2 bindings, raw contact
+values, or Access credentials in browser code. The local dashboard validation
 commands are:
 
 ```powershell
@@ -94,22 +94,16 @@ npm.cmd run test --workspace @seller-intelligence/dashboard
 npm.cmd run build --workspace @seller-intelligence/dashboard
 ```
 
-Phase 10A local runner readiness is partially complete and fixture-only by
-default. The real spider and signed/spooled batch path work locally; Docker
-verification remains. Runbook details are
-in `docs/local-runner.md`. The local smoke command validates startup gates,
+Phase 10A local runner readiness is complete and fixture-only by default. The
+real spider, signed/spooled ingestion path, and offline Docker smoke work
+locally. Runbook details are in `docs/local-runner.md`. The local smoke command validates startup gates,
 global kill switch state, one-job lock paths, spool paths, and forbidden browser
 profile variables. Scheduling instructions for Windows Task Scheduler and Linux
 cron are documented for later approval, but no schedule is enabled in this phase.
 
-Solo v1 launch operations must add these before staging:
-
-1. Worker-backed seller search, seller detail, contact, source health, review,
-   suppression, and CSV export routes.
-2. Single-user Cloudflare Access before any dashboard exposure.
-3. Basic logical backup and local restore validation for core, contacts,
-   operations, and history.
-4. Local fallback verification with live crawling still disabled until the
-   approved official-site crawl gate.
-5. Zyte Phase 10B no-network smoke verification with exactly one Scrapy Cloud
-   unit and `ZYTE_API_ENABLED=false`.
+Solo v1 launch operations now require external setup only: populate the
+staging/production Wrangler files, create and migrate the existing four D1
+partitions per environment, deploy the Worker and static dashboard behind one
+single-user Access application, and verify the one-unit Zyte no-network smoke.
+Follow `DEPLOYMENT_RUNBOOK.md`; live crawling remains disabled until the
+explicit approved-seed step.

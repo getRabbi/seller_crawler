@@ -7,6 +7,8 @@ import sys
 from pathlib import Path
 
 import pytest
+from scrapy.settings import Settings
+from sellerintel.runtime.scrapy_engine import total_scheduled_requests
 from sellerintel.spiders.website_contacts import OfficialWebsiteSpider
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -81,3 +83,40 @@ def test_spider_rejects_private_seed_hosts() -> None:
             crawl_run_id="018f2d5e-7b3c-7a1d-8f2e-523456789abc",
             fixture_dir=str(FIXTURE_SITE),
         )
+
+
+def test_fixture_request_stats_use_scheduler_count_when_downloader_is_intercepted() -> None:
+    assert total_scheduled_requests(
+        {
+            "downloader/request_count": 0,
+            "scheduler/dequeued": 9,
+            "response_received_count": 9,
+        }
+    ) == 9
+
+
+def test_cloud_runtime_settings_open_only_the_explicit_one_unit_live_gate() -> None:
+    spider = OfficialWebsiteSpider(
+        seed_urls="https://approved.example/",
+        crawl_run_id="018f2d5e-7b3c-7a1d-8f2e-523456789abc",
+    )
+
+    spider._validate_runtime(
+        Settings(
+            {
+                "RUNNER_MODE": "zyte_student_active",
+                "LIVE_CRAWL_ENABLED": True,
+                "PAID_SERVICES_ALLOWED": False,
+                "MAX_EXTERNAL_MONTHLY_SPEND_AUD": 0,
+                "ALLOW_EXTRA_SCRAPY_UNITS": False,
+                "ZYTE_STUDENT_ENTITLEMENT_CONFIRMED": True,
+                "SCRAPY_CLOUD_DEPLOY_ENABLED": True,
+                "SCRAPY_CLOUD_MAX_UNITS": 1,
+                "ZYTE_API_ENABLED": False,
+                "ZYTE_API_DAILY_REQUEST_BUDGET": 0,
+                "ZYTE_API_MONTHLY_BUDGET_USD": 0,
+                "ENABLE_AMAZON": False,
+                "ENABLE_OFFICIAL_WEBSITE": True,
+            }
+        )
+    )

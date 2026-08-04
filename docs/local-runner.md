@@ -1,8 +1,7 @@
 # Local Runner Readiness
 
-Phase 10A is partially complete and prepares the provider-neutral local runner
-without enabling live crawling, scheduling, provider deployment, or paid
-services. The reconciled active phase is Phase 9.
+Phase 10A is complete and verified locally for Solo v1 without enabling live
+crawling, scheduling, provider deployment, or paid services.
 
 In Solo Mode v1, the local runner is the only launch fallback. It must use the
 same crawler package, contracts, local spool, and signed ingestion path as the
@@ -43,11 +42,13 @@ defaults are locked to development, fixture-only dry-run mode:
 
 ```powershell
 docker build -t sellerintel-crawler:local .
-docker run --rm sellerintel-crawler:local
+docker run --rm --network none sellerintel-crawler:local
 ```
 
-Do not add secrets to the image. Use runtime environment variables only after an
-approved non-dry-run mode is reached.
+The no-network image smoke is verified and must end with
+`state=\"dry_run_complete\"`, eight fixture pages, and four supported contact
+types. Do not add secrets to the image. Use runtime environment variables only
+after an approved non-dry-run mode is reached.
 
 ## Sequential Lock
 

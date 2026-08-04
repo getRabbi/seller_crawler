@@ -45,7 +45,7 @@ export default {
     }
 
     if (request.method === "GET" && isDashboardRoute(url.pathname)) {
-      const access = authorizeDashboardRequest(request, env);
+      const access = await authorizeDashboardRequest(request, env);
       if (!access.allowed) {
         return withCors(errorResponse(access.status, access.code, access.message), request, env);
       }

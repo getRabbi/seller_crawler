@@ -45,6 +45,8 @@ export interface RuntimeEnv {
   ENABLE_AMAZON?: string;
   ACCESS_AUTH_REQUIRED?: string;
   ACCESS_ALLOWED_EMAIL?: string;
+  TEAM_DOMAIN?: string;
+  POLICY_AUD?: string;
   DASHBOARD_ORIGIN?: string;
 }
 

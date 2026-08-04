@@ -1,22 +1,24 @@
 # Seller Intelligence Platform
 
-Local-only Seller Intelligence implementation for the zero-cost hybrid runner
-architecture in `SELLER_INTELLIGENCE_MASTER_SPEC.md`.
+Seller Intelligence Solo Mode v1 release candidate for the zero-cost hybrid
+runner architecture in `SELLER_INTELLIGENCE_MASTER_SPEC.md`.
 
 ## Current Phase Status
 
-- Active phase: `9 - dashboard and Worker query APIs`
-- Phases 0-8: complete and verified
-- Phase 9: partially complete
-- Phase 10A: partially complete
-- Phase 10B and later provider phases: not ready
+- Active milestone: external staging and one-unit provider verification
+- Phases 0-8: complete and verified for Solo v1
+- Phase 9: complete and verified locally for Solo v1; not deployed
+- Phase 10A: complete and verified locally, including the Docker artifact
+- Phase 10B: implementation and one-unit controls complete; external deployment
+  and job verification blocked on operator values
+- Post-launch provider phases: deferred
 - Runner mode: `development_locked`
 - Live crawling: disabled
 - Zyte API: disabled
 - Scrapy Cloud deploy: disabled
 - GitHub Actions crawler: disabled
 - Credit runner: disabled
-- Deployment: disabled
+- Cloudflare and Zyte deployment: not performed
 
 Zyte Support has confirmed that the GitHub Student Scrapy Cloud entitlement is
 applied and that exactly one Scrapy Cloud unit is free. Repository defaults now
@@ -177,28 +179,26 @@ automatic production merging, or dashboard review actions.
 
 ## Dashboard
 
-Phase 9 is partially complete. It replaces the bootstrap screen with a static
-internal Next.js dashboard
-under `apps/dashboard`. It includes Overview, Sellers, Seller detail, Contacts,
-Review queue, Crawl health, Sources, Suppression, and Export routes. Local
-fixture data stays masked in the browser, review items expose only score and
-audit metadata, and route data boundaries are represented as `/v1` Worker API
-paths for later live integration.
+Phase 9 is complete and verified locally for Solo v1. The static Next.js
+dashboard under `apps/dashboard` calls versioned Worker `/v1` APIs for overview,
+seller list/detail, contacts, duplicate review, crawl runs, search, and CSV
+export. It has loading, empty, failure, retry, and locked states. Browser-visible
+contacts remain masked and no browser bundle contains an ingestion, Cloudflare,
+or provider secret.
 
-The dashboard remains a static export in this phase. It does not read
-production secrets, call live Worker endpoints, reveal raw contact values,
-deploy Cloudflare Pages, or activate Cloudflare Access.
+The Worker validates Cloudflare Access JWT signatures, issuer, audience,
+expiration, and the single allowed email before serving private API routes.
+Cloudflare Pages and Access are configured by examples and the deployment
+runbook, but no hosted resource has been deployed.
 
 ## Local Runner Readiness
 
-Phase 10A is partially complete. It adds the provider-neutral local runner
-readiness layer under
-`crawler/sellerintel/runtime/local.py`, a shared crawler `Dockerfile`, and the
-runbook at `docs/local-runner.md`. The runner validates startup gates, honors the
-global kill switch, rejects personal browser profile and cookie inputs, enforces
-one-job execution with an exclusive lock, and executes the real official-site
-Scrapy spider in fixture-only dry-run mode. The Docker artifact is not yet
-verified because the local Docker daemon was unavailable.
+Phase 10A is complete and verified locally for Solo v1. The provider-neutral
+local runner under `crawler/sellerintel/runtime/local.py`, shared `Dockerfile`,
+and `docs/local-runner.md` validate startup gates, honor the global kill switch,
+reject personal browser profile and cookie inputs, enforce one-job execution,
+and execute the real official-site spider. The image builds successfully and
+passes a fixture-only smoke with `--network none`.
 
 Durable spool replay verifies stored checksums, re-signs the same compressed body
 with a fresh nonce and timestamp, preserves the idempotency key, and deletes a
@@ -206,11 +206,20 @@ spool file only after a 2xx Worker response. Defaults stay locked:
 `development_locked`, `LIVE_CRAWL_ENABLED=false`, `LOCAL_RUNNER_FIXTURE_ONLY=true`,
 and `LOCAL_RUNNER_DRY_RUN=true`.
 
+Phase 10B provides a controlled Scrapy Cloud runner and CLI for deploy,
+no-network smoke start, official-site start, status, and cancellation. Every job
+sets `units=1`; the official-site action additionally requires the separate live
+crawl gate. Repository defaults keep deployment false, so external verification
+cannot begin until the operator supplies the Scrapy Cloud project and credential
+and explicitly opens only the deployment gate.
+
 ## Stop Conditions
 
-Do not run live crawling, deploy Cloudflare resources, use Zyte API, activate a
-provider, start Phase 10B/10C/10D provider activation, or push. Checkpoint
-commits are allowed only after the safe local validation suite passes.
+Do not run live crawling, use Zyte API, add a Scrapy Cloud unit, activate a
+fallback provider, or push. Do not deploy until the consolidated values in
+`OPERATOR_INPUTS_REQUIRED.md` are supplied and the appropriate runbook gate is
+followed. Keep broad live crawling disabled after deployment until the single
+approved-seed smoke has passed end to end.
 
 ## Rollback Or Recovery
 
@@ -226,9 +235,10 @@ documented retention operation.
 
 ## Free-Tier Impact
 
-The current local state has no external infrastructure use and no recurring
-cost. Local dependency installation may download development packages, but no
-Cloudflare, Zyte, crawling, R2, hosted D1, or provider runtime is activated.
+The current release candidate has no hosted infrastructure use and no recurring
+cost. Local dependency installation and Docker image creation may download
+packages, but no Cloudflare, Zyte job, live crawl, R2, hosted D1, or provider
+runtime has been activated.
 Local SQLite migration tests, Worker ingestion tests, crawler client tests,
 extractor fixture tests, normalization tests, adapter policy tests,
 official-site enrichment tests, entity-resolution fixture tests, dashboard

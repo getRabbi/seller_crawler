@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import argparse
 import base64
 import json
 import os
 import re
-import subprocess
+import subprocess  # nosec B404
+import sys
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -13,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
+from sellerintel.adapters.official_site import new_uuidv7
 from sellerintel.config.features import RuntimeConfig, load_runtime_config, startup_gate_violations
 from sellerintel.runtime.base import (
     BuildArtifact,
@@ -32,7 +35,18 @@ NO_NETWORK_SMOKE_SPIDER = "solo_no_network_smoke"
 OFFICIAL_SITE_SPIDER = "official_website"
 PROJECT_ID_PATTERN = re.compile(r"^[0-9]+$")
 JOB_ID_PATTERN = re.compile(r"^[0-9]+/[0-9]+/[0-9]+$")
-RESERVED_JOB_ARGUMENTS = frozenset({"project", "spider", "units", "job_settings"})
+RESERVED_JOB_ARGUMENTS = frozenset(
+    {
+        "INGESTION_HMAC_SECRET",
+        "SCRAPY_CLOUD_API_KEY",
+        "ZYTE_API_KEY",
+        "apikey",
+        "job_settings",
+        "project",
+        "spider",
+        "units",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -128,25 +142,45 @@ class ScrapyCloudRunner:
         arguments = dict(job.arguments)
         if RESERVED_JOB_ARGUMENTS.intersection(arguments):
             raise ValueError("Job arguments may not override provider safety fields.")
+        job_settings: dict[str, object] = {
+            "ALLOW_EXTRA_SCRAPY_UNITS": False,
+            "ALLOW_PAID_ADDONS": False,
+            "ALLOW_PAID_GITHUB_ACTIONS_MINUTES": False,
+            "CLOSESPIDER_PAGECOUNT": job.page_budget,
+            "CONCURRENT_REQUESTS": 4,
+            "CONCURRENT_REQUESTS_PER_DOMAIN": 1,
+            "CREDIT_RUNNER_ENABLED": False,
+            "DOWNLOAD_TIMEOUT": 30,
+            "ENABLE_AMAZON": False,
+            "ENABLE_LOCAL_PLAYWRIGHT": False,
+            "ENABLE_OFFICIAL_WEBSITE": True,
+            "GLOBAL_CRAWL_KILL_SWITCH": False,
+            "MAX_EXTERNAL_MONTHLY_SPEND_AUD": 0,
+            "PAID_SERVICES_ALLOWED": False,
+            "RETRY_TIMES": 2,
+            "ROBOTSTXT_OBEY": True,
+            "RUNNER_MODE": "zyte_student_active",
+            "SCRAPY_CLOUD_DEPLOY_ENABLED": True,
+            "SCRAPY_CLOUD_MAX_UNITS": 1,
+            "ZYTE_API_DAILY_REQUEST_BUDGET": 0,
+            "ZYTE_API_ENABLED": False,
+            "ZYTE_API_MONTHLY_BUDGET_USD": 0,
+            "ZYTE_STUDENT_ENTITLEMENT_CONFIRMED": True,
+        }
+        if job.spider_name == OFFICIAL_SITE_SPIDER:
+            job_settings["LIVE_CRAWL_ENABLED"] = True
+            job_settings["ITEM_PIPELINES"] = {
+                "sellerintel.pipelines.SignedIngestionPipeline": 300,
+            }
+        else:
+            job_settings["LIVE_CRAWL_ENABLED"] = False
         form = {
             "project": self._project_id(),
             "spider": job.spider_name,
             "units": "1",
             "priority": "1",
             "add_tag": f"solo-v1:{job.job_id[:64]}",
-            "job_settings": json.dumps(
-                {
-                    "CLOSESPIDER_PAGECOUNT": job.page_budget,
-                    "CONCURRENT_REQUESTS": 4,
-                    "CONCURRENT_REQUESTS_PER_DOMAIN": 1,
-                    "DOWNLOAD_TIMEOUT": 30,
-                    "RETRY_TIMES": 2,
-                    "ROBOTSTXT_OBEY": True,
-                    "ZYTE_API_ENABLED": False,
-                },
-                separators=(",", ":"),
-                sort_keys=True,
-            ),
+            "job_settings": json.dumps(job_settings, separators=(",", ":"), sort_keys=True),
             **arguments,
         }
         payload = self._json_request("POST", f"{API_BASE_URL}/run.json", form=form)
@@ -246,6 +280,12 @@ class UrllibScrapyCloudTransport:
         *,
         form: Mapping[str, str] | None = None,
     ) -> HttpResult:
+        parsed_url = urllib.parse.urlparse(url)
+        if parsed_url.scheme != "https" or parsed_url.hostname not in {
+            "app.zyte.com",
+            "storage.zyte.com",
+        }:
+            raise ValueError("Scrapy Cloud transport accepts only official HTTPS endpoints.")
         body = urllib.parse.urlencode(form).encode() if form is not None else None
         request = urllib.request.Request(
             url,
@@ -259,7 +299,10 @@ class UrllibScrapyCloudTransport:
             },
         )
         try:
-            with urllib.request.urlopen(request, timeout=self._timeout_seconds) as response:  # noqa: S310
+            with urllib.request.urlopen(  # noqa: S310  # nosec B310
+                request,
+                timeout=self._timeout_seconds,
+            ) as response:
                 return HttpResult(status_code=response.status, body=response.read())
         except urllib.error.HTTPError as error:
             return HttpResult(status_code=error.code, body=error.read())
@@ -277,7 +320,7 @@ def load_scrapy_cloud_config(env: Mapping[str, str] | None = None) -> ScrapyClou
 
 
 def run_deploy_command(command: Sequence[str], *, cwd: Path) -> None:
-    subprocess.run(command, cwd=cwd, check=True)  # noqa: S603
+    subprocess.run(command, cwd=cwd, check=True)  # noqa: S603  # nosec B603
 
 
 def cloud_log_level(raw_level: object) -> str:
@@ -287,3 +330,94 @@ def cloud_log_level(raw_level: object) -> str:
         raw_level,
         "unknown",
     )
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Controlled one-unit Scrapy Cloud runner")
+    actions = parser.add_subparsers(dest="action", required=True)
+    actions.add_parser("validate", help="Validate configuration without network access")
+
+    deploy = actions.add_parser("deploy", help="Deploy crawler code to the configured project")
+    deploy.add_argument("--version", default="solo-v1")
+
+    smoke = actions.add_parser("start-smoke", help="Start the no-network smoke spider")
+    smoke.add_argument("--job-id", default="solo-v1-no-network-smoke")
+
+    official = actions.add_parser("start-official", help="Start one approved official-site job")
+    official.add_argument("--seed-url", action="append", required=True)
+    official.add_argument("--crawl-run-id", default="")
+    official.add_argument("--page-budget", type=int, default=8)
+    official.add_argument("--max-depth", type=int, default=2)
+    official.add_argument("--default-region", default="")
+
+    status = actions.add_parser("status", help="Read one job status")
+    status.add_argument("job_id")
+
+    cancel = actions.add_parser("cancel", help="Cancel one job")
+    cancel.add_argument("job_id")
+    return parser
+
+
+def main(
+    argv: Sequence[str] | None = None,
+    *,
+    runner: ScrapyCloudRunner | None = None,
+) -> int:
+    args = _parser().parse_args(argv)
+    config = load_scrapy_cloud_config()
+    cloud_runner = runner or ScrapyCloudRunner(config)
+
+    if args.action == "validate":
+        validation = cloud_runner.validate_configuration()
+        print(json.dumps({"errors": validation.errors, "ok": validation.ok}, sort_keys=True))
+        return 0 if validation.ok else 1
+    if args.action == "deploy":
+        artifact = BuildArtifact(version=args.version, path=str(config.project_dir))
+        result = cloud_runner.deploy(artifact)
+        print(json.dumps({"deployed": result.deployed, "provider": result.provider}))
+        return 0
+    if args.action == "start-smoke":
+        handle = cloud_runner.start(
+            CrawlJob(
+                job_id=args.job_id,
+                page_budget=1,
+                spider_name=NO_NETWORK_SMOKE_SPIDER,
+            )
+        )
+        print(json.dumps({"provider": handle.provider, "run_id": handle.run_id}))
+        return 0
+    if args.action == "start-official":
+        crawl_run_id = args.crawl_run_id or new_uuidv7()
+        arguments = [
+            ("seed_urls", ",".join(args.seed_url)),
+            ("crawl_run_id", crawl_run_id),
+            ("page_budget", str(args.page_budget)),
+            ("max_depth", str(args.max_depth)),
+        ]
+        if args.default_region:
+            arguments.append(("default_region", args.default_region))
+        handle = cloud_runner.start(
+            CrawlJob(
+                job_id=crawl_run_id,
+                page_budget=args.page_budget,
+                spider_name=OFFICIAL_SITE_SPIDER,
+                arguments=tuple(arguments),
+            )
+        )
+        print(json.dumps({"provider": handle.provider, "run_id": handle.run_id}))
+        return 0
+    handle = RunHandle(provider=PROVIDER_NAME, run_id=args.job_id)
+    if args.action == "status":
+        print(json.dumps({"run_id": handle.run_id, "state": cloud_runner.status(handle).state}))
+        return 0
+    cloud_runner.cancel(handle)
+    print(json.dumps({"cancelled": True, "run_id": handle.run_id}))
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except (OSError, RuntimeError, ValueError, subprocess.CalledProcessError) as error:
+        print(f"scrapy-cloud: {error}", file=sys.stderr)
+        raise SystemExit(1) from error

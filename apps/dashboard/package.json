@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "next dev",
     "lint": "eslint app components lib tests next.config.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck": "next typegen && tsc -p tsconfig.json --noEmit",
     "test": "vitest run --root ../.. apps/dashboard/tests",
     "build": "next build"
   },

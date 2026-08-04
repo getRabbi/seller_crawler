@@ -1,4 +1,5 @@
 import sqlite3
+import tomllib
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -226,6 +227,22 @@ def test_operations_sources_store_solo_v1_compact_evidence() -> None:
         "detected_at",
         "last_seen_at",
     }.issubset(table_columns(connection, "sources"))
+
+
+def test_worker_configs_bind_exactly_four_partition_migration_directories() -> None:
+    config_paths = [
+        ROOT / "apps" / "worker-api" / "wrangler.toml",
+        ROOT / "apps" / "worker-api" / "wrangler.staging.toml.example",
+        ROOT / "apps" / "worker-api" / "wrangler.production.toml.example",
+    ]
+    expected_bindings = {"CORE_DB", "CONTACTS_DB", "OPS_DB", "HISTORY_DB"}
+
+    for config_path in config_paths:
+        config = tomllib.loads(config_path.read_text(encoding="utf-8"))
+        bindings = config["d1_databases"]
+        assert {binding["binding"] for binding in bindings} == expected_bindings
+        assert len({binding["migrations_dir"] for binding in bindings}) == 4
+        assert "r2_buckets" not in config
 
 
 def insert_core_fixture(connection: sqlite3.Connection, seller_id: str) -> None:

@@ -92,6 +92,9 @@ def test_enrich_official_page_hashes_evidence_and_extracts_contacts() -> None:
     assert "sales@acme-industrial.testmail" not in enrichment.evidence_snippet
     assert "+14155552671" not in enrichment.evidence_snippet
     assert "AcmeExport_88" not in enrichment.evidence_snippet
+    assert "wa.me/141555" not in enrichment.evidence_snippet
+    assert "wa.me/+*******2672" in enrichment.evidence_snippet
+    assert "WeChat ID: ac***88" in enrichment.evidence_snippet
     assert contacts[("email", "sales@acme-industrial.testmail")].confidence >= 80
     assert contacts[("phone", "+14155552671")].confidence >= 80
     assert contacts[("whatsapp", "+14155552672")].confidence >= 80

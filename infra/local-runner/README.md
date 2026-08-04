@@ -1,9 +1,10 @@
 # Local Runner Infra
 
-Local runner activation is not enabled. Phase 10A readiness is partially
-implemented for fixture-only dry-run smoke and spool replay, but live crawling,
-scheduling, provider deployment, and production ingestion remain disabled.
+The local runner is complete and verified in fixture-only dry-run mode,
+including signed/spooled ingestion tests and a Docker smoke with networking
+disabled. Live crawling, scheduling, provider deployment, and production
+ingestion remain disabled.
 
 Solo Mode v1 keeps this as the only fallback runner. It should remain
-fixture-only and dry-run until the official-website Phase 7 crawl gate is
-approved. It must not become an automatic provider failover path.
+fixture-only and dry-run until one explicit official-site seed is approved for
+the staging smoke. It must not become an automatic provider failover path.

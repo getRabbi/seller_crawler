@@ -11,6 +11,22 @@
   ingestion records, and a no-network end-to-end fixture crawl.
 - Added operations migration `0004_compact_evidence.sql` and regenerated the strict
   ingestion JSON Schema contract.
+- Added Worker APIs for seller list/detail, masked contacts, duplicate review,
+  crawl runs, FTS search, and seller/contact CSV export.
+- Connected the static dashboard to Worker APIs with loading, empty, failure,
+  retry, and locked states; removed launch-path fixture data.
+- Added cryptographic Cloudflare Access JWT verification for signature, issuer,
+  audience, expiry, and the single allowed email.
+- Added local and staging/production four-D1 Wrangler configuration, migration
+  validation, and checksummed backup/restore tooling.
+- Added the controlled one-unit Scrapy Cloud runner, no-network smoke spider,
+  deploy/start/status/cancel CLI, and a manual fail-closed deployment workflow.
+- Verified signed fixture ingestion through a real local Worker and four local
+  D1 databases, including search, duplicate handling, crawl status, detail, and
+  CSV responses.
+- Verified the crawler Docker image with networking disabled; corrected the
+  image entrypoint so runtime startup never attempts to install development
+  dependencies.
 
 ## Unreleased - Solo Mode v1 Planning
 

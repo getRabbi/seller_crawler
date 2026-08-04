@@ -17,9 +17,10 @@ extraction context, content hash, timestamps, parser version, and schema
 version. R2 can be added later for full HTML, screenshots, batch archives, and
 longer evidence retention.
 
-Current reconciled phase state: Phases 0-8 are complete and verified; Phase 9 is
-active and partially complete; Phase 10A is partially complete; Phase 10B and
-later provider phases are not ready.
+Current Solo v1 state: Phases 0-8, Phase 9, and Phase 10A are complete and
+verified locally. Phase 10B code and one-unit controls are complete; hosted
+deployment and job behavior remain unverified because required external values
+are not available. Later provider phases are deferred.
 
 Phase 1 implements the local D1 data boundary:
 
@@ -87,27 +88,25 @@ Decisions are deterministic: scores at `>= 92` can auto-merge, scores from
 record decision payloads and non-destructive redirects so merges can be audited
 and rolled back without deleting canonical or historical rows.
 
-Phase 9 is partially complete. The Next.js app exposes internal
-Overview, Sellers, Seller detail, Contacts, Review queue, Crawl health, Sources,
-Suppression, and Export routes while remaining a static export. Browser-visible
-data is local fixture data with masked contacts and reveal-audit metadata. Live
-dashboard data must come through versioned Worker `/v1` API routes; secrets,
+Phase 9 is complete and verified locally for Solo v1. The static Next.js app
+reads seller list/detail, masked contacts, duplicate review, crawl-run status,
+search, and CSV data through versioned Worker `/v1` APIs. The Worker verifies a
+Cloudflare Access JWT and exact allowed email outside local mode. Secrets,
 direct D1/R2 access, and raw contact values do not belong in browser code.
 
-Phase 10A is partially complete. The local runner validates
+Phase 10A is complete and verified locally. The local runner validates
 the same zero-charge startup gates as other providers, honors the global kill
 switch, rejects personal browser profile and cookie inputs, enforces a single
 active job with an exclusive local lock, and defaults to fixture-only dry-run
-smoke batches. The shared Docker artifact uses the same crawler code path as
-future provider runners, but provider-specific deployments remain blocked until
-their separate activation phases. Spool replay verifies stored checksums,
+smoke batches. The shared Docker artifact builds and runs the fixture crawl with
+networking disabled. Provider deployments remain separately gated. Spool replay verifies stored checksums,
 re-signs the original compressed body with a fresh nonce, preserves
 idempotency, and deletes records only after Worker acceptance.
 
-The shortest Solo v1 architecture path is:
+The remaining Solo v1 architecture path is external and sequential:
 
-1. Add Worker read/search/export APIs for the simple private dashboard.
-2. Protect dashboard access with single-user Cloudflare Access.
-3. Verify basic four-D1 backup and restore.
-4. Verify the local Docker fallback artifact.
-5. Activate Zyte only through the one-unit Phase 10B smoke gate.
+1. Supply hosted Cloudflare resource IDs, routes, Access values, and HMAC secrets.
+2. Deploy staging, apply all four D1 migrations, and verify health and Access.
+3. Deploy and verify only the Zyte no-network smoke with one unit.
+4. Run one explicitly approved, tightly bounded official-site staging crawl.
+5. Back up staging, verify all dashboard/API paths, then deploy production.

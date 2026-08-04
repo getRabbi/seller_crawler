@@ -4,12 +4,13 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@seller-intelligence/shared-types": "0.0.0"
+    "@seller-intelligence/shared-types": "0.0.0",
+    "jose": "^6.2.8"
   },
   "scripts": {
     "lint": "eslint src test",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run test",
-    "health": "vitest run test/health.test.ts"
+    "test": "vitest run --root ../.. apps/worker-api/test",
+    "health": "vitest run --root ../.. apps/worker-api/test/health.test.ts"
   }
 }

@@ -5,12 +5,14 @@ import os
 from collections.abc import AsyncIterator, Iterable, Mapping
 from ipaddress import ip_address
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 from urllib.parse import urlparse
 
 import scrapy
 from scrapy import Request
+from scrapy.crawler import Crawler
 from scrapy.http import Response, TextResponse
+from scrapy.settings import BaseSettings
 
 from sellerintel.adapters.base import is_blocked_response
 from sellerintel.adapters.official_site import (
@@ -21,7 +23,7 @@ from sellerintel.adapters.official_site import (
     seller_record_for_domain,
     source_record_for_page,
 )
-from sellerintel.config.features import assert_startup_gates
+from sellerintel.config.features import assert_startup_gates, load_runtime_config
 from sellerintel.normalization.domain import canonicalize_domain
 from sellerintel.schemas.ingestion import (
     ContactRecord,
@@ -32,6 +34,27 @@ from sellerintel.schemas.ingestion import (
 )
 
 MAX_CONTACTS_PER_PAGE_BATCH = 17
+RUNTIME_SETTING_KEYS = (
+    "RUNNER_MODE",
+    "LIVE_CRAWL_ENABLED",
+    "PAID_SERVICES_ALLOWED",
+    "MAX_EXTERNAL_MONTHLY_SPEND_AUD",
+    "ALLOW_EXTRA_SCRAPY_UNITS",
+    "ALLOW_PAID_GITHUB_ACTIONS_MINUTES",
+    "ALLOW_PAID_ADDONS",
+    "ZYTE_STUDENT_ENTITLEMENT_CONFIRMED",
+    "SCRAPY_CLOUD_DEPLOY_ENABLED",
+    "SCRAPY_CLOUD_MAX_UNITS",
+    "ZYTE_API_ENABLED",
+    "ZYTE_API_DAILY_REQUEST_BUDGET",
+    "ZYTE_API_MONTHLY_BUDGET_USD",
+    "GITHUB_ACTIONS_CRAWLER_ENABLED",
+    "CREDIT_RUNNER_ENABLED",
+    "ENABLE_AMAZON",
+    "ENABLE_OFFICIAL_WEBSITE",
+    "ENABLE_LOCAL_PLAYWRIGHT",
+    "GLOBAL_CRAWL_KILL_SWITCH",
+)
 
 
 class OfficialWebsiteSpider(scrapy.Spider):
@@ -75,21 +98,39 @@ class OfficialWebsiteSpider(scrapy.Spider):
         self._blocked_domains: set[str] = set()
         self._company_names: dict[str, str] = {}
 
-        runtime_config = assert_startup_gates()
+        if self.fixture_dir is not None and not self.fixture_dir.is_dir():
+            raise ValueError("fixture_dir must be an existing directory")
+
+    @classmethod
+    def from_crawler(
+        cls,
+        crawler: Crawler,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Self:
+        spider = super().from_crawler(crawler, *args, **kwargs)
+        spider._validate_runtime(crawler.settings)
+        return spider
+
+    def _validate_runtime(self, settings: BaseSettings) -> None:
+        runtime_values = dict(os.environ)
+        for key in RUNTIME_SETTING_KEYS:
+            value = settings.get(key)
+            if value is not None:
+                runtime_values[key] = _setting_value(value)
+        runtime_config = assert_startup_gates(load_runtime_config(runtime_values))
         if not runtime_config.feature_flags.get("ENABLE_OFFICIAL_WEBSITE", False):
             raise ValueError("ENABLE_OFFICIAL_WEBSITE=true is required")
         if runtime_config.feature_flags.get("GLOBAL_CRAWL_KILL_SWITCH", False):
             raise ValueError("GLOBAL_CRAWL_KILL_SWITCH is active")
 
-        if self.fixture_dir is None and not _env_bool("LIVE_CRAWL_ENABLED", False):
+        if self.fixture_dir is None and not runtime_config.live_crawl_enabled:
             raise ValueError("LIVE_CRAWL_ENABLED=true is required outside fixture mode")
         if self.fixture_dir is None and runtime_config.runner_mode not in {
             "fallback_local",
             "zyte_student_active",
         }:
             raise ValueError("Live official-site crawl requires an explicitly selected runner")
-        if self.fixture_dir is not None and not self.fixture_dir.is_dir():
-            raise ValueError("fixture_dir must be an existing directory")
 
     def start_requests(self) -> Iterable[Request]:
         return self._initial_requests()
@@ -300,6 +341,12 @@ def _parse_seed_urls(value: str) -> tuple[str, ...]:
     return tuple(seeds)
 
 
+def _setting_value(value: object) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
 def _assert_public_hostname(hostname: str) -> None:
     normalized = hostname.strip("[]").casefold()
     if normalized == "localhost" or normalized.endswith(".local"):
@@ -336,10 +383,3 @@ def _bounded_int(value: str | int, *, name: str, minimum: int, maximum: int) -> 
     if not minimum <= parsed <= maximum:
         raise ValueError(f"{name} must be between {minimum} and {maximum}")
     return parsed
-
-
-def _env_bool(name: str, default: bool) -> bool:
-    value = os.environ.get(name)
-    if value is None or value == "":
-        return default
-    return value.casefold() in {"1", "true", "yes", "on"}

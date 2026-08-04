@@ -1,4 +1,4 @@
-name: Deploy Worker Disabled
+name: Worker Deployment Handoff (Manual)
 
 on:
   workflow_dispatch:
@@ -8,6 +8,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          echo "Worker deployment is blocked during local phase reconciliation."
-          echo "Use the Cloudflare release gates in SELLER_INTELLIGENCE_MASTER_SPEC.md before enabling deployment."
+          echo "Worker deployment is blocked until OPERATOR_INPUTS_REQUIRED.md is complete."
+          echo "Use DEPLOYMENT_RUNBOOK.md for the operator-led staging release."
           exit 1

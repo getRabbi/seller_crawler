@@ -5,7 +5,7 @@ import hashlib
 import json
 import os
 import re
-import subprocess
+import subprocess  # nosec B404
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
@@ -184,7 +184,7 @@ def wrangler_prefix() -> tuple[str, ...]:
 
 
 def run_command(command: Sequence[str], *, cwd: Path) -> None:
-    subprocess.run(command, cwd=cwd, check=True)  # noqa: S603
+    subprocess.run(command, cwd=cwd, check=True)  # noqa: S603  # nosec B603
 
 
 def _require_within(path: Path, root: Path, label: str) -> None:

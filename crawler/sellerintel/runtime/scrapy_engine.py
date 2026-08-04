@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -91,11 +92,25 @@ def execute_official_site_crawl(config: ScrapyExecutionConfig) -> ScrapyExecutio
     return ScrapyExecutionResult(
         batches=batches,
         finish_reason=finish_reason,
-        requests_total=int(stats.get("downloader/request_count", 0)),
+        requests_total=total_scheduled_requests(stats),
         responses_success=int(stats.get("downloader/response_status_count/200", 0)),
         blocked_count=int(stats.get("sellerintel/blocked_count", 0)),
         error_count=int(stats.get("sellerintel/error_count", 0)),
     )
+
+
+def total_scheduled_requests(stats: Mapping[str, object]) -> int:
+    return max(
+        _stat_int(stats.get("downloader/request_count")),
+        _stat_int(stats.get("scheduler/dequeued")),
+        _stat_int(stats.get("response_received_count")),
+    )
+
+
+def _stat_int(value: object) -> int:
+    if isinstance(value, (int, float, str)):
+        return int(value)
+    return 0
 
 
 def _read_batches(path: Path) -> list[IngestionBatch]:

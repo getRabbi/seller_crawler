@@ -12,7 +12,7 @@ export default [
       "**/out/**",
       "coverage/**",
       "dist/**",
-      ".wrangler/**"
+      "**/.wrangler/**"
     ]
   },
   js.configs.recommended,

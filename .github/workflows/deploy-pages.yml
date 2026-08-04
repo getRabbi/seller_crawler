@@ -1,4 +1,4 @@
-name: Deploy Pages Disabled
+name: Pages Deployment Handoff (Manual)
 
 on:
   workflow_dispatch:
@@ -8,6 +8,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          echo "Pages deployment is blocked during local phase reconciliation."
-          echo "Do not deploy without the specification release flow and operator approval."
+          echo "Pages deployment is blocked until Worker health and Cloudflare Access are verified."
+          echo "Use DEPLOYMENT_RUNBOOK.md for the operator-led staging release."
           exit 1

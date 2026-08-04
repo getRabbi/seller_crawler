@@ -1,4 +1,4 @@
-name: Database Migrations Disabled
+name: Hosted D1 Migration Handoff (Manual)
 
 on:
   workflow_dispatch:
@@ -8,6 +8,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          echo "Hosted database migrations are blocked during local phase reconciliation."
-          echo "Phase 1 local D1-compatible schema and migrations are validated locally only."
+          echo "Hosted migrations are blocked until all eight D1 resources are recorded."
+          echo "Use DEPLOYMENT_RUNBOOK.md and migrate core, contacts, operations, then history."
           exit 1

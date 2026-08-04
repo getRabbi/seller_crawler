@@ -10,7 +10,9 @@ from sellerintel.runtime.scrapy_cloud import (
     NO_NETWORK_SMOKE_SPIDER,
     HttpResult,
     ScrapyCloudRunner,
+    UrllibScrapyCloudTransport,
     load_scrapy_cloud_config,
+    main,
 )
 
 READY_ENV = {
@@ -139,13 +141,99 @@ def test_job_arguments_cannot_override_unit_limit(tmp_path: Path) -> None:
         )
 
 
+def test_job_arguments_cannot_expose_ingestion_or_provider_secrets(tmp_path: Path) -> None:
+    runner = ready_runner(tmp_path)
+
+    with pytest.raises(ValueError, match="safety fields"):
+        runner.start(
+            CrawlJob(
+                job_id="unsafe-secret-test",
+                page_budget=1,
+                spider_name=NO_NETWORK_SMOKE_SPIDER,
+                arguments=(("INGESTION_HMAC_SECRET", "forbidden"),),
+            )
+        )
+
+
+def test_http_transport_rejects_non_zyte_and_non_https_urls() -> None:
+    transport = UrllibScrapyCloudTransport("fixture-cloud-credential")
+
+    with pytest.raises(ValueError, match="official HTTPS endpoints"):
+        transport.request("GET", "https://example.invalid/jobs")
+    with pytest.raises(ValueError, match="official HTTPS endpoints"):
+        transport.request("GET", "http://app.zyte.com/api/jobs/list.json")
+
+
+def test_cli_exposes_smoke_status_and_cancel_without_secrets(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    transport = FakeTransport()
+    runner = ready_runner(tmp_path, transport=transport)
+
+    assert main(["start-smoke", "--job-id", "controlled-smoke"], runner=runner) == 0
+    assert '"run_id": "123456/1/9"' in capsys.readouterr().out
+    assert main(["status", "123456/1/9"], runner=runner) == 0
+    assert '"state": "finished"' in capsys.readouterr().out
+    assert main(["cancel", "123456/1/9"], runner=runner) == 0
+    assert '"cancelled": true' in capsys.readouterr().out
+
+
+def test_cli_official_job_passes_only_explicit_bounded_spider_arguments(
+    tmp_path: Path,
+) -> None:
+    transport = FakeTransport()
+    runner = ready_runner(
+        tmp_path,
+        transport=transport,
+        env_overrides={"LIVE_CRAWL_ENABLED": "true"},
+    )
+
+    assert main(
+        [
+            "start-official",
+            "--seed-url",
+            "https://approved.example/",
+            "--crawl-run-id",
+            "018f2d5e-7b3c-7a1d-8f2e-523456789abc",
+            "--page-budget",
+            "3",
+            "--max-depth",
+            "1",
+        ],
+        runner=runner,
+    ) == 0
+
+    form = transport.calls[0][2]
+    assert form is not None
+    assert form["units"] == "1"
+    assert form["seed_urls"] == "https://approved.example/"
+    assert form["page_budget"] == "3"
+    assert form["max_depth"] == "1"
+    settings = json.loads(form["job_settings"])
+    assert settings["RUNNER_MODE"] == "zyte_student_active"
+    assert settings["LIVE_CRAWL_ENABLED"] is True
+    assert settings["SCRAPY_CLOUD_MAX_UNITS"] == 1
+    assert settings["ZYTE_API_ENABLED"] is False
+    assert settings["PAID_SERVICES_ALLOWED"] is False
+    assert settings["ITEM_PIPELINES"] == {
+        "sellerintel.pipelines.SignedIngestionPipeline": 300
+    }
+    assert "INGESTION_HMAC_SECRET" not in settings
+
+
 def ready_runner(
     tmp_path: Path,
     *,
     transport: FakeTransport | None = None,
     deploy_runner: FakeDeployRunner | None = None,
+    env_overrides: Mapping[str, str] | None = None,
 ) -> ScrapyCloudRunner:
-    env = {**READY_ENV, "SCRAPY_CLOUD_PROJECT_DIR": str(tmp_path)}
+    env = {
+        **READY_ENV,
+        "SCRAPY_CLOUD_PROJECT_DIR": str(tmp_path),
+        **(env_overrides or {}),
+    }
     return ScrapyCloudRunner(
         load_scrapy_cloud_config(env),
         transport=transport or FakeTransport(),

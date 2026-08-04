@@ -10,7 +10,7 @@
   ],
   "scripts": {
     "lint": "eslint .",
-    "typecheck": "tsc -p packages/shared-types/tsconfig.json --noEmit && tsc -p apps/worker-api/tsconfig.json --noEmit && tsc -p apps/dashboard/tsconfig.json --noEmit",
+    "typecheck": "tsc -p packages/shared-types/tsconfig.json --noEmit && tsc -p apps/worker-api/tsconfig.json --noEmit && npm.cmd run typecheck --workspace @seller-intelligence/dashboard",
     "test": "vitest run",
     "health:worker": "vitest run apps/worker-api/test/health.test.ts",
     "build": "npm.cmd run build --workspace @seller-intelligence/dashboard",
@@ -26,6 +26,7 @@
     "globals": "^15.0.0",
     "typescript": "^5.6.0",
     "typescript-eslint": "^8.0.0",
-    "vitest": "^3.0.0"
+    "vitest": "^3.0.0",
+    "wrangler": "^4.118.0"
   }
 }

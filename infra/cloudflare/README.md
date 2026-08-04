@@ -1,9 +1,10 @@
 # Cloudflare Infra
 
-No Cloudflare resources are created by the current local implementation. Worker,
-D1, R2, Pages, and Access activation require later phase approval and the
-release flow in the master spec. Phase 9 dashboard work is only a static local
-export, and Phase 7 R2 evidence upload is not implemented.
+No Cloudflare resources have been created by repository commands. The Worker,
+four D1 bindings, static Pages dashboard, Access JWT verification, environment
+examples, and backup tooling are prepared and verified locally. Hosted resource
+existence and deployment remain unknown until the operator completes
+`OPERATOR_INPUTS_REQUIRED.md` and follows `DEPLOYMENT_RUNBOOK.md`.
 
 Solo Mode v1 Cloudflare scope is Worker ingestion and read APIs, the existing
 four D1 databases, a static Pages dashboard, single-user Cloudflare Access, CSV

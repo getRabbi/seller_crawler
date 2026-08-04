@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { exportJWK, generateKeyPair, SignJWT } from "jose";
 
 import worker from "../src/index";
 import type {
@@ -11,6 +12,7 @@ import type { RuntimeEnv } from "../src/validation/startup";
 
 const sellerId = "018f2d5e-7b3c-7a1d-8f2e-123456789abc";
 const matchedSellerId = "018f2d5e-7b3c-7a1d-8f2e-123456789abd";
+let accessSigningKeys: Awaited<ReturnType<typeof generateKeyPair>> | undefined;
 
 type QueryResolver = (query: string, values: D1Value[]) => unknown[];
 
@@ -152,13 +154,26 @@ describe("Solo dashboard API", () => {
     expect((await unauthenticated.json()).error.code).toBe("access_required");
   });
 
-  it("allows exactly the configured Access user and adds exact-origin CORS", async () => {
+  it("does not enable the local bypass when APP_ENV is missing", async () => {
+    const env = dashboardEnv();
+    delete env.APP_ENV;
+
+    const response = await worker.fetch(
+      new Request("https://api.example.invalid/v1/sellers"),
+      env
+    );
+
+    expect(response.status).toBe(401);
+    expect((await response.json()).error.code).toBe("access_required");
+  });
+
+  it("allows exactly the configured signed Access user and adds exact-origin CORS", async () => {
     const env = dashboardEnv({ appEnv: "production" });
+    const token = await accessToken("operator@example.invalid");
     const request = new Request("https://api.example.invalid/v1/sellers", {
       headers: {
         origin: "https://dashboard.example.invalid",
-        "cf-access-jwt-assertion": "fixture-jwt",
-        "cf-access-authenticated-user-email": "operator@example.invalid"
+        "cf-access-jwt-assertion": token
       }
     });
     const response = await worker.fetch(request, env);
@@ -171,12 +186,12 @@ describe("Solo dashboard API", () => {
   });
 
   it("does not echo unapproved origins and rejects other Access users", async () => {
+    const token = await accessToken("other@example.invalid");
     const response = await worker.fetch(
       new Request("https://api.example.invalid/v1/sellers", {
         headers: {
           origin: "https://attacker.invalid",
-          "cf-access-jwt-assertion": "fixture-jwt",
-          "cf-access-authenticated-user-email": "other@example.invalid"
+          "cf-access-jwt-assertion": token
         }
       }),
       dashboardEnv({ appEnv: "production" })
@@ -243,12 +258,36 @@ function dashboardEnv(
     ACCESS_AUTH_REQUIRED: "true",
     ACCESS_ALLOWED_EMAIL:
       "allowedEmail" in options ? options.allowedEmail : "operator@example.invalid",
+    TEAM_DOMAIN: "https://seller-intelligence.cloudflareaccess.com",
+    POLICY_AUD: "fixture-access-audience",
     DASHBOARD_ORIGIN: "https://dashboard.example.invalid",
     CORE_DB: options.omitCore ? undefined : core,
     CONTACTS_DB: contacts,
     OPS_DB: operations,
     HISTORY_DB: new FixtureD1(() => [])
   };
+}
+
+async function accessToken(email: string): Promise<string> {
+  accessSigningKeys ??= await generateKeyPair("RS256");
+  const { privateKey, publicKey } = accessSigningKeys;
+  const key = { ...(await exportJWK(publicKey)), kid: "fixture-key", alg: "RS256", use: "sig" };
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ keys: [key] }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      })
+    )
+  );
+  return new SignJWT({ email, type: "app" })
+    .setProtectedHeader({ alg: "RS256", kid: "fixture-key" })
+    .setIssuer("https://seller-intelligence.cloudflareaccess.com")
+    .setAudience("fixture-access-audience")
+    .setIssuedAt()
+    .setExpirationTime("5m")
+    .sign(privateKey);
 }
 
 function sellerRow(): Record<string, unknown> {

@@ -9,8 +9,8 @@ WeChat. Marketplace crawling, Amazon, Alibaba, 1688, supplier directories,
 registry crawling, broad search discovery, paid search APIs, paid proxies, and
 Zyte API are deferred.
 
-Phase 7 is complete and verified in no-network fixture mode. Phase 9 is active;
-Phase 10A remains partial. No live source is activated.
+Phase 7, the Solo v1 Phase 9 dashboard/API surface, and Phase 10A are complete
+and verified locally. No live source is activated.
 
 Phase 4 contact extractor tests use sanitized local HTML fixtures only. These
 fixtures cover an official contact page, a multilingual contact page, and a
@@ -38,8 +38,9 @@ Phase 8 entity resolution does not add a live source. It compares already
 collected seller identities, aliases, domains, marketplace identifiers, public
 contact hashes, and location hints in deterministic local fixtures.
 
-Phase 9 dashboard data is local fixture data only. It does not call live Worker
-endpoints, direct D1, R2, crawlers, source adapters, or provider APIs.
+Phase 9 dashboard data comes only from Worker `/v1` endpoints. The browser does
+not call D1, R2, crawlers, source adapters, or provider APIs directly, and list
+or export responses expose masked contacts only.
 
 Phase 10A local runner smoke mode executes the official-site spider against the
 sanitized fixture site and emits deterministic ingestion batches. It does not

@@ -61,8 +61,11 @@ be recorded as a new audit/decision operation rather than deleting history.
 
 Dashboard code must never contain production secrets, direct D1/R2 bindings, or
 raw contact values. Browser-visible contact fields must remain masked, reveal
-metadata must be audit-only, and future live data must pass through authenticated
-Worker `/v1` routes rather than direct provider or storage calls.
+metadata must be audit-only, and data must pass through authenticated Worker
+`/v1` routes rather than direct provider or storage calls. Outside local mode,
+the Worker must cryptographically validate the Cloudflare Access token signature,
+issuer, audience, expiry, and exact single allowed email; header presence alone
+is not authentication.
 
 Local runner smoke mode must remain fixture-only and dry-run unless an approved
 operator action supplies ingestion settings. Do not pass browser profile paths,
