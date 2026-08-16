@@ -5,12 +5,13 @@ runner architecture in `SELLER_INTELLIGENCE_MASTER_SPEC.md`.
 
 ## Current Phase Status
 
-- Active milestone: external staging and one-unit provider verification
+- Active milestone: authenticated dashboard acceptance and production promotion
 - Phases 0-8: complete and verified for Solo v1
-- Phase 9: complete and verified locally for Solo v1; not deployed
+- Phase 9: Cloudflare staging deployed; authenticated feature verification and
+  production promotion remain pending
 - Phase 10A: complete and verified locally, including the Docker artifact
-- Phase 10B: implementation and one-unit controls complete; external deployment
-  and job verification blocked on operator values
+- Phase 10B: code deployed to Scrapy Cloud; one-unit no-network completion,
+  controlled cancellation, and bounded signed-ingestion crawl verified
 - Post-launch provider phases: deferred
 - Runner mode: `development_locked`
 - Live crawling: disabled
@@ -18,7 +19,12 @@ runner architecture in `SELLER_INTELLIGENCE_MASTER_SPEC.md`.
 - Scrapy Cloud deploy: disabled
 - GitHub Actions crawler: disabled
 - Credit runner: disabled
-- Cloudflare and Zyte deployment: not performed
+- Cloudflare staging and Scrapy Cloud code: deployed; the controlled synthetic
+  seed crawl completed on one unit with signed D1 ingestion. Production and
+  broad live crawling have not started.
+
+The current hosted inventory, verification evidence, security review, quota
+impact, and recovery path are recorded in `STAGING_DEPLOYMENT_REPORT.md`.
 
 Zyte Support has confirmed that the GitHub Student Scrapy Cloud entitlement is
 applied and that exactly one Scrapy Cloud unit is free. Repository defaults now
@@ -164,18 +170,17 @@ disabled.
 
 ## Entity Resolution
 
-Phase 8 is complete and verified. It adds
-runner-side exact and fuzzy entity resolution under
-`crawler/sellerintel/entity_resolution`. Decisions include transparent score
+Phase 8 is complete and verified. The existing deterministic scorer is connected
+to the Worker ingestion/persistence path. Decisions include transparent score
 components, deterministic IDs, and fixed thresholds: auto-merge at `>= 92`,
 review queue at `70-91`, and no merge below `70`.
 
 The core migration `database/migrations/core/0004_entity_resolution.sql` adds
-`entity_resolution_decisions` and `seller_merge_redirects` so merge decisions
-can be audited and rolled back without deleting canonical or historical data.
-The implementation only prepares deterministic decisions, review payloads,
-merge audit metadata, and rollback steps; it does not perform live writes,
-automatic production merging, or dashboard review actions.
+`entity_resolution_decisions`, `seller_merge_redirects`, and decision-scoped row
+link audit metadata so merge decisions can be applied idempotently and rolled
+back without deleting canonical or historical data. The single-operator API and
+dashboard support merge, keep-separate, and ignore decisions; rollback restores
+only rows recorded for the selected merge.
 
 ## Dashboard
 
@@ -184,7 +189,9 @@ dashboard under `apps/dashboard` calls versioned Worker `/v1` APIs for overview,
 seller list/detail, contacts, duplicate review, crawl runs, search, and CSV
 export. It has loading, empty, failure, retry, and locked states. Browser-visible
 contacts remain masked and no browser bundle contains an ingestion, Cloudflare,
-or provider secret.
+contact-encryption, or provider secret. Individual raw values require an
+authenticated POST reveal with an operator reason; every successful reveal is
+audited. Contact CSV remains masked by design.
 
 The Worker validates Cloudflare Access JWT signatures, issuer, audience,
 expiration, and the single allowed email before serving private API routes.
@@ -201,7 +208,8 @@ and execute the real official-site spider. The image builds successfully and
 passes a fixture-only smoke with `--network none`.
 
 Durable spool replay verifies stored checksums, re-signs the same compressed body
-with a fresh nonce and timestamp, preserves the idempotency key, and deletes a
+with the required crawler User-Agent, ingestion headers, fresh nonce and timestamp,
+preserves the idempotency key, and deletes a
 spool file only after a 2xx Worker response. Defaults stay locked:
 `development_locked`, `LIVE_CRAWL_ENABLED=false`, `LOCAL_RUNNER_FIXTURE_ONLY=true`,
 and `LOCAL_RUNNER_DRY_RUN=true`.

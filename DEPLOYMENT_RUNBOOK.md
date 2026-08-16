@@ -17,6 +17,13 @@ PAID_SERVICES_ALLOWED=false
 MAX_EXTERNAL_MONTHLY_SPEND_AUD=0
 ALLOW_EXTRA_SCRAPY_UNITS=false
 ENABLE_AMAZON=false
+ENABLE_ALIBABA=false
+ENABLE_1688=false
+ENABLE_SEARCH_DISCOVERY=false
+ENABLE_BUSINESS_REGISTRY=false
+ENABLE_OFFICIAL_WEBSITE=true
+ENABLE_AI_SUMMARY=false
+ENABLE_OUTREACH=false
 GITHUB_ACTIONS_CRAWLER_ENABLED=false
 CREDIT_RUNNER_ENABLED=false
 ```
@@ -77,7 +84,9 @@ query paths with a Cloudflare Access Allow policy containing exactly the
 operator email. Configure an exact-path Access Bypass application/policy only
 for `/v1/ingest/batch`; that route uses HMAC, timestamp, nonce, source-policy,
 payload-schema, and idempotency validation and cannot use an interactive Access
-session. Do not bypass Access for health, search, CSV, or other `/v1` routes.
+session. Add the same exact-path HMAC bypass for `/v1/crawl/authorize`; this
+signed read checks the persisted domain cooldown before a live job schedules a
+seed. Do not bypass Access for health, search, CSV, or other `/v1` routes.
 
 Create untracked files from the committed templates:
 
@@ -92,6 +101,7 @@ flags unchanged. Confirm there is no R2 binding. Configure secrets interactively
 ```powershell
 npx.cmd wrangler secret put INGESTION_HMAC_SECRET --config apps/worker-api/wrangler.staging.toml
 npx.cmd wrangler secret put ACCESS_ALLOWED_EMAIL --config apps/worker-api/wrangler.staging.toml
+npx.cmd wrangler secret put CONTACT_ENCRYPTION_KEYS --config apps/worker-api/wrangler.staging.toml
 ```
 
 `TEAM_DOMAIN` must be the HTTPS `*.cloudflareaccess.com` team domain.
@@ -127,8 +137,18 @@ Set only the public Worker base URL at build time:
 ```powershell
 $env:NEXT_PUBLIC_WORKER_API_BASE_URL="https://<STAGING_WORKER_HOST>"
 npm.cmd run build --workspace @seller-intelligence/dashboard
-npx.cmd wrangler pages deploy apps/dashboard/out --project-name <STAGING_PAGES_PROJECT> --branch staging
+npx.cmd wrangler pages deploy apps/dashboard/out --project-name <STAGING_PAGES_PROJECT> --branch <STAGING_PAGES_PRODUCTION_BRANCH>
 ```
+
+Before invoking Pages CLI, load `CLOUDFLARE_ACCOUNT_ID` from the repository's
+ignored environment file into that process and verify `wrangler whoami` resolves
+only to the repository-authorized account. Pages CLI may consult cached account
+selection; an ambiguous or mismatched account is a hard stop. If account-safe
+CLI selection cannot be proven, upload assets with a project-scoped upload token
+and create the deployment through the explicit
+`/accounts/<AUTHORIZED_ACCOUNT_ID>/pages/projects/<PROJECT>/deployments` API.
+The branch must match the Pages project's configured production branch so the
+custom staging domain serves the new deployment.
 
 Do not put the HMAC secret, Cloudflare API token, Access token, Scrapy Cloud
 credential, raw contact values, or D1 IDs in `NEXT_PUBLIC_*` variables. Confirm
@@ -144,18 +164,22 @@ retry/empty/error states, and both CSV exports.
 Load the four database-name variables for the target environment, then run:
 
 ```powershell
-$env:PYTHONPATH="crawler"
-uv run python -m sellerintel.operations.d1_transfer backup --environment staging
+uv run --directory crawler python -m sellerintel.operations.d1_transfer backup --environment staging --workspace-root .. --output-root .sellerintel/backups
 ```
 
 The output directory contains four SQL files and a SHA-256 manifest under
 `.sellerintel/backups`. Move the completed backup to operator-controlled,
 encrypted storage. The repository does not upload backups to R2.
 
+Cloudflare D1 cannot export a database while including an FTS5 virtual table.
+The backup utility therefore exports every canonical core table explicitly and
+excludes only the rebuildable `seller_search_fts` index. After any core restore,
+run `database/queries/rebuild_core_fts_after_restore.sql`.
+
 Restore only into the matching environment and database mapping:
 
 ```powershell
-uv run python -m sellerintel.operations.d1_transfer restore --environment staging --manifest <MANIFEST_PATH> --confirm-restore
+uv run --directory crawler python -m sellerintel.operations.d1_transfer restore --environment staging --workspace-root .. --manifest <MANIFEST_PATH> --confirm-restore
 ```
 
 After a core restore, execute
@@ -170,10 +194,13 @@ settings in the private Scrapy Cloud project before an official-site job:
 
 ```text
 INGESTION_ENDPOINT_URL=https://<STAGING_WORKER_HOST>/v1/ingest/batch
+SOURCE_COOLDOWN_CHECK_URL=https://<STAGING_WORKER_HOST>/v1/crawl/authorize
 INGESTION_HMAC_SECRET=<STAGING_INGESTION_HMAC_SECRET>
+CONTACT_ENCRYPTION_KEYS=<STAGING_VERSIONED_KEYRING_JSON>
+CONTACT_ENCRYPTION_ACTIVE_KEY_VERSION=<ACTIVE_KEY_VERSION>
 ```
 
-Treat the HMAC value as a secret. The scheduler request never contains it. The
+Treat the HMAC value and contact keyring as secrets. The scheduler request never contains them. The
 official-site pipeline fails closed if either setting is absent, submits signed
 idempotent batches, stores only receipt metadata as Scrapy Cloud items, and
 stops after a spooled ingestion failure.
@@ -181,7 +208,6 @@ stops after a spooled ingestion failure.
 Open the deploy gate only in the controlled operator shell:
 
 ```powershell
-$env:PYTHONPATH="crawler"
 $env:RUNNER_MODE="zyte_student_active"
 $env:SCRAPY_CLOUD_DEPLOY_ENABLED="true"
 $env:LIVE_CRAWL_ENABLED="false"
@@ -192,21 +218,30 @@ $env:PAID_SERVICES_ALLOWED="false"
 $env:MAX_EXTERNAL_MONTHLY_SPEND_AUD="0"
 $env:ALLOW_EXTRA_SCRAPY_UNITS="false"
 $env:ENABLE_AMAZON="false"
-uv run python -m sellerintel.runtime.scrapy_cloud validate
-uv run python -m sellerintel.runtime.scrapy_cloud deploy --version solo-v1
-uv run python -m sellerintel.runtime.scrapy_cloud start-smoke --job-id controlled-no-network-smoke
+$env:ENABLE_ALIBABA="false"
+$env:ENABLE_1688="false"
+$env:ENABLE_SEARCH_DISCOVERY="false"
+$env:ENABLE_BUSINESS_REGISTRY="false"
+$env:ENABLE_OFFICIAL_WEBSITE="true"
+$env:SCRAPY_CLOUD_PROJECT_DIR="."
+$env:SHUB_APIKEY=$env:SCRAPY_CLOUD_API_KEY
+uv run --directory crawler python -m sellerintel.runtime.scrapy_cloud validate
+uv run --with shub==2.18.1 --directory crawler python -m sellerintel.runtime.scrapy_cloud deploy --version solo-v1
+Remove-Item Env:SHUB_APIKEY
+uv run --directory crawler python -m sellerintel.runtime.scrapy_cloud start-smoke --job-id controlled-no-network-smoke
 ```
 
 The returned run ID is safe to use for status and cancellation:
 
 ```powershell
-uv run python -m sellerintel.runtime.scrapy_cloud status <PROJECT/SPIDER/JOB>
-uv run python -m sellerintel.runtime.scrapy_cloud cancel <PROJECT/SPIDER/JOB>
+uv run --directory crawler python -m sellerintel.runtime.scrapy_cloud status <PROJECT/SPIDER/JOB>
+uv run --directory crawler python -m sellerintel.runtime.scrapy_cloud cancel <PROJECT/SPIDER/JOB>
 ```
 
 Verify one started job, `units=1`, completion, and one controlled cancellation.
 The smoke spider uses a `data:` URL and cannot crawl a network source. There must
-be no schedule. Restore `SCRAPY_CLOUD_DEPLOY_ENABLED=false` after the check.
+be no schedule. Restore `SCRAPY_CLOUD_DEPLOY_ENABLED=false` and
+`RUNNER_MODE=development_locked` after the check.
 
 ## 7. One Approved Official-Site Staging Smoke
 
@@ -216,7 +251,7 @@ budget no greater than eight and depth no greater than two:
 
 ```powershell
 $env:LIVE_CRAWL_ENABLED="true"
-uv run python -m sellerintel.runtime.scrapy_cloud start-official --seed-url <APPROVED_HTTPS_SEED> --page-budget 8 --max-depth 2
+uv run --directory crawler python -m sellerintel.runtime.scrapy_cloud start-official --seed-url <APPROVED_HTTPS_SEED> --page-budget 8 --max-depth 2
 $env:LIVE_CRAWL_ENABLED="false"
 ```
 

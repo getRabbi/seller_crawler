@@ -1,5 +1,9 @@
 # Solo Mode v1 Production Report
 
+> Historical local-release checkpoint (2026-08-04). Cloudflare staging was
+> deployed on 2026-08-16; see `STAGING_DEPLOYMENT_REPORT.md` for current hosted
+> state and remaining gates.
+
 Report date: 2026-08-04
 Implementation checkpoint: `e6fac2d`
 Authoritative specification: `SELLER_INTELLIGENCE_MASTER_SPEC.md`

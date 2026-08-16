@@ -2,6 +2,20 @@
 
 ## Unreleased - Solo Mode v1 Implementation
 
+- Added versioned AES-256-GCM contact storage, a masked-by-default API/CSV
+  boundary, and an Access-authenticated, reasoned, audited single-operator
+  contact reveal path.
+- Connected deterministic entity resolution to ingestion persistence with
+  review records, idempotent merge/keep-separate/ignore decisions, cross-D1
+  link audits, and non-destructive rollback.
+- Added signed pre-crawl cooldown authorization and persisted per-domain 429
+  `Retry-After` state so later jobs fail closed until the cooldown expires.
+- Tracked the spool package, aligned replay headers with normal ingestion,
+  restored the sanitized environment example, and made package scripts
+  Linux-compatible.
+- Locked Solo v1 source defaults to official websites only; business registry,
+  marketplace/search discovery, Zyte API, paid services, and deferred features
+  remain disabled.
 - Approved the Solo Mode v1 delivery overlay and amended the authoritative master
   specification to version 2.1.0 before implementation.
 - Kept live crawling, Scrapy Cloud deployment, Zyte API, paid services, extra units,
@@ -27,6 +41,31 @@
 - Verified the crawler Docker image with networking disabled; corrected the
   image entrypoint so runtime startup never attempts to install development
   dependencies.
+- Made local-runner, D1 transfer, and Scrapy Cloud runbook commands self-contained
+  from the repository root instead of relying on a shell-persistent `PYTHONPATH`.
+- Deployed Cloudflare staging in the repository-authorized account: four migrated
+  D1 partitions, the bound Worker and route, the Pages dashboard/custom domain,
+  proxied DNS, exact-email Access protection, and the exact-path HMAC ingestion
+  bypass. Secret values were neither printed nor committed.
+- Documented the deployed staging inventory, security review, free-tier quota
+  impact, remaining manual gates, and forward-only rollback/recovery path in
+  `STAGING_DEPLOYMENT_REPORT.md`.
+- Deployed crawler version `a6aea18-main` to the entitled Scrapy Cloud project,
+  verified a one-unit/no-network hosted smoke with one response, one item, and
+  zero errors, then verified controlled cancellation on a second sequential job.
+  No periodic job, live crawl, Zyte API, extra unit, or paid service was enabled.
+- Added and deployed the public synthetic `seed-stg.scalemyprints.com` fixture,
+  restricted Worker ingestion to that exact domain, and configured the endpoint
+  and HMAC only in private Scrapy Cloud project settings.
+- Hardened cloud ingestion with an explicit product User-Agent, valid UTC
+  observation timestamps, safe rejection receipts that never log raw items,
+  explicit deploy-version forwarding, and Scrapy Cloud job-ID persistence.
+- Completed final one-unit run `871778/1/3`: 6 responses, 2 receipt-only items,
+  0 errors, 0 block/spool signals, four encrypted and masked synthetic contact
+  types in D1, a completed linked crawl run, and zero remaining jobs/schedules.
+- Completed a checksummed four-D1 staging backup. Core export now excludes only
+  the rebuildable FTS5 virtual index because Cloudflare D1 cannot export virtual
+  tables; canonical tables remain covered and the runbook requires FTS rebuild.
 
 ## Unreleased - Solo Mode v1 Planning
 

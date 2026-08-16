@@ -73,13 +73,13 @@ title, masked snippet, content hash, detection time, and last-seen time. R2
 writes do not occur. Local-live execution remains double-gated by runner mode
 and `LIVE_CRAWL_ENABLED=true` plus explicit seeds.
 
-Entity resolution runs in the crawler/runner layer, not in request-time Worker
-queries. Use deterministic fixture tests for exact and fuzzy matching. Decisions
+Entity resolution runs in the Worker ingestion path using the deterministic
+exact/domain/contact and fuzzy-name scoring rules. Decisions
 must include score components, use the fixed `>= 92`, `70-91`, and `< 70`
-thresholds, and write or replay merge metadata idempotently by decision ID when
-persistence is later connected. Merge rollback is forward-only: create a
-rollback decision, restore source-seller links from audit metadata, and never
-delete canonical or historical rows to undo a merge.
+thresholds, and write or replay merge metadata idempotently by decision ID.
+Merge rollback is forward-only: restore only source-seller links recorded for
+the decision, preserve audit history, and never delete canonical or historical
+rows to undo a merge.
 
 The dashboard is a static Next.js export backed by Worker `/v1` APIs. Contacts
 remain masked, and Access configuration is enforced at the Worker rather than

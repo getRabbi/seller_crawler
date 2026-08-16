@@ -24,6 +24,14 @@ SELLER_INTELLIGENCE_MASTER_SPEC.md.
 - Do not change frozen architecture without first updating the master specification.
 - Run tests before declaring a task complete.
 
+## Cloudflare account safety
+- This repository may use only `Uprightseo24@gmail.com's Account` with Cloudflare account ID `b63e426431b63ec9db33d7c421d01b42`.
+- Never use `Servicerabbi@gmail.com's Account` or Cloudflare account ID `5c06252f18014fafe3ceed6acd45e82a` for any work in this repository, including read, write, deploy, migration, DNS, Access, Pages, Workers, D1, or R2 operations.
+- Load Cloudflare credentials from the repository's ignored `.env` file. Do not rely on inherited Windows user or process environment variables for account selection.
+- Before every Cloudflare write, deploy, migration, binding update, or other external mutation, verify that both `CLOUDFLARE_ACCOUNT_ID` and the authenticated account resolve exactly to `b63e426431b63ec9db33d7c421d01b42`.
+- After every approved Cloudflare mutation, verify the affected resource in the same account.
+- Treat an account mismatch, ambiguous account selection, authentication fallback, or inability to verify the account ID as a hard stop. Do not attempt the mutation until the account is corrected and re-verified.
+
 ## Architecture
 - Provider-neutral Python Scrapy crawler package.
 - Preferred runner: verified Zyte Student Scrapy Cloud unit.

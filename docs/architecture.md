@@ -88,6 +88,13 @@ Decisions are deterministic: scores at `>= 92` can auto-merge, scores from
 record decision payloads and non-destructive redirects so merges can be audited
 and rolled back without deleting canonical or historical rows.
 
+The Worker invokes entity resolution during ingestion, persists the chosen
+decision, creates review records, and applies idempotent merge redirects. A
+decision-scoped row-link audit supports forward rollback across all four D1
+partitions. Contact values use versioned AES-256-GCM at rest; dashboard and CSV
+responses stay masked, while an Access-authenticated single-operator reveal is
+reasoned and audited.
+
 Phase 9 is complete and verified locally for Solo v1. The static Next.js app
 reads seller list/detail, masked contacts, duplicate review, crawl-run status,
 search, and CSV data through versioned Worker `/v1` APIs. The Worker verifies a

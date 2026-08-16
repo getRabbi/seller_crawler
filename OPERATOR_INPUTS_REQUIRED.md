@@ -44,7 +44,7 @@ use distinct resources and values.
 | `CLOUDFLARE_WORKER_NAME` | Non-secret | MISSING; template default exists | Operator naming decision | `.env.*`; matching Wrangler `name` | Workers deploy | Staging/production |
 | `CLOUDFLARE_WORKER_ROUTE` / Worker API hostname | Non-secret | MISSING | Approved DNS/Worker route | `.env.*`; Wrangler `routes` | Zone route edit | Staging/production |
 | `DASHBOARD_ORIGIN` | Non-secret | MISSING | Final protected dashboard origin | Wrangler vars | Exact CORS origin | Staging/production |
-| `INGESTION_ALLOWED_SOURCE_DOMAINS` | Non-secret | MISSING | Approved seed-domain list | Wrangler vars | Restrict ingestion source URLs | Staging/production |
+| `INGESTION_ALLOWED_SOURCE_DOMAINS` | Non-secret | STAGING CONFIGURED (`seed-stg.scalemyprints.com`) | Approved seed-domain list | Wrangler vars | Restrict ingestion source URLs | Staging/production |
 
 ## Dashboard And Pages
 
@@ -71,7 +71,7 @@ Worker route may bypass Access.
 
 | Variable/value | Type | State | Obtain from | Configure in | Required scope | Environment |
 |---|---|---:|---|---|---|---|
-| `INGESTION_HMAC_SECRET` (staging) | Secret | MISSING | Generate with a cryptographic password manager | Staging Worker secret; Scrapy Cloud project setting during staging test; local controlled runner when needed | Sign/verify ingestion only | Staging |
+| `INGESTION_HMAC_SECRET` (staging) | Secret | WORKER AND PRIVATE SCRAPY CLOUD SETTING CONFIGURED | Generated securely | Staging Worker secret; Scrapy Cloud project setting | Sign/verify ingestion only | Staging |
 | `INGESTION_HMAC_SECRET` (production) | Secret | MISSING | Generate separately | Production Worker secret; Scrapy Cloud project setting after production promotion | Sign/verify ingestion only | Production |
 
 Do not reuse the staging secret in production. Never put either value in a
@@ -82,10 +82,10 @@ request.
 
 | Variable/value | Type | State | Obtain from | Configure in | Required scope | Environment |
 |---|---|---:|---|---|---|---|
-| `SCRAPY_CLOUD_PROJECT_ID` | Non-secret | MISSING | Verified Student Scrapy Cloud project URL/dashboard | Operator shell; optional GitHub input/variable | One entitled project | Staging smoke/production runner |
-| `SCRAPY_CLOUD_API_KEY` / `SHUB_APIKEY` | Secret | MISSING | Scrapy Cloud account API key | Operator secret store/shell or `scrapy-cloud` GitHub environment secret | Deploy project; start/read/stop jobs; read logs | Staging smoke/production runner |
-| `INGESTION_ENDPOINT_URL` project setting | Non-secret | MISSING | Current protected Worker ingestion URL | Scrapy Cloud project custom setting | Outbound HTTPS to Worker | Staging, then production |
-| `INGESTION_HMAC_SECRET` project setting | Secret | MISSING | Matching target Worker secret above | Scrapy Cloud private project custom setting | Sign ingestion only | Staging, then rotate to production |
+| `SCRAPY_CLOUD_PROJECT_ID` | Non-secret | CONFIGURED (`871778`) | Verified Student Scrapy Cloud project URL/dashboard | Ignored repository `.env`; optional GitHub input/variable | One entitled project | Staging smoke/production runner |
+| `SCRAPY_CLOUD_API_KEY` / `SHUB_APIKEY` | Secret | CONFIGURED IN IGNORED `.env` | Scrapy Cloud account API key | Operator secret store/shell or `scrapy-cloud` GitHub environment secret | Deploy project; start/read/stop jobs; read logs | Staging smoke/production runner |
+| `INGESTION_ENDPOINT_URL` project setting | Non-secret | STAGING CONFIGURED | Current protected Worker ingestion URL | Scrapy Cloud project custom setting | Outbound HTTPS to Worker | Staging, then production |
+| `INGESTION_HMAC_SECRET` project setting | Secret | STAGING CONFIGURED; VALUE NOT RECORDED | Matching target Worker secret above | Scrapy Cloud private project custom setting | Sign ingestion only | Staging, then rotate to production |
 
 The Scrapy Cloud API key is not a Zyte API key. Do not create or configure a
 Zyte API key. Confirm in the dashboard that only the one Student unit exists.
@@ -109,14 +109,14 @@ scheduled-crawl secrets.
 
 ## Boundary Exit Checklist
 
-- [ ] `npx.cmd wrangler whoami` succeeds for the intended account.
+- [x] `npx.cmd wrangler whoami` succeeds exclusively for the repository-authorized account.
 - [ ] Eight distinct D1 resource names/IDs are recorded across staging and production.
 - [ ] Staging and production Worker/API and dashboard hostnames are final.
 - [ ] Separate staging and production HMAC secrets are configured without display.
 - [ ] One operator email, team domain, and both Access audiences are available.
-- [ ] The entitled Scrapy Cloud project ID and Scrapy Cloud API credential are available.
-- [ ] The dashboard confirms exactly one free Student unit and no Zyte API subscription.
-- [ ] An explicit HTTPS official-site seed is approved only for the bounded staging smoke.
+- [x] The entitled Scrapy Cloud project ID and Scrapy Cloud API credential are available.
+- [x] The controlled runner and job metadata confirm exactly one unit; Zyte API is disabled.
+- [x] The synthetic HTTPS seed `seed-stg.scalemyprints.com` is approved and its bounded staging smoke completed.
 
 After this checklist is complete, the next command is:
 

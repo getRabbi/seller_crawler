@@ -20,7 +20,11 @@ ALLOW_EXTRA_SCRAPY_UNITS=false
 ENABLE_AMAZON=false
 ```
 
-Use `python -m sellerintel.runtime.scrapy_cloud` for controlled validation,
-deployment, smoke start, status, and cancellation. Do not create a Zyte API key,
+From the repository root, use
+`uv run --directory crawler python -m sellerintel.runtime.scrapy_cloud` for
+controlled validation, deployment, smoke start, status, and cancellation. This
+does not depend on a shell-persistent `PYTHONPATH`. Before deployment, map the
+ignored `SCRAPY_CLOUD_API_KEY` to process-only `SHUB_APIKEY`, and remove that
+alias immediately afterward. Do not create a Zyte API key,
 add another Scrapy Cloud unit, deploy a live spider, or run an official-site
 crawl until the corresponding gate in `DEPLOYMENT_RUNBOOK.md` is reached.

@@ -11,11 +11,11 @@ API remain out of scope.
 
 ## Default Smoke Command
 
-Run from the repository root with `PYTHONPATH=crawler` set in the shell:
+Run from the repository root. The command selects the crawler package directory
+itself and does not depend on a shell-persistent `PYTHONPATH`:
 
 ```powershell
-$env:PYTHONPATH="crawler"
-uv run python -m sellerintel.runtime.local
+uv run --directory crawler python -m sellerintel.runtime.local
 ```
 
 The default mode is fixture-only and dry-run:
@@ -70,7 +70,7 @@ Scheduling remains blocked until operator approval. When approved, schedule one
 fixture or fallback-local runner command at a time with:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$env:PYTHONPATH='crawler'; uv run python -m sellerintel.runtime.local"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "uv run --directory crawler python -m sellerintel.runtime.local"
 ```
 
 Keep `LOCAL_RUNNER_LOCK_PATH` on the same local disk as the runner workspace so
@@ -79,11 +79,10 @@ overlapping jobs fail closed.
 ## Linux Cron
 
 Scheduling remains blocked until operator approval. When approved, use a single
-cron entry that sets `PYTHONPATH`, changes to the repository root, and runs the
-same module:
+cron entry that changes to the repository root and runs the same module:
 
 ```cron
-*/30 * * * * cd /srv/seller_crawler && PYTHONPATH=crawler uv run python -m sellerintel.runtime.local
+*/30 * * * * cd /srv/seller_crawler && uv run --directory crawler python -m sellerintel.runtime.local
 ```
 
 Do not configure a cron schedule for marketplace crawling, browser profiles,
