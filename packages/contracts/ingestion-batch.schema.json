@@ -153,6 +153,7 @@
         },
         "contact_value_ciphertext": {
           "minLength": 1,
+          "pattern": "^si-aesgcm:v1:[A-Za-z0-9._-]{1,32}:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$",
           "title": "Contact Value Ciphertext",
           "type": "string"
         },

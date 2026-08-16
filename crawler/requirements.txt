@@ -1,3 +1,4 @@
+cryptography>=50,<51
 pydantic>=2.8,<3
 phonenumbers>=8.13,<9
 scrapy>=2.12,<3

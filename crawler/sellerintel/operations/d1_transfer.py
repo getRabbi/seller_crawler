@@ -19,6 +19,16 @@ DATABASE_KEYS = (
     "OPS_D1_DATABASE_NAME",
     "HISTORY_D1_DATABASE_NAME",
 )
+CORE_EXPORT_TABLES = (
+    "sellers",
+    "marketplace_accounts",
+    "seller_aliases",
+    "score_components",
+    "seller_product_links",
+    "entity_resolution_decisions",
+    "seller_merge_redirects",
+    "seller_merge_link_audit",
+)
 DATABASE_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 
 
@@ -62,6 +72,11 @@ def backup_databases(
 
     for binding, database_name in database_names(env).items():
         file_path = backup_dir / f"{binding.removesuffix('_D1_DATABASE_NAME').lower()}.sql"
+        table_arguments = (
+            [argument for table in CORE_EXPORT_TABLES for argument in ("--table", table)]
+            if binding == "CORE_D1_DATABASE_NAME"
+            else []
+        )
         command_runner(
             [
                 *wrangler_prefix(),
@@ -69,6 +84,8 @@ def backup_databases(
                 "export",
                 database_name,
                 "--remote",
+                "--skip-confirmation",
+                *table_arguments,
                 "--output",
                 str(file_path),
             ],

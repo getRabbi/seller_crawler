@@ -62,6 +62,7 @@ def test_client_signs_the_sent_gzip_body(tmp_path: Path) -> None:
     assert payload["batch_number"] == 1
     assert payload["crawl_run_id"] == RUN_ID
     assert headers["Content-Encoding"] == "gzip"
+    assert headers["User-Agent"] == "seller-intelligence-crawler/1.0"
     assert headers["Idempotency-Key"] == f"{RUN_ID}:1"
     assert verify_signature(headers, body)
 

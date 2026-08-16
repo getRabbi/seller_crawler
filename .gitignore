@@ -20,7 +20,6 @@ coverage/
 .dev.vars
 apps/worker-api/wrangler.staging.toml
 apps/worker-api/wrangler.production.toml
-spool/
 .sellerintel/
 *.log
 *.tsbuildinfo

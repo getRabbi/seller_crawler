@@ -12,6 +12,7 @@ import urllib.parse
 import urllib.request
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
 
@@ -38,6 +39,7 @@ JOB_ID_PATTERN = re.compile(r"^[0-9]+/[0-9]+/[0-9]+$")
 RESERVED_JOB_ARGUMENTS = frozenset(
     {
         "INGESTION_HMAC_SECRET",
+        "CONTACT_ENCRYPTION_KEYS",
         "SCRAPY_CLOUD_API_KEY",
         "ZYTE_API_KEY",
         "apikey",
@@ -125,7 +127,10 @@ class ScrapyCloudRunner:
         artifact_path = Path(artifact.path).resolve()
         if artifact_path != self._config.project_dir.resolve():
             raise ValueError("Scrapy Cloud artifact path must equal SCRAPY_CLOUD_PROJECT_DIR.")
-        self._deploy_runner(["shub", "deploy", self._project_id()], cwd=artifact_path)
+        self._deploy_runner(
+            ["shub", "deploy", "--version", artifact.version, self._project_id()],
+            cwd=artifact_path,
+        )
         return DeploymentResult(deployed=True, provider=self.name)
 
     def start(self, job: CrawlJob) -> RunHandle:
@@ -152,6 +157,12 @@ class ScrapyCloudRunner:
             "CREDIT_RUNNER_ENABLED": False,
             "DOWNLOAD_TIMEOUT": 30,
             "ENABLE_AMAZON": False,
+            "ENABLE_ALIBABA": False,
+            "ENABLE_1688": False,
+            "ENABLE_BUSINESS_REGISTRY": False,
+            "ENABLE_SEARCH_DISCOVERY": False,
+            "ENABLE_AI_SUMMARY": False,
+            "ENABLE_OUTREACH": False,
             "ENABLE_LOCAL_PLAYWRIGHT": False,
             "ENABLE_OFFICIAL_WEBSITE": True,
             "GLOBAL_CRAWL_KILL_SWITCH": False,
@@ -169,6 +180,9 @@ class ScrapyCloudRunner:
         }
         if job.spider_name == OFFICIAL_SITE_SPIDER:
             job_settings["LIVE_CRAWL_ENABLED"] = True
+            job_settings["SELLERINTEL_OBSERVED_AT"] = datetime.now(UTC).isoformat().replace(
+                "+00:00", "Z"
+            )
             job_settings["ITEM_PIPELINES"] = {
                 "sellerintel.pipelines.SignedIngestionPipeline": 300,
             }

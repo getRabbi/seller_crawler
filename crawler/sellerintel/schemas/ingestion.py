@@ -12,6 +12,10 @@ UUIDV7_PATTERN = (
 
 UuidV7 = Annotated[str, Field(pattern=UUIDV7_PATTERN)]
 NonEmptyStr = Annotated[str, Field(min_length=1)]
+ContactCiphertext = Annotated[
+    str,
+    Field(pattern=r"^si-aesgcm:v1:[A-Za-z0-9._-]{1,32}:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$"),
+]
 SchemaVersion = Annotated[int, Field(ge=1)]
 NonNegativeInt = Annotated[int, Field(ge=0)]
 Confidence = Annotated[int, Field(ge=0, le=100)]
@@ -115,7 +119,7 @@ class ContactRecord(VersionedRecord):
     id: UuidV7
     seller_id: UuidV7
     contact_type: NonEmptyStr
-    contact_value_ciphertext: NonEmptyStr
+    contact_value_ciphertext: ContactCiphertext
     normalized_hash: NonEmptyStr
     display_value_masked: str | None = None
     classification: NonEmptyStr

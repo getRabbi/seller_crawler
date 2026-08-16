@@ -27,6 +27,7 @@ def test_default_source_policies_include_required_risk_and_crawl_controls() -> N
     assert policies["official_site"].terms_risk == "low"
     assert policies["official_site"].concurrency_per_domain == 1
     assert policies["official_site"].blocked_cooldown_seconds == 86_400
+    assert policies["business_registry"].enabled is False
 
     assert policies["amazon"].enabled is False
     assert policies["amazon"].source_family == "marketplace"
@@ -50,16 +51,13 @@ def test_registry_enables_only_policy_and_feature_allowed_adapters() -> None:
         "search_discovery",
     )
     assert [adapter.name for adapter in registry.enabled_adapters(default_config)] == [
-        "business_registry",
         "official_site",
     ]
     amazon_enabled_names = [
         adapter.name for adapter in registry.enabled_adapters(amazon_flag_config)
     ]
     assert "amazon" not in amazon_enabled_names
-    assert [adapter.name for adapter in registry.enabled_adapters(official_disabled_config)] == [
-        "business_registry"
-    ]
+    assert [adapter.name for adapter in registry.enabled_adapters(official_disabled_config)] == []
 
 
 def test_adapter_url_policy_rejects_evasion_primitives() -> None:
@@ -103,6 +101,7 @@ def test_blocked_response_detection_and_cooldown_behavior() -> None:
 
     assert is_blocked_response(captcha) is True
     assert is_blocked_response(forbidden) is True
+    assert is_blocked_response(rate_limited) is True
     assert adapter.cooldown_for(captcha) == timedelta(seconds=86_400)
     assert adapter.cooldown_for(forbidden) == timedelta(seconds=86_400)
     assert adapter.cooldown_for(rate_limited) == timedelta(hours=1)

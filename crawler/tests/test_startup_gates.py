@@ -23,6 +23,7 @@ def test_default_runtime_is_zero_charge_locked() -> None:
     assert config.github_actions_crawler_enabled is False
     assert config.credit_runner_enabled is False
     assert config.feature_flags["ENABLE_AMAZON"] is False
+    assert config.feature_flags["ENABLE_BUSINESS_REGISTRY"] is False
     assert config.feature_flags["ENABLE_OFFICIAL_WEBSITE"] is True
     assert assert_startup_gates(config) == config
 

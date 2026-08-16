@@ -41,7 +41,7 @@ DEFAULT_SOURCE_POLICIES: tuple[SourcePolicy, ...] = (
     SourcePolicy(
         adapter_name="business_registry",
         source_family="registry",
-        enabled=True,
+        enabled=False,
         risk_level="low",
         robots_policy="obey",
         terms_risk="low",

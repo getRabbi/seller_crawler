@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import os
 import subprocess
@@ -67,6 +68,9 @@ def test_fixture_only_scrapy_crawl_runs_end_to_end_without_network(tmp_path: Pat
     }
     assert contact_types == {"email", "phone", "whatsapp", "wechat"}
     for batch in batches:
+        for contact in batch.get("contacts", []):
+            assert contact["contact_value_ciphertext"].startswith("si-aesgcm:v1:fixture-v1:")
+            assert not contact["contact_value_ciphertext"].startswith("redacted-sha256:")
         for source in batch.get("sources", []):
             assert source["source_url"].startswith("https://acme-industrial.testmail/")
             assert source["page_title"]
@@ -117,6 +121,12 @@ def test_cloud_runtime_settings_open_only_the_explicit_one_unit_live_gate() -> N
                 "ZYTE_API_MONTHLY_BUDGET_USD": 0,
                 "ENABLE_AMAZON": False,
                 "ENABLE_OFFICIAL_WEBSITE": True,
+                "CONTACT_ENCRYPTION_KEYS": json.dumps(
+                    {"test-v1": base64.urlsafe_b64encode(b"x" * 32).decode().rstrip("=")}
+                ),
+                "CONTACT_ENCRYPTION_ACTIVE_KEY_VERSION": "test-v1",
+                "INGESTION_ENDPOINT_URL": "https://api.example/v1/ingest/batch",
+                "INGESTION_HMAC_SECRET": "test-only-hmac-secret",
             }
         )
     )

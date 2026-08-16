@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -102,7 +103,9 @@ def test_runner_deploys_only_explicit_project_directory(tmp_path: Path) -> None:
     result = runner.deploy(BuildArtifact(version="fixture", path=str(tmp_path)))
 
     assert result.deployed is True
-    assert deploy.calls == [(('shub', 'deploy', '123456'), tmp_path.resolve())]
+    assert deploy.calls == [
+        (("shub", "deploy", "--version", "fixture", "123456"), tmp_path.resolve())
+    ]
 
 
 def test_runner_remains_blocked_with_repository_safe_defaults(tmp_path: Path) -> None:
@@ -216,6 +219,9 @@ def test_cli_official_job_passes_only_explicit_bounded_spider_arguments(
     assert settings["SCRAPY_CLOUD_MAX_UNITS"] == 1
     assert settings["ZYTE_API_ENABLED"] is False
     assert settings["PAID_SERVICES_ALLOWED"] is False
+    observed_at = settings["SELLERINTEL_OBSERVED_AT"]
+    assert isinstance(observed_at, str) and observed_at.endswith("Z")
+    datetime.fromisoformat(observed_at.replace("Z", "+00:00"))
     assert settings["ITEM_PIPELINES"] == {
         "sellerintel.pipelines.SignedIngestionPipeline": 300
     }

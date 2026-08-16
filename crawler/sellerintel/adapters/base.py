@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
+from email.utils import parsedate_to_datetime
 from ipaddress import ip_address
 from typing import Protocol
 from urllib.parse import urlparse
@@ -143,10 +144,10 @@ class PolicyBackedAdapter:
         return []
 
     def cooldown_for(self, response: AdapterResponse) -> timedelta:
+        if response.status == 429:
+            return timedelta(seconds=retry_after_seconds(response))
         if is_blocked_response(response):
             return timedelta(seconds=self.policy.blocked_cooldown_seconds)
-        if response.status == 429:
-            return timedelta(hours=1)
         return timedelta(seconds=self.policy.minimum_delay_seconds)
 
 
@@ -163,10 +164,41 @@ BLOCKED_MARKERS = (
 
 
 def is_blocked_response(response: AdapterResponse) -> bool:
-    if response.status in {401, 403, 407, 451}:
+    if response.status in {401, 403, 407, 429, 451}:
         return True
     text = response.text.casefold()
     return any(marker in text for marker in BLOCKED_MARKERS)
+
+
+def retry_after_seconds(
+    response: AdapterResponse,
+    *,
+    now: datetime | None = None,
+    default_seconds: int = 3_600,
+    maximum_seconds: int = 604_800,
+) -> int:
+    if response.status != 429:
+        return default_seconds
+    value = next(
+        (
+            header_value
+            for name, header_value in response.headers.items()
+            if name.casefold() == "retry-after"
+        ),
+        "",
+    ).strip()
+    if value.isdigit():
+        return max(1, min(maximum_seconds, int(value)))
+    if value:
+        try:
+            retry_at = parsedate_to_datetime(value)
+            if retry_at.tzinfo is None:
+                retry_at = retry_at.replace(tzinfo=UTC)
+            current = now or datetime.now(UTC)
+            return max(1, min(maximum_seconds, int((retry_at - current).total_seconds())))
+        except (TypeError, ValueError, OverflowError):
+            pass
+    return default_seconds
 
 
 def _is_private_test_host(hostname: str) -> bool:

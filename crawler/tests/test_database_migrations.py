@@ -19,6 +19,7 @@ EXPECTED_TABLES = {
         "seller_search_fts",
         "entity_resolution_decisions",
         "seller_merge_redirects",
+        "seller_merge_link_audit",
     },
     "contacts": {
         "contacts",
@@ -203,6 +204,7 @@ def test_core_entity_resolution_tables_store_audit_and_rollback_metadata() -> No
 
     decision_columns = table_columns(connection, "entity_resolution_decisions")
     redirect_columns = table_columns(connection, "seller_merge_redirects")
+    link_columns = table_columns(connection, "seller_merge_link_audit")
 
     assert {
         "score_breakdown_json",
@@ -214,6 +216,14 @@ def test_core_entity_resolution_tables_store_audit_and_rollback_metadata() -> No
     assert {"decision_id", "reason", "rollback_status", "rollback_decision_id"}.issubset(
         redirect_columns
     )
+    assert {
+        "decision_id",
+        "table_name",
+        "row_id",
+        "original_seller_id",
+        "target_seller_id",
+        "rolled_back_at",
+    }.issubset(link_columns)
 
 
 def test_operations_sources_store_solo_v1_compact_evidence() -> None:

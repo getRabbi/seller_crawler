@@ -10,6 +10,7 @@ from sellerintel.adapters.official_site.enrichment import OfficialPageEnrichment
 from sellerintel.normalization.company import normalize_company_name
 from sellerintel.normalization.hashing import deterministic_hash
 from sellerintel.schemas.ingestion import ContactRecord, SellerRecord, SourceRecord
+from sellerintel.security.contact_crypto import ContactCipher
 
 OFFICIAL_SITE_PARSER_VERSION = "official-site-v1"
 
@@ -94,6 +95,7 @@ def contact_records_for_page(
     *,
     seller_id: str,
     source_id: str,
+    contact_cipher: ContactCipher,
 ) -> list[ContactRecord]:
     records: list[ContactRecord] = []
     for candidate in enrichment.contacts:
@@ -101,15 +103,21 @@ def contact_records_for_page(
             candidate.normalized_value,
             namespace=f"contact:{candidate.contact_type}",
         )
+        contact_id = deterministic_uuidv7(
+            "contact",
+            f"{seller_id}:{candidate.contact_type}:{candidate.normalized_value}",
+        )
         records.append(
             ContactRecord(
-                id=deterministic_uuidv7(
-                    "contact",
-                    f"{seller_id}:{candidate.contact_type}:{candidate.normalized_value}",
-                ),
+                id=contact_id,
                 seller_id=seller_id,
                 contact_type=candidate.contact_type,
-                contact_value_ciphertext=f"redacted-sha256:{normalized_hash}",
+                contact_value_ciphertext=contact_cipher.encrypt(
+                    candidate.normalized_value,
+                    contact_id=contact_id,
+                    seller_id=seller_id,
+                    contact_type=candidate.contact_type,
+                ),
                 normalized_hash=normalized_hash,
                 display_value_masked=candidate.display_value_masked,
                 classification=candidate.classification,

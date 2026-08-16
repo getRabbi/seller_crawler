@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import os
 from collections.abc import AsyncIterator, Iterable, Mapping
+from datetime import UTC, datetime, timedelta
 from ipaddress import ip_address
 from pathlib import Path
 from typing import Any, Self
@@ -14,15 +15,17 @@ from scrapy.crawler import Crawler
 from scrapy.http import Response, TextResponse
 from scrapy.settings import BaseSettings
 
-from sellerintel.adapters.base import is_blocked_response
+from sellerintel.adapters.base import is_blocked_response, retry_after_seconds
 from sellerintel.adapters.official_site import (
     build_official_site_crawl_plan,
     canonicalize_official_url,
     contact_records_for_page,
+    deterministic_uuidv7,
     enrich_official_page,
     seller_record_for_domain,
     source_record_for_page,
 )
+from sellerintel.clients.cooldown import CooldownClient, cooldown_endpoint_from_ingestion
 from sellerintel.config.features import assert_startup_gates, load_runtime_config
 from sellerintel.normalization.domain import canonicalize_domain
 from sellerintel.schemas.ingestion import (
@@ -31,7 +34,9 @@ from sellerintel.schemas.ingestion import (
     IngestionBatch,
     SellerRecord,
     SourceRecord,
+    SourceRegistryRecord,
 )
+from sellerintel.security.contact_crypto import ContactCipher
 
 MAX_CONTACTS_PER_PAGE_BATCH = 17
 RUNTIME_SETTING_KEYS = (
@@ -54,6 +59,11 @@ RUNTIME_SETTING_KEYS = (
     "ENABLE_OFFICIAL_WEBSITE",
     "ENABLE_LOCAL_PLAYWRIGHT",
     "GLOBAL_CRAWL_KILL_SWITCH",
+    "CONTACT_ENCRYPTION_KEYS",
+    "CONTACT_ENCRYPTION_ACTIVE_KEY_VERSION",
+    "INGESTION_ENDPOINT_URL",
+    "INGESTION_HMAC_SECRET",
+    "SOURCE_COOLDOWN_CHECK_URL",
 )
 
 
@@ -97,6 +107,8 @@ class OfficialWebsiteSpider(scrapy.Spider):
         self._pages_scheduled: dict[str, int] = {domain: 0 for domain in self.allowed_domains}
         self._blocked_domains: set[str] = set()
         self._company_names: dict[str, str] = {}
+        self._contact_cipher: ContactCipher | None = None
+        self._cooldown_client: CooldownClient | None = None
 
         if self.fixture_dir is not None and not self.fixture_dir.is_dir():
             raise ValueError("fixture_dir must be an existing directory")
@@ -132,6 +144,20 @@ class OfficialWebsiteSpider(scrapy.Spider):
         }:
             raise ValueError("Live official-site crawl requires an explicitly selected runner")
 
+        if self.fixture_dir is not None:
+            self._contact_cipher = ContactCipher.for_fixture_tests()
+            return
+
+        self._contact_cipher = ContactCipher.from_environment(runtime_values)
+        ingestion_endpoint = runtime_values.get("INGESTION_ENDPOINT_URL", "")
+        cooldown_endpoint = runtime_values.get("SOURCE_COOLDOWN_CHECK_URL", "")
+        if not cooldown_endpoint:
+            cooldown_endpoint = cooldown_endpoint_from_ingestion(ingestion_endpoint)
+        self._cooldown_client = CooldownClient(
+            endpoint_url=cooldown_endpoint,
+            hmac_secret=runtime_values.get("INGESTION_HMAC_SECRET", ""),
+        )
+
     def start_requests(self) -> Iterable[Request]:
         return self._initial_requests()
 
@@ -142,6 +168,17 @@ class OfficialWebsiteSpider(scrapy.Spider):
     def _initial_requests(self) -> Iterable[Request]:
         for seed_url in self.seed_urls:
             domain = _domain(seed_url)
+            if self._cooldown_client is not None:
+                decision = self._cooldown_client.check(domain)
+                if not decision.allowed:
+                    self._blocked_domains.add(domain)
+                    self._inc_stat("sellerintel/blocked_count")
+                    self.logger.warning(
+                        "Official-site domain remains in cooldown domain=%s blocked_until=%s",
+                        domain,
+                        decision.blocked_until,
+                    )
+                    continue
             self._seen[domain].add(seed_url)
             self._pages_scheduled[domain] = 1
             yield self._page_request(seed_url, depth=0)
@@ -152,13 +189,7 @@ class OfficialWebsiteSpider(scrapy.Spider):
             return
 
         if is_blocked_response(_ResponseAdapter(response)):
-            self._blocked_domains.add(domain)
-            self._queues[domain].clear()
-            self._inc_stat("sellerintel/blocked_count")
-            self.logger.warning(
-                "Official-site adapter paused after an explicit block domain=%s",
-                domain,
-            )
+            yield from self._record_domain_block(response, domain)
             return
 
         if (
@@ -196,6 +227,7 @@ class OfficialWebsiteSpider(scrapy.Spider):
             enrichment,
             seller_id=seller.id,
             source_id=source.id,
+            contact_cipher=self._required_contact_cipher(),
         )
         yield from self._page_batches(seller, source, contacts, response.url, observed_at)
 
@@ -222,14 +254,12 @@ class OfficialWebsiteSpider(scrapy.Spider):
 
         yield from self._schedule_next(domain)
 
-    def parse_sitemap(self, response: Response) -> Iterable[Request]:
+    def parse_sitemap(self, response: Response) -> Iterable[dict[str, object] | Request]:
         domain = str(response.meta["source_domain"])
         if domain in self._blocked_domains:
             return
         if is_blocked_response(_ResponseAdapter(response)):
-            self._blocked_domains.add(domain)
-            self._queues[domain].clear()
-            self._inc_stat("sellerintel/blocked_count")
+            yield from self._record_domain_block(response, domain)
             return
         if 200 <= response.status < 300 and isinstance(response, TextResponse):
             plan = build_official_site_crawl_plan(
@@ -308,6 +338,95 @@ class OfficialWebsiteSpider(scrapy.Spider):
             )
             yield dict(batch.as_payload())
 
+    def _record_domain_block(
+        self,
+        response: Response,
+        domain: str,
+    ) -> Iterable[dict[str, object]]:
+        self._blocked_domains.add(domain)
+        self._queues[domain].clear()
+        self._inc_stat("sellerintel/blocked_count")
+        observed_at = str(
+            response.meta.get("observed_at")
+            or self.crawler.settings.get("SELLERINTEL_OBSERVED_AT")
+            or datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        )
+        observed = _parse_datetime(observed_at)
+        cooldown_seconds = (
+            retry_after_seconds(_ResponseAdapter(response), now=observed)
+            if response.status == 429
+            else 86_400
+        )
+        blocked_until = (observed + timedelta(seconds=cooldown_seconds)).isoformat().replace(
+            "+00:00", "Z"
+        )
+        canonical_url = canonicalize_official_url(response.url) or response.url
+        source = SourceRecord(
+            id=deterministic_uuidv7("source-url", canonical_url),
+            source_url=canonical_url,
+            canonical_url=canonical_url,
+            source_domain=domain,
+            source_type="official_site",
+            robots_status="obey",
+            terms_risk="low",
+            http_status=response.status,
+            detected_at=observed_at,
+            last_seen_at=observed_at,
+            first_seen_at=observed_at,
+            last_fetched_at=observed_at,
+            next_allowed_at=blocked_until,
+            schema_version=1,
+            parser_version="official-site-v1",
+            status="cooldown",
+        )
+        registry = SourceRegistryRecord(
+            adapter_name=f"official_site:{domain}",
+            source_family="official_site",
+            enabled=True,
+            risk_level="low",
+            robots_policy="obey",
+            terms_review_status="approved",
+            daily_request_budget=self.page_budget,
+            concurrency_per_domain=1,
+            minimum_delay_seconds=2.5,
+            blocked_until=blocked_until,
+            parser_version="official-site-v1",
+            last_failure_at=observed_at,
+            operator_notes=f"HTTP {response.status} cooldown; crawler stopped for this domain.",
+        )
+        batch_number = int(hashlib.sha256(f"cooldown:{domain}".encode()).hexdigest()[:7], 16)
+        batch = IngestionBatch(
+            schema_version=1,
+            parser_version="official-site-v1",
+            crawl_run_id=self.crawl_run_id,
+            batch_number=batch_number,
+            generated_at=observed_at,
+            sources=[source],
+            source_registry=[registry],
+            crawl_runs=[
+                CrawlRunRecord(
+                    id=self.crawl_run_id,
+                    job_type="official_website",
+                    started_at=observed_at,
+                    status="paused_by_policy",
+                    blocked_count=1,
+                    notes=f"Domain cooldown persisted until {blocked_until}.",
+                )
+            ],
+        )
+        self.logger.warning(
+            "Official-site adapter paused domain=%s status=%s blocked_until=%s",
+            domain,
+            response.status,
+            blocked_until,
+        )
+        yield dict(batch.as_payload())
+
+    def _required_contact_cipher(self) -> ContactCipher:
+        if self._contact_cipher is None:
+            raise RuntimeError("contact encryption was not initialized")
+        return self._contact_cipher
+
     def _inc_stat(self, key: str) -> None:
         if self.crawler.stats is not None:
             self.crawler.stats.inc_value(key)
@@ -383,3 +502,13 @@ def _bounded_int(value: str | int, *, name: str, minimum: int, maximum: int) -> 
     if not minimum <= parsed <= maximum:
         raise ValueError(f"{name} must be between {minimum} and {maximum}")
     return parsed
+
+
+def _parse_datetime(value: str) -> datetime:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ValueError("SELLERINTEL_OBSERVED_AT must be ISO-8601") from error
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)

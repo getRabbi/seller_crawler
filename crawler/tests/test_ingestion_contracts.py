@@ -138,7 +138,9 @@ def valid_batch() -> IngestionBatch:
                 id=CONTACT_ID,
                 seller_id=SELLER_ID,
                 contact_type="email",
-                contact_value_ciphertext="sealed-contact-value",
+                contact_value_ciphertext=(
+                    "si-aesgcm:v1:test-v1:bm5ubm5ubm5ubm5u:Y2lwaGVydGV4dHdpdGh0YWc"
+                ),
                 normalized_hash="contact-hash",
                 display_value_masked="sa***@example.invalid",
                 classification="business_generic",

@@ -42,6 +42,14 @@ def test_backup_exports_all_four_databases_and_writes_checksums(tmp_path: Path) 
 
     assert len(runner.commands) == 4
     assert all("--remote" in command and "d1" in command for command in runner.commands)
+    core_command = next(
+        command for command in runner.commands if "seller-core-staging" in command
+    )
+    assert core_command.count("--table") == 8
+    assert "sellers" in core_command
+    assert "seller_merge_link_audit" in core_command
+    assert "seller_search_fts" not in core_command
+    assert all("--skip-confirmation" in command for command in runner.commands)
     assert {entry["binding"] for entry in manifest["databases"]} == set(DATABASE_ENV)
     assert all(len(entry["sha256"]) == 64 for entry in manifest["databases"])
 

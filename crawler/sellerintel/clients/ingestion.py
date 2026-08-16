@@ -14,14 +14,13 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
+from sellerintel.clients.headers import INGESTION_USER_AGENT
 from sellerintel.clients.serialization import deterministic_gzip, deterministic_json_bytes
 from sellerintel.schemas.ingestion import IngestionBatch
 from sellerintel.spool.checksums import sha256_hex
 from sellerintel.spool.writer import build_spool_record, write_spool_record
 
 LOGGER = logging.getLogger(__name__)
-
-
 @dataclass(frozen=True, slots=True)
 class HttpResponse:
     status_code: int
@@ -223,6 +222,7 @@ class IngestionClient:
         return {
             "Content-Type": "application/json",
             "Content-Encoding": "gzip",
+            "User-Agent": INGESTION_USER_AGENT,
             "Idempotency-Key": batch.idempotency_key,
             "X-SI-Timestamp": timestamp,
             "X-SI-Nonce": nonce,

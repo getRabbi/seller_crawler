@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
@@ -8,7 +9,12 @@ from typing import Protocol
 from scrapy import Spider
 from scrapy.crawler import Crawler
 
-from sellerintel.clients.ingestion import IngestionClient, IngestionClientConfig, IngestionResult
+from sellerintel.clients.ingestion import (
+    IngestionClient,
+    IngestionClientConfig,
+    IngestionRejectedError,
+    IngestionResult,
+)
 from sellerintel.schemas.ingestion import CrawlRunRecord, IngestionBatch
 
 COMPLETION_BATCH_NUMBER = 2_147_483_647
@@ -32,6 +38,7 @@ class SignedIngestionPipeline:
         self._sources_found = 0
         self._contacts_found = 0
         self._spooled = 0
+        self._rejected = 0
 
     @classmethod
     def from_crawler(cls, crawler: Crawler) -> SignedIngestionPipeline:
@@ -59,7 +66,25 @@ class SignedIngestionPipeline:
         spider: Spider,
     ) -> dict[str, object]:
         batch = IngestionBatch.model_validate(item)
-        result = self._submitter.submit_batch(batch)
+        try:
+            result = self._submitter.submit_batch(batch)
+        except IngestionRejectedError as error:
+            self._rejected += 1
+            _inc_stat(spider, "sellerintel/ingestion_rejected")
+            spider.logger.error(
+                "Ingestion rejected; stopping crawl status=%s",
+                error.status_code,
+            )
+            _stop_spider(spider, "ingestion_rejected")
+            return {
+                "accepted": False,
+                "batch_number": batch.batch_number,
+                "crawl_run_id": batch.crawl_run_id,
+                "rejected": True,
+                "schema_version": batch.schema_version,
+                "spooled": False,
+                "status_code": error.status_code,
+            }
         self._sources_found += len(batch.sources)
         self._contacts_found += len(batch.contacts)
         if result.spool_path is not None:
@@ -86,7 +111,7 @@ class SignedIngestionPipeline:
         status = "completed"
         if blocked:
             status = "paused_by_policy"
-        elif errors or self._spooled:
+        elif errors or self._spooled or self._rejected:
             status = "completed_with_errors"
         finished_at = _utc_now()
         batch = IngestionBatch(
@@ -110,12 +135,20 @@ class SignedIngestionPipeline:
                     candidates_found=self._sources_found,
                     contacts_verified=self._contacts_found,
                     blocked_count=blocked,
-                    error_count=errors + self._spooled,
+                    error_count=errors + self._spooled + self._rejected,
                     notes="Solo v1 one-unit Scrapy Cloud official-site crawl",
                 )
             ],
         )
-        result = self._submitter.submit_batch(batch)
+        try:
+            result = self._submitter.submit_batch(batch)
+        except IngestionRejectedError as error:
+            _inc_stat(spider, "sellerintel/completion_rejected")
+            spider.logger.error(
+                "Completion ingestion rejected status=%s",
+                error.status_code,
+            )
+            return
         if result.spool_path is not None:
             _inc_stat(spider, "sellerintel/completion_spooled")
 
@@ -144,7 +177,10 @@ def _stop_spider(spider: Spider, reason: str) -> None:
 
 def _setting_string(spider: Spider, key: str) -> str | None:
     value = spider.crawler.settings.get(key)
-    return value if isinstance(value, str) and value else None
+    if isinstance(value, str) and value:
+        return value
+    environment_value = os.environ.get(key)
+    return environment_value if environment_value else None
 
 
 def _stat_int(value: object) -> int:

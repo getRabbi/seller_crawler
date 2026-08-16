@@ -24,7 +24,7 @@ DEFAULT_FEATURE_FLAGS: dict[str, bool] = {
     "ENABLE_AMAZON": False,
     "ENABLE_ALIBABA": False,
     "ENABLE_1688": False,
-    "ENABLE_BUSINESS_REGISTRY": True,
+    "ENABLE_BUSINESS_REGISTRY": False,
     "ENABLE_OFFICIAL_WEBSITE": True,
     "ENABLE_SEARCH_DISCOVERY": False,
     "ENABLE_LOCAL_PLAYWRIGHT": False,
@@ -151,6 +151,24 @@ def startup_gate_violations(config: RuntimeConfig) -> list[str]:
 
     if config.runner_mode == "development_locked" and config.live_crawl_enabled:
         violations.append("LIVE_CRAWL_ENABLED must be false in development_locked mode.")
+
+    deferred_flags = (
+        "ENABLE_AMAZON",
+        "ENABLE_ALIBABA",
+        "ENABLE_1688",
+        "ENABLE_BUSINESS_REGISTRY",
+        "ENABLE_SEARCH_DISCOVERY",
+        "ENABLE_LOCAL_PLAYWRIGHT",
+        "ENABLE_AI_SUMMARY",
+        "ENABLE_OUTREACH",
+    )
+    enabled_deferred = [flag for flag in deferred_flags if config.feature_flags.get(flag, False)]
+    if enabled_deferred:
+        violations.append(
+            f"Deferred Solo v1 features must remain disabled: {', '.join(enabled_deferred)}."
+        )
+    if not config.feature_flags.get("ENABLE_OFFICIAL_WEBSITE", False):
+        violations.append("ENABLE_OFFICIAL_WEBSITE must remain true for Solo v1.")
 
     if config.runner_mode == "zyte_student_active":
         if not config.zyte_student_entitlement_confirmed:
