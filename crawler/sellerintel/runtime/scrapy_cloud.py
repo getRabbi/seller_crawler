@@ -11,7 +11,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
@@ -27,6 +27,7 @@ from sellerintel.runtime.base import (
     RunStatus,
     ValidationResult,
 )
+from sellerintel.security.contact_crypto import ContactCipher, ContactEncryptionConfigError
 
 PROVIDER_NAME = "zyte_scrapy_cloud"
 DEFAULT_ENABLED = False
@@ -39,7 +40,10 @@ JOB_ID_PATTERN = re.compile(r"^[0-9]+/[0-9]+/[0-9]+$")
 RESERVED_JOB_ARGUMENTS = frozenset(
     {
         "INGESTION_HMAC_SECRET",
+        "INGESTION_ENDPOINT_URL",
         "CONTACT_ENCRYPTION_KEYS",
+        "CONTACT_ENCRYPTION_ACTIVE_KEY_VERSION",
+        "SOURCE_COOLDOWN_CHECK_URL",
         "SCRAPY_CLOUD_API_KEY",
         "ZYTE_API_KEY",
         "apikey",
@@ -75,8 +79,13 @@ class DeployCommandRunner(Protocol):
 class ScrapyCloudConfig:
     runtime_config: RuntimeConfig
     project_id: str | None
-    api_key: str | None
+    api_key: str | None = field(repr=False)
     project_dir: Path
+    source_cooldown_check_url: str | None
+    ingestion_endpoint_url: str | None
+    ingestion_hmac_secret: str | None = field(repr=False)
+    contact_encryption_keys: str | None = field(repr=False)
+    contact_encryption_active_key_version: str | None
 
 
 class ScrapyCloudRunner:
@@ -120,6 +129,30 @@ class ScrapyCloudRunner:
             errors.append("SCRAPY_CLOUD_API_KEY is required.")
         if not self._config.project_dir.is_dir():
             errors.append("SCRAPY_CLOUD_PROJECT_DIR must be an existing directory.")
+        if not valid_cooldown_check_url(self._config.source_cooldown_check_url):
+            errors.append(
+                "SOURCE_COOLDOWN_CHECK_URL must use the approved staging or production HTTPS host."
+            )
+        if not valid_ingestion_endpoint_url(self._config.ingestion_endpoint_url):
+            errors.append(
+                "INGESTION_ENDPOINT_URL must use the approved staging or production HTTPS host."
+            )
+        if not self._config.ingestion_hmac_secret:
+            errors.append("INGESTION_HMAC_SECRET is required.")
+        try:
+            ContactCipher.from_environment(
+                {
+                    "CONTACT_ENCRYPTION_KEYS": self._config.contact_encryption_keys or "",
+                    "CONTACT_ENCRYPTION_ACTIVE_KEY_VERSION": (
+                        self._config.contact_encryption_active_key_version or ""
+                    ),
+                }
+            )
+        except ContactEncryptionConfigError:
+            errors.append(
+                "CONTACT_ENCRYPTION_KEYS and CONTACT_ENCRYPTION_ACTIVE_KEY_VERSION "
+                "must contain a valid matching keyring."
+            )
         return ValidationResult(ok=not errors, errors=tuple(dict.fromkeys(errors)))
 
     def deploy(self, artifact: BuildArtifact) -> DeploymentResult:
@@ -166,6 +199,7 @@ class ScrapyCloudRunner:
             "ENABLE_LOCAL_PLAYWRIGHT": False,
             "ENABLE_OFFICIAL_WEBSITE": True,
             "GLOBAL_CRAWL_KILL_SWITCH": False,
+            "LOG_LEVEL": "WARNING",
             "MAX_EXTERNAL_MONTHLY_SPEND_AUD": 0,
             "PAID_SERVICES_ALLOWED": False,
             "RETRY_TIMES": 2,
@@ -177,6 +211,13 @@ class ScrapyCloudRunner:
             "ZYTE_API_ENABLED": False,
             "ZYTE_API_MONTHLY_BUDGET_USD": 0,
             "ZYTE_STUDENT_ENTITLEMENT_CONFIRMED": True,
+            "SOURCE_COOLDOWN_CHECK_URL": self._source_cooldown_check_url(),
+            "INGESTION_ENDPOINT_URL": self._ingestion_endpoint_url(),
+            "INGESTION_HMAC_SECRET": self._ingestion_hmac_secret(),
+            "CONTACT_ENCRYPTION_KEYS": self._contact_encryption_keys(),
+            "CONTACT_ENCRYPTION_ACTIVE_KEY_VERSION": (
+                self._contact_encryption_active_key_version()
+            ),
         }
         if job.spider_name == OFFICIAL_SITE_SPIDER:
             job_settings["LIVE_CRAWL_ENABLED"] = True
@@ -276,6 +317,31 @@ class ScrapyCloudRunner:
             raise ValueError("SCRAPY_CLOUD_PROJECT_ID is required.")
         return self._config.project_id
 
+    def _source_cooldown_check_url(self) -> str:
+        if self._config.source_cooldown_check_url is None:
+            raise ValueError("SOURCE_COOLDOWN_CHECK_URL is required.")
+        return self._config.source_cooldown_check_url
+
+    def _contact_encryption_keys(self) -> str:
+        if self._config.contact_encryption_keys is None:
+            raise ValueError("CONTACT_ENCRYPTION_KEYS is required.")
+        return self._config.contact_encryption_keys
+
+    def _ingestion_endpoint_url(self) -> str:
+        if self._config.ingestion_endpoint_url is None:
+            raise ValueError("INGESTION_ENDPOINT_URL is required.")
+        return self._config.ingestion_endpoint_url
+
+    def _ingestion_hmac_secret(self) -> str:
+        if self._config.ingestion_hmac_secret is None:
+            raise ValueError("INGESTION_HMAC_SECRET is required.")
+        return self._config.ingestion_hmac_secret
+
+    def _contact_encryption_active_key_version(self) -> str:
+        if self._config.contact_encryption_active_key_version is None:
+            raise ValueError("CONTACT_ENCRYPTION_ACTIVE_KEY_VERSION is required.")
+        return self._config.contact_encryption_active_key_version
+
     @staticmethod
     def _validate_job_id(job_id: str) -> None:
         if not JOB_ID_PATTERN.fullmatch(job_id):
@@ -330,6 +396,43 @@ def load_scrapy_cloud_config(env: Mapping[str, str] | None = None) -> ScrapyClou
         project_id=source.get("SCRAPY_CLOUD_PROJECT_ID"),
         api_key=source.get("SCRAPY_CLOUD_API_KEY"),
         project_dir=project_dir,
+        source_cooldown_check_url=source.get("SOURCE_COOLDOWN_CHECK_URL"),
+        ingestion_endpoint_url=source.get("INGESTION_ENDPOINT_URL"),
+        ingestion_hmac_secret=source.get("INGESTION_HMAC_SECRET"),
+        contact_encryption_keys=source.get("CONTACT_ENCRYPTION_KEYS"),
+        contact_encryption_active_key_version=source.get(
+            "CONTACT_ENCRYPTION_ACTIVE_KEY_VERSION"
+        ),
+    )
+
+
+def valid_cooldown_check_url(value: str | None) -> bool:
+    return valid_worker_url(value, path="/v1/crawl/authorize")
+
+
+def valid_ingestion_endpoint_url(value: str | None) -> bool:
+    return valid_worker_url(value, path="/v1/ingest/batch")
+
+
+def valid_worker_url(value: str | None, *, path: str) -> bool:
+    if not value:
+        return False
+    parsed = urllib.parse.urlparse(value)
+    try:
+        port = parsed.port
+    except ValueError:
+        return False
+    return (
+        parsed.scheme == "https"
+        and parsed.hostname
+        in {"api-stg.scalemyprints.com", "api.scalemyprints.com"}
+        and parsed.path == path
+        and not parsed.params
+        and not parsed.query
+        and not parsed.fragment
+        and parsed.username is None
+        and parsed.password is None
+        and port is None
     )
 
 

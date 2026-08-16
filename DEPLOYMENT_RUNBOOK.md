@@ -189,8 +189,10 @@ seller detail, contacts, and CSV checks. Production additionally requires
 
 ## 6. One-Unit Scrapy Cloud Smoke
 
-Do not use a Zyte API key. Configure these two custom project-level Scrapy
-settings in the private Scrapy Cloud project before an official-site job:
+Do not use a Zyte API key and do not depend on custom project settings in the
+Scrapy Cloud UI. Before every verification job, load these values from the
+approved local environment. The controlled runner injects them into the
+official `run.json` `job_settings` payload for that job only:
 
 ```text
 INGESTION_ENDPOINT_URL=https://<STAGING_WORKER_HOST>/v1/ingest/batch
@@ -200,10 +202,12 @@ CONTACT_ENCRYPTION_KEYS=<STAGING_VERSIONED_KEYRING_JSON>
 CONTACT_ENCRYPTION_ACTIVE_KEY_VERSION=<ACTIVE_KEY_VERSION>
 ```
 
-Treat the HMAC value and contact keyring as secrets. The scheduler request never contains them. The
-official-site pipeline fails closed if either setting is absent, submits signed
-idempotent batches, stores only receipt metadata as Scrapy Cloud items, and
-stops after a spooled ingestion failure.
+Treat the HMAC value and contact keyring as secrets. The runner sends them only
+to the official Scrapy Cloud HTTPS endpoint, uses warning-level crawler logging,
+and never prints the request payload. The official-site pipeline fails closed
+if a required setting is absent, submits signed idempotent batches, stores only
+receipt metadata as Scrapy Cloud items, and stops after a spooled ingestion
+failure.
 
 Open the deploy gate only in the controlled operator shell:
 
@@ -223,6 +227,11 @@ $env:ENABLE_1688="false"
 $env:ENABLE_SEARCH_DISCOVERY="false"
 $env:ENABLE_BUSINESS_REGISTRY="false"
 $env:ENABLE_OFFICIAL_WEBSITE="true"
+$env:INGESTION_ENDPOINT_URL="https://<STAGING_WORKER_HOST>/v1/ingest/batch"
+$env:SOURCE_COOLDOWN_CHECK_URL="https://<STAGING_WORKER_HOST>/v1/crawl/authorize"
+# INGESTION_HMAC_SECRET, CONTACT_ENCRYPTION_KEYS, and
+# CONTACT_ENCRYPTION_ACTIVE_KEY_VERSION must already be loaded from the
+# approved ignored local environment.
 $env:SCRAPY_CLOUD_PROJECT_DIR="."
 $env:SHUB_APIKEY=$env:SCRAPY_CLOUD_API_KEY
 uv run --directory crawler python -m sellerintel.runtime.scrapy_cloud validate

@@ -2,6 +2,11 @@
 
 ## Unreleased - Solo Mode v1 Implementation
 
+- Replaced the unreliable manual Scrapy Cloud custom-setting dependency with
+  per-job `run.json` settings sourced from the approved local environment. The
+  controlled runner pins one unit, validates staging/production Worker URLs,
+  injects ingestion, cooldown, and encryption settings without printing secret
+  payloads, and keeps Zyte API and paid services disabled.
 - Added versioned AES-256-GCM contact storage, a masked-by-default API/CSV
   boundary, and an Access-authenticated, reasoned, audited single-operator
   contact reveal path.

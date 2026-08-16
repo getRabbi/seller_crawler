@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 from collections.abc import Mapping, Sequence
 from datetime import datetime
@@ -30,6 +31,17 @@ READY_ENV = {
     "ZYTE_API_MONTHLY_BUDGET_USD": "0",
     "SCRAPY_CLOUD_PROJECT_ID": "123456",
     "SCRAPY_CLOUD_API_KEY": "fixture-cloud-credential",
+    "SOURCE_COOLDOWN_CHECK_URL": "https://api-stg.scalemyprints.com/v1/crawl/authorize",
+    "CONTACT_ENCRYPTION_KEYS": json.dumps(
+        {
+            "fixture-v1": base64.urlsafe_b64encode(b"k" * 32)
+            .decode("ascii")
+            .rstrip("=")
+        }
+    ),
+    "CONTACT_ENCRYPTION_ACTIVE_KEY_VERSION": "fixture-v1",
+    "INGESTION_ENDPOINT_URL": "https://api-stg.scalemyprints.com/v1/ingest/batch",
+    "INGESTION_HMAC_SECRET": "fixture-hmac-secret",
 }
 
 
@@ -81,6 +93,13 @@ def test_runner_starts_exactly_one_unit_no_network_smoke(tmp_path: Path) -> None
     assert form["units"] == "1"
     assert form["spider"] == NO_NETWORK_SMOKE_SPIDER
     assert json.loads(form["job_settings"])["ZYTE_API_ENABLED"] is False
+    settings = json.loads(form["job_settings"])
+    assert settings["SOURCE_COOLDOWN_CHECK_URL"] == READY_ENV["SOURCE_COOLDOWN_CHECK_URL"]
+    assert settings["CONTACT_ENCRYPTION_KEYS"] == READY_ENV["CONTACT_ENCRYPTION_KEYS"]
+    assert settings["CONTACT_ENCRYPTION_ACTIVE_KEY_VERSION"] == "fixture-v1"
+    assert settings["INGESTION_ENDPOINT_URL"] == READY_ENV["INGESTION_ENDPOINT_URL"]
+    assert settings["INGESTION_HMAC_SECRET"] == READY_ENV["INGESTION_HMAC_SECRET"]
+    assert settings["LOG_LEVEL"] == "WARNING"
 
 
 def test_runner_supports_status_cancel_and_masked_log_transport(tmp_path: Path) -> None:
@@ -121,6 +140,37 @@ def test_runner_remains_blocked_with_repository_safe_defaults(tmp_path: Path) ->
     assert validation.ok is False
     assert "RUNNER_MODE must be zyte_student_active" in " ".join(validation.errors)
     assert "SCRAPY_CLOUD_DEPLOY_ENABLED must be true" in " ".join(validation.errors)
+
+
+def test_runner_rejects_missing_or_unapproved_job_setting_secrets(tmp_path: Path) -> None:
+    invalid = ready_runner(
+        tmp_path,
+        env_overrides={
+            "SOURCE_COOLDOWN_CHECK_URL": "https://example.invalid/v1/crawl/authorize",
+            "CONTACT_ENCRYPTION_KEYS": "",
+            "CONTACT_ENCRYPTION_ACTIVE_KEY_VERSION": "",
+            "INGESTION_ENDPOINT_URL": "https://example.invalid/v1/ingest/batch",
+            "INGESTION_HMAC_SECRET": "",
+        },
+    )
+
+    errors = " ".join(invalid.validate_configuration().errors)
+
+    assert "approved staging or production HTTPS host" in errors
+    assert "valid matching keyring" in errors
+    assert "INGESTION_ENDPOINT_URL" in errors
+    assert "INGESTION_HMAC_SECRET is required" in errors
+    assert READY_ENV["CONTACT_ENCRYPTION_KEYS"] not in errors
+
+
+def test_scrapy_cloud_config_repr_masks_credentials_and_job_secrets(tmp_path: Path) -> None:
+    config_repr = repr(
+        load_scrapy_cloud_config({**READY_ENV, "SCRAPY_CLOUD_PROJECT_DIR": str(tmp_path)})
+    )
+
+    assert READY_ENV["SCRAPY_CLOUD_API_KEY"] not in config_repr
+    assert READY_ENV["INGESTION_HMAC_SECRET"] not in config_repr
+    assert READY_ENV["CONTACT_ENCRYPTION_KEYS"] not in config_repr
 
 
 def test_official_site_job_requires_separate_live_gate(tmp_path: Path) -> None:
@@ -219,13 +269,31 @@ def test_cli_official_job_passes_only_explicit_bounded_spider_arguments(
     assert settings["SCRAPY_CLOUD_MAX_UNITS"] == 1
     assert settings["ZYTE_API_ENABLED"] is False
     assert settings["PAID_SERVICES_ALLOWED"] is False
+    assert settings["SOURCE_COOLDOWN_CHECK_URL"] == READY_ENV["SOURCE_COOLDOWN_CHECK_URL"]
+    assert settings["CONTACT_ENCRYPTION_KEYS"] == READY_ENV["CONTACT_ENCRYPTION_KEYS"]
+    assert settings["CONTACT_ENCRYPTION_ACTIVE_KEY_VERSION"] == "fixture-v1"
+    assert settings["INGESTION_ENDPOINT_URL"] == READY_ENV["INGESTION_ENDPOINT_URL"]
+    assert settings["INGESTION_HMAC_SECRET"] == READY_ENV["INGESTION_HMAC_SECRET"]
     observed_at = settings["SELLERINTEL_OBSERVED_AT"]
     assert isinstance(observed_at, str) and observed_at.endswith("Z")
     datetime.fromisoformat(observed_at.replace("Z", "+00:00"))
     assert settings["ITEM_PIPELINES"] == {
         "sellerintel.pipelines.SignedIngestionPipeline": 300
     }
-    assert "INGESTION_HMAC_SECRET" not in settings
+
+
+def test_cli_never_prints_contact_keyring(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    runner = ready_runner(tmp_path)
+
+    assert main(["start-smoke", "--job-id", "secret-safe-smoke"], runner=runner) == 0
+
+    captured = capsys.readouterr()
+    assert READY_ENV["CONTACT_ENCRYPTION_KEYS"] not in captured.out
+    assert READY_ENV["CONTACT_ENCRYPTION_KEYS"] not in captured.err
+    assert READY_ENV["INGESTION_HMAC_SECRET"] not in captured.out
+    assert READY_ENV["INGESTION_HMAC_SECRET"] not in captured.err
 
 
 def ready_runner(
