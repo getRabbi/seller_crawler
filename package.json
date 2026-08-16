@@ -10,11 +10,11 @@
   ],
   "scripts": {
     "lint": "eslint .",
-    "typecheck": "tsc -p packages/shared-types/tsconfig.json --noEmit && tsc -p apps/worker-api/tsconfig.json --noEmit && npm.cmd run typecheck --workspace @seller-intelligence/dashboard",
+    "typecheck": "tsc -p packages/shared-types/tsconfig.json --noEmit && tsc -p apps/worker-api/tsconfig.json --noEmit && npm run typecheck --workspace @seller-intelligence/dashboard",
     "test": "vitest run",
     "health:worker": "vitest run apps/worker-api/test/health.test.ts",
-    "build": "npm.cmd run build --workspace @seller-intelligence/dashboard",
-    "audit:prod": "npm.cmd audit --omit=dev"
+    "build": "npm run build --workspace @seller-intelligence/dashboard",
+    "audit:prod": "npm audit --omit=dev"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

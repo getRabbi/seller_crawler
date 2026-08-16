@@ -20,6 +20,7 @@ export interface HealthPayload {
     operationsDb: boolean;
     historyDb: boolean;
     ingestionHmac: boolean;
+    contactEncryption: boolean;
     access: boolean;
   };
   violations: string[];
@@ -34,6 +35,7 @@ export function buildHealthPayload(env: RuntimeEnv = {}): HealthPayload {
     operationsDb: env.OPS_DB !== undefined,
     historyDb: env.HISTORY_DB !== undefined,
     ingestionHmac: Boolean(env.INGESTION_HMAC_SECRET),
+    contactEncryption: Boolean(env.CONTACT_ENCRYPTION_KEYS),
     access: Boolean(
       env.ACCESS_ALLOWED_EMAIL &&
         env.ACCESS_AUTH_REQUIRED === "true" &&

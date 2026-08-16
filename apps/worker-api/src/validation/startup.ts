@@ -17,6 +17,7 @@ export interface RuntimeEnv {
   OPS_DB?: D1Database;
   HISTORY_DB?: D1Database;
   INGESTION_HMAC_SECRET?: string;
+  CONTACT_ENCRYPTION_KEYS?: string;
   MAX_BATCH_SELLERS?: string;
   MAX_BATCH_CONTACTS?: string;
   MAX_BATCH_D1_STATEMENTS?: string;
@@ -43,6 +44,13 @@ export interface RuntimeEnv {
   CREDIT_RUNNER_MONTHLY_CAP_AUD?: string;
   CREDIT_RUNNER_AUTO_SHUTDOWN?: string;
   ENABLE_AMAZON?: string;
+  ENABLE_ALIBABA?: string;
+  ENABLE_1688?: string;
+  ENABLE_BUSINESS_REGISTRY?: string;
+  ENABLE_OFFICIAL_WEBSITE?: string;
+  ENABLE_SEARCH_DISCOVERY?: string;
+  ENABLE_AI_SUMMARY?: string;
+  ENABLE_OUTREACH?: string;
   ACCESS_AUTH_REQUIRED?: string;
   ACCESS_ALLOWED_EMAIL?: string;
   TEAM_DOMAIN?: string;
@@ -70,6 +78,13 @@ export interface RuntimeState {
   creditRunnerMonthlyCapAud: number;
   creditRunnerAutoShutdown: boolean;
   amazonEnabled: boolean;
+  alibabaEnabled: boolean;
+  marketplace1688Enabled: boolean;
+  businessRegistryEnabled: boolean;
+  searchDiscoveryEnabled: boolean;
+  aiSummaryEnabled: boolean;
+  outreachEnabled: boolean;
+  officialWebsiteEnabled: boolean;
 }
 
 const runnerModes: ReadonlySet<string> = new Set([
@@ -129,7 +144,14 @@ export function readRuntimeState(env: RuntimeEnv = {}): RuntimeState {
     creditRunnerEnabled: readBool(env.CREDIT_RUNNER_ENABLED, false),
     creditRunnerMonthlyCapAud: readNumber(env.CREDIT_RUNNER_MONTHLY_CAP_AUD, 0),
     creditRunnerAutoShutdown: readBool(env.CREDIT_RUNNER_AUTO_SHUTDOWN, true),
-    amazonEnabled: readBool(env.ENABLE_AMAZON, false)
+    amazonEnabled: readBool(env.ENABLE_AMAZON, false),
+    alibabaEnabled: readBool(env.ENABLE_ALIBABA, false),
+    marketplace1688Enabled: readBool(env.ENABLE_1688, false),
+    businessRegistryEnabled: readBool(env.ENABLE_BUSINESS_REGISTRY, false),
+    searchDiscoveryEnabled: readBool(env.ENABLE_SEARCH_DISCOVERY, false),
+    aiSummaryEnabled: readBool(env.ENABLE_AI_SUMMARY, false),
+    outreachEnabled: readBool(env.ENABLE_OUTREACH, false),
+    officialWebsiteEnabled: readBool(env.ENABLE_OFFICIAL_WEBSITE, true)
   };
 }
 
@@ -165,8 +187,20 @@ export function startupGateViolations(state: RuntimeState): string[] {
     violations.push("Live crawling cannot be enabled while RUNNER_MODE is development_locked.");
   }
 
-  if (state.amazonEnabled) {
-    violations.push("Amazon crawling is outside the Solo v1 scope and must remain disabled.");
+  const deferredFeatures = [
+    ["Amazon", state.amazonEnabled],
+    ["Alibaba", state.alibabaEnabled],
+    ["1688", state.marketplace1688Enabled],
+    ["business registry", state.businessRegistryEnabled],
+    ["search discovery", state.searchDiscoveryEnabled],
+    ["AI summary", state.aiSummaryEnabled],
+    ["outreach", state.outreachEnabled]
+  ] as const;
+  for (const [name, enabled] of deferredFeatures) {
+    if (enabled) violations.push(`${name} is outside the Solo v1 scope and must remain disabled.`);
+  }
+  if (!state.officialWebsiteEnabled) {
+    violations.push("Official website crawling must remain enabled for Solo v1.");
   }
 
   if (state.runnerMode === "zyte_student_active") {

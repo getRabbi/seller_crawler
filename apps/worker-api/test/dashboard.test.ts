@@ -12,6 +12,8 @@ import type { RuntimeEnv } from "../src/validation/startup";
 
 const sellerId = "018f2d5e-7b3c-7a1d-8f2e-123456789abc";
 const matchedSellerId = "018f2d5e-7b3c-7a1d-8f2e-123456789abd";
+const contactId = "018f2d5e-7b3c-7a1d-8f2e-123456789abe";
+const contactKey = new Uint8Array(32).fill(107);
 let accessSigningKeys: Awaited<ReturnType<typeof generateKeyPair>> | undefined;
 
 type QueryResolver = (query: string, values: D1Value[]) => unknown[];
@@ -138,6 +140,57 @@ describe("Solo dashboard API", () => {
     expect(body).not.toContain("sealed-contact-value");
   });
 
+  it("reveals an authenticated contact only through an audited operator mutation", async () => {
+    const env = dashboardEnv({ appEnv: "production" });
+    const token = await accessToken("operator@example.invalid");
+    const response = await worker.fetch(
+      new Request(`https://api.example.invalid/v1/contacts/${contactId}/reveal`, {
+        method: "POST",
+        headers: {
+          origin: "https://dashboard.example.invalid",
+          "content-type": "application/json",
+          "cf-access-jwt-assertion": token
+        },
+        body: JSON.stringify({ reason: "Operator verification" })
+      }),
+      env
+    );
+    const payload = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(payload).toMatchObject({
+      id: contactId,
+      contactType: "email",
+      value: "sales@example.test"
+    });
+    const contacts = env.CONTACTS_DB as FixtureD1;
+    const audit = contacts.calls.find((call) => call.query.includes("INSERT INTO audit_events"));
+    expect(audit?.values).toContain("operator@example.invalid");
+    expect(audit?.values).toContain("Operator verification");
+    expect(JSON.stringify(audit)).not.toContain("sales@example.test");
+  });
+
+  it("rejects contact reveal from an unapproved origin before decryption", async () => {
+    const env = dashboardEnv({ appEnv: "production" });
+    const token = await accessToken("operator@example.invalid");
+    const response = await worker.fetch(
+      new Request(`https://api.example.invalid/v1/contacts/${contactId}/reveal`, {
+        method: "POST",
+        headers: {
+          origin: "https://attacker.invalid",
+          "content-type": "application/json",
+          "cf-access-jwt-assertion": token
+        },
+        body: JSON.stringify({ reason: "not allowed" })
+      }),
+      env
+    );
+
+    expect(response.status).toBe(403);
+    expect((await response.json()).error.code).toBe("origin_denied");
+    expect((env.CONTACTS_DB as FixtureD1).calls.some((call) => call.query.includes("audit_events"))).toBe(false);
+  });
+
   it("fails closed outside local when Access is unconfigured or unauthenticated", async () => {
     const unconfigured = await worker.fetch(
       new Request("https://api.example.invalid/v1/sellers"),
@@ -240,9 +293,10 @@ function dashboardEnv(
     }
     return [];
   });
-  const contacts = new FixtureD1((query) =>
-    query.includes("FROM contacts") ? [contactRow(options.contactDisplay)] : []
-  );
+  const contacts = new FixtureD1((query) => {
+    if (query.includes("contact_value_ciphertext")) return [contactSecretRow()];
+    return query.includes("FROM contacts") ? [contactRow(options.contactDisplay)] : [];
+  });
   const operations = new FixtureD1((query) => {
     if (query.includes("FROM sources")) {
       return [evidenceRow()];
@@ -261,6 +315,7 @@ function dashboardEnv(
     TEAM_DOMAIN: "https://seller-intelligence.cloudflareaccess.com",
     POLICY_AUD: "fixture-access-audience",
     DASHBOARD_ORIGIN: "https://dashboard.example.invalid",
+    CONTACT_ENCRYPTION_KEYS: JSON.stringify({ "test-v1": encodeBase64Url(contactKey) }),
     CORE_DB: options.omitCore ? undefined : core,
     CONTACTS_DB: contacts,
     OPS_DB: operations,
@@ -325,6 +380,45 @@ function contactRow(displayValue = "sa***@example.invalid"): Record<string, unkn
     total_count: 1
   };
 }
+
+function contactSecretRow(): Record<string, unknown> {
+  return {
+    id: contactId,
+    seller_id: sellerId,
+    contact_type: "email",
+    contact_value_ciphertext: sealedContactValue(),
+    normalized_hash: "fixture-normalized-hash",
+    display_value_masked: "sa***@example.test",
+    status: "active"
+  };
+}
+
+let sealedContact: string | undefined;
+
+function sealedContactValue(): string {
+  if (!sealedContact) throw new Error("sealed contact fixture was not initialized");
+  return sealedContact;
+}
+
+async function initializeSealedContact(): Promise<void> {
+  const nonce = new Uint8Array(12).fill(110);
+  const key = await crypto.subtle.importKey("raw", contactKey, "AES-GCM", false, ["encrypt"]);
+  const aad = new TextEncoder().encode(
+    `seller-intelligence-contact|v1|${contactId}|${sellerId}|email`
+  );
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: nonce, additionalData: aad, tagLength: 128 },
+    key,
+    new TextEncoder().encode("sales@example.test")
+  );
+  sealedContact = `si-aesgcm:v1:test-v1:${encodeBase64Url(nonce)}:${encodeBase64Url(new Uint8Array(ciphertext))}`;
+}
+
+function encodeBase64Url(value: Uint8Array): string {
+  return btoa(String.fromCharCode(...value)).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/, "");
+}
+
+await initializeSealedContact();
 
 function evidenceRow(): Record<string, unknown> {
   return {

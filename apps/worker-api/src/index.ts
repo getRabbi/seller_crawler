@@ -1,6 +1,7 @@
 import { authorizeDashboardRequest, isIngestionRoute } from "./auth";
 import { dashboardResponse, errorResponse, isDashboardRoute } from "./dashboard/routes";
 import { ingestBatchResponse } from "./ingestion/route";
+import { cooldownAuthorizationResponse, isCooldownRoute } from "./cooldown/route";
 import { healthResponse } from "./routes/health";
 import type { RuntimeEnv } from "./validation/startup";
 
@@ -30,7 +31,7 @@ export default {
 
     if (request.method === "OPTIONS" && isDashboardRoute(url.pathname)) {
       const headers = new Headers(corsHeaders(request, env));
-      headers.set("access-control-allow-methods", "GET, OPTIONS");
+      headers.set("access-control-allow-methods", "GET, POST, OPTIONS");
       headers.set("access-control-allow-headers", "content-type");
       headers.set("access-control-max-age", "86400");
       return new Response(null, { status: 204, headers });
@@ -44,12 +45,20 @@ export default {
       return ingestBatchResponse(request, env);
     }
 
-    if (request.method === "GET" && isDashboardRoute(url.pathname)) {
+    if (request.method === "GET" && isCooldownRoute(url.pathname)) {
+      return cooldownAuthorizationResponse(request, env);
+    }
+
+    if ((request.method === "GET" || request.method === "POST") && isDashboardRoute(url.pathname)) {
       const access = await authorizeDashboardRequest(request, env);
       if (!access.allowed) {
         return withCors(errorResponse(access.status, access.code, access.message), request, env);
       }
-      return withCors(await dashboardResponse(request, env), request, env);
+      return withCors(
+        await dashboardResponse(request, env, access.actorEmail ?? "local-operator"),
+        request,
+        env
+      );
     }
 
     return errorResponse(404, "not_found", "Route not found.");

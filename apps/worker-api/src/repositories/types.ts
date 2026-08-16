@@ -28,6 +28,41 @@ export interface SellerWrite extends VersionedWrite {
   updatedAt: string;
 }
 
+export interface EntityResolutionDecisionWrite extends VersionedWrite {
+  id: string;
+  candidateSellerId: string;
+  matchedSellerId: string;
+  action: "auto_merge" | "review_queue" | "no_merge";
+  score: number;
+  scoreBreakdownJson: string;
+  mergeAuditJson?: string | null;
+  rollbackPlanJson?: string | null;
+  status?: string;
+  createdAt: string;
+  decidedAt?: string | null;
+  decidedBy?: string | null;
+}
+
+export interface SellerMergeRedirectWrite {
+  sourceSellerId: string;
+  targetSellerId: string;
+  decisionId: string;
+  reason: string;
+  createdAt: string;
+  rollbackStatus?: string;
+  rollbackDecisionId?: string | null;
+}
+
+export interface SellerMergeLinkAuditWrite {
+  decisionId: string;
+  tableName: string;
+  rowId: string;
+  originalSellerId: string;
+  targetSellerId: string;
+  createdAt: string;
+  rolledBackAt?: string | null;
+}
+
 export interface MarketplaceAccountWrite {
   id: string;
   sellerId: string;

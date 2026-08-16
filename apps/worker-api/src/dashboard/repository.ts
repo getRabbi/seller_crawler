@@ -1,5 +1,6 @@
 import type {
   ContactListItem,
+  ContactRevealResponse,
   CrawlRunItem,
   DuplicateReviewItem,
   EvidenceListItem,
@@ -9,6 +10,9 @@ import type {
 } from "@seller-intelligence/shared-types/dashboard";
 
 import type { D1Database, D1Value } from "../repositories/d1";
+import { ContactsRepository } from "../repositories/contacts";
+import { newUuidV7 } from "../repositories/ids";
+import { decryptContactValue } from "../security/contact-crypto";
 import type { RuntimeEnv } from "../validation/startup";
 
 const DEFAULT_LIMIT = 50;
@@ -235,6 +239,50 @@ export class DashboardRepository {
     const rows = result.results ?? [];
     const sellerNames = await this.getSellerNames(rows.map((row) => row.seller_id));
     return listResponse(rows, options, (row) => mapContact(row, sellerNames.get(row.seller_id) ?? null));
+  }
+
+  async revealContact(
+    contactId: string,
+    actorId: string,
+    reason: string
+  ): Promise<ContactRevealResponse | null> {
+    const contactsDb = requireDb(this.env.CONTACTS_DB, "CONTACTS_DB");
+    if (!this.env.CONTACT_ENCRYPTION_KEYS) {
+      throw new Error("CONTACT_ENCRYPTION_KEYS is not configured.");
+    }
+    const contacts = new ContactsRepository(contactsDb);
+    const record = await contacts.getActiveContactForReveal(contactId);
+    if (!record) {
+      return null;
+    }
+    const decrypted = await decryptContactValue(
+      record.contact_value_ciphertext,
+      this.env.CONTACT_ENCRYPTION_KEYS,
+      {
+        contactId: record.id,
+        sellerId: record.seller_id,
+        contactType: record.contact_type
+      }
+    );
+    const revealedAt = new Date().toISOString();
+    await contacts.insertAuditEvent({
+      id: newUuidV7(),
+      eventType: "contact_revealed",
+      entityType: "contact",
+      entityId: record.id,
+      actorId,
+      oldValueHash: record.normalized_hash,
+      oldValueMasked: record.display_value_masked,
+      reason,
+      metadataJson: JSON.stringify({ key_version: decrypted.keyVersion, access: "single_operator" }),
+      createdAt: revealedAt
+    });
+    return {
+      id: record.id,
+      contactType: record.contact_type,
+      value: decrypted.value,
+      revealedAt
+    };
   }
 
   async listDuplicates(options: ListOptions): Promise<ListResponse<DuplicateReviewItem>> {

@@ -169,6 +169,25 @@ describe("POST /v1/ingest/batch", () => {
     expect(state.contacts.size).toBe(0);
   });
 
+  it("rejects unrecoverable contact hash markers as ciphertext", async () => {
+    const state = new MemoryD1State();
+    const invalid = validBatch();
+    invalid.contacts[0].contact_value_ciphertext = "redacted-sha256:fixture-hash";
+    const request = await signedIngestionRequest(invalid, {
+      idempotencyKey: `${runId}:ciphertext-format`,
+      nonce: "nonce-invalid-ciphertext"
+    });
+
+    const response = await worker.fetch(request, ingestionEnv(state));
+    const payload = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(payload.error.details).toContain(
+      "$.contacts[0].contact_value_ciphertext must use the versioned AES-GCM format"
+    );
+    expect(state.contacts.size).toBe(0);
+  });
+
   it("rejects wrong primitive types before partition writes", async () => {
     const state = new MemoryD1State();
     const invalid = validBatch();
@@ -356,7 +375,8 @@ function validBatch(): {
         id: contactId,
         seller_id: sellerId,
         contact_type: "email",
-        contact_value_ciphertext: "sealed-contact-value",
+        contact_value_ciphertext:
+          "si-aesgcm:v1:test-v1:bm5ubm5ubm5ubm5u:Y2lwaGVydGV4dHdpdGh0YWc",
         normalized_hash: "contact-hash",
         display_value_masked: "sa***@example.invalid",
         classification: "business_generic",

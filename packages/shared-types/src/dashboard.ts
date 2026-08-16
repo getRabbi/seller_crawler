@@ -36,6 +36,23 @@ export interface ContactListItem {
   status: string;
 }
 
+export interface ContactRevealResponse {
+  id: string;
+  contactType: string;
+  value: string;
+  revealedAt: string;
+}
+
+export type DuplicateDecisionAction = "merge" | "keep_separate" | "ignore" | "rollback";
+
+export interface DuplicateDecisionResponse {
+  decisionId: string;
+  action: DuplicateDecisionAction;
+  status: string;
+  duplicate: boolean;
+  decidedAt: string;
+}
+
 export interface EvidenceListItem {
   id: string;
   sourceUrl: string;

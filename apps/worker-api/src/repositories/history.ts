@@ -68,4 +68,40 @@ export class HistoryRepository {
       ]
     );
   }
+
+  async listSellerLinks(sellerId: string): Promise<Array<{ tableName: string; rowId: string }>> {
+    const rows: Array<{ tableName: string; rowId: string }> = [];
+    for (const tableName of ["field_history", "recent_diff_metadata"]) {
+      const result = await this.db
+        .prepare(`SELECT id FROM ${tableName} WHERE entity_type = 'seller' AND entity_id = ?`)
+        .bind(sellerId)
+        .all<{ id: string }>();
+      rows.push(...(result.results ?? []).map((row) => ({ tableName, rowId: row.id })));
+    }
+    return rows;
+  }
+
+  async reassignSellerLinks(sourceSellerId: string, targetSellerId: string): Promise<void> {
+    for (const tableName of ["field_history", "recent_diff_metadata"]) {
+      await runStatement(
+        this.db,
+        `UPDATE ${tableName} SET entity_id = ? WHERE entity_type = 'seller' AND entity_id = ?`,
+        [targetSellerId, sourceSellerId]
+      );
+    }
+  }
+
+  async restoreSellerLinks(
+    links: Array<{ table_name: string; row_id: string; original_seller_id: string; target_seller_id: string }>
+  ): Promise<void> {
+    const allowedTables = new Set(["field_history", "recent_diff_metadata"]);
+    for (const link of links) {
+      if (!allowedTables.has(link.table_name)) continue;
+      await runStatement(
+        this.db,
+        `UPDATE ${link.table_name} SET entity_id = ? WHERE id = ? AND entity_type = 'seller' AND entity_id = ?`,
+        [link.original_seller_id, link.row_id, link.target_seller_id]
+      );
+    }
+  }
 }

@@ -44,6 +44,21 @@ export async function fetchWorkerApi<T>(path: string, signal?: AbortSignal): Pro
   return (await response.json()) as T;
 }
 
+export async function postWorkerApi<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(workerApiUrl(path), {
+    method: "POST",
+    credentials: "include",
+    headers: { accept: "application/json", "content-type": "application/json" },
+    cache: "no-store",
+    body: JSON.stringify(body)
+  });
+  if (!response.ok) {
+    const payload = await readError(response);
+    throw new WorkerApiError(payload.message, response.status, payload.code);
+  }
+  return (await response.json()) as T;
+}
+
 async function readError(response: Response): Promise<{ code: string; message: string }> {
   try {
     const payload = (await response.json()) as ApiErrorPayload;

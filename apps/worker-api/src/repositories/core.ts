@@ -1,9 +1,12 @@
 import { nullable, runStatement, type D1Database, type D1Result } from "./d1";
 import { assertUuidV7Compatible } from "./ids";
 import type {
+  EntityResolutionDecisionWrite,
   MarketplaceAccountWrite,
   ScoreComponentWrite,
   SellerAliasWrite,
+  SellerMergeLinkAuditWrite,
+  SellerMergeRedirectWrite,
   SellerProductLinkWrite,
   SellerWrite
 } from "./types";
@@ -20,6 +23,24 @@ export interface SellerRow {
   official_domain: string | null;
   status: string;
   parser_version: string;
+}
+
+export interface ResolutionDecisionRow {
+  id: string;
+  candidate_seller_id: string;
+  matched_seller_id: string;
+  action: string;
+  score: number;
+  status: string;
+}
+
+export interface MergeLinkRow {
+  decision_id: string;
+  table_name: string;
+  row_id: string;
+  original_seller_id: string;
+  target_seller_id: string;
+  rolled_back_at: string | null;
 }
 
 export class CoreRepository {
@@ -47,6 +68,38 @@ export class CoreRepository {
       )
       .bind(id)
       .first<SellerRow>();
+  }
+
+  async findResolutionCandidates(record: SellerWrite): Promise<SellerRow[]> {
+    const domain = record.officialDomain ?? "";
+    const result = await this.db
+      .prepare(
+        `SELECT id, canonical_name, normalized_name, legal_name, legal_name_local,
+                country_code, province, city, official_domain, status, parser_version
+         FROM sellers
+         WHERE id <> ? AND status = 'active'
+           AND (
+             (? <> '' AND official_domain = ?)
+             OR normalized_name = ?
+             OR substr(normalized_name, 1, 8) = substr(?, 1, 8)
+           )
+         ORDER BY id ASC
+         LIMIT 25`
+      )
+      .bind(record.id, domain, domain, record.normalizedName, record.normalizedName)
+      .all<SellerRow>();
+    return result.results ?? [];
+  }
+
+  async getResolutionDecision(id: string): Promise<ResolutionDecisionRow | null> {
+    assertUuidV7Compatible(id, "decision_id");
+    return this.db
+      .prepare(
+        `SELECT id, candidate_seller_id, matched_seller_id, action, score, status
+         FROM entity_resolution_decisions WHERE id = ? LIMIT 1`
+      )
+      .bind(id)
+      .first<ResolutionDecisionRow>();
   }
 
   async upsertSeller(record: SellerWrite): Promise<D1Result> {
@@ -249,6 +302,170 @@ export class CoreRepository {
         record.parserVersion,
         record.status ?? "active"
       ]
+    );
+  }
+
+  async upsertResolutionDecision(record: EntityResolutionDecisionWrite): Promise<D1Result> {
+    assertUuidV7Compatible(record.id, "decision_id");
+    assertUuidV7Compatible(record.candidateSellerId, "candidate_seller_id");
+    assertUuidV7Compatible(record.matchedSellerId, "matched_seller_id");
+    return runStatement(
+      this.db,
+      `INSERT INTO entity_resolution_decisions (
+         id, candidate_seller_id, matched_seller_id, action, score,
+         score_breakdown_json, merge_audit_json, rollback_plan_json,
+         parser_version, schema_version, status, created_at, decided_at, decided_by
+       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(candidate_seller_id, matched_seller_id, parser_version) DO NOTHING`,
+      [
+        record.id,
+        record.candidateSellerId,
+        record.matchedSellerId,
+        record.action,
+        record.score,
+        record.scoreBreakdownJson,
+        nullable(record.mergeAuditJson),
+        nullable(record.rollbackPlanJson),
+        record.parserVersion,
+        record.schemaVersion ?? 1,
+        record.status ?? "pending",
+        record.createdAt,
+        nullable(record.decidedAt),
+        nullable(record.decidedBy)
+      ]
+    );
+  }
+
+  async upsertMergeRedirect(record: SellerMergeRedirectWrite): Promise<D1Result> {
+    assertUuidV7Compatible(record.sourceSellerId, "source_seller_id");
+    assertUuidV7Compatible(record.targetSellerId, "target_seller_id");
+    assertUuidV7Compatible(record.decisionId, "decision_id");
+    return runStatement(
+      this.db,
+      `INSERT INTO seller_merge_redirects (
+         source_seller_id, target_seller_id, decision_id, reason, created_at,
+         rollback_status, rollback_decision_id
+       ) VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(source_seller_id) DO UPDATE SET
+         target_seller_id = excluded.target_seller_id,
+         decision_id = excluded.decision_id,
+         reason = excluded.reason,
+         rollback_status = excluded.rollback_status,
+         rollback_decision_id = excluded.rollback_decision_id`,
+      [
+        record.sourceSellerId,
+        record.targetSellerId,
+        record.decisionId,
+        record.reason,
+        record.createdAt,
+        record.rollbackStatus ?? "active",
+        nullable(record.rollbackDecisionId)
+      ]
+    );
+  }
+
+  async upsertMergeLinkAudit(record: SellerMergeLinkAuditWrite): Promise<D1Result> {
+    assertUuidV7Compatible(record.decisionId, "decision_id");
+    return runStatement(
+      this.db,
+      `INSERT INTO seller_merge_link_audit (
+         decision_id, table_name, row_id, original_seller_id, target_seller_id,
+         created_at, rolled_back_at
+       ) VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(decision_id, table_name, row_id) DO NOTHING`,
+      [
+        record.decisionId,
+        record.tableName,
+        record.rowId,
+        record.originalSellerId,
+        record.targetSellerId,
+        record.createdAt,
+        nullable(record.rolledBackAt)
+      ]
+    );
+  }
+
+  async listCoreSellerLinks(sellerId: string): Promise<Array<{ tableName: string; rowId: string }>> {
+    assertUuidV7Compatible(sellerId, "seller_id");
+    const tables = ["marketplace_accounts", "seller_aliases", "score_components", "seller_product_links"];
+    const rows: Array<{ tableName: string; rowId: string }> = [];
+    for (const tableName of tables) {
+      const result = await this.db
+        .prepare(`SELECT id FROM ${tableName} WHERE seller_id = ?`)
+        .bind(sellerId)
+        .all<{ id: string }>();
+      rows.push(...(result.results ?? []).map((row) => ({ tableName, rowId: row.id })));
+    }
+    return rows;
+  }
+
+  async reassignCoreSellerLinks(sourceSellerId: string, targetSellerId: string): Promise<void> {
+    for (const tableName of ["marketplace_accounts", "seller_aliases", "score_components", "seller_product_links"]) {
+      await runStatement(this.db, `UPDATE ${tableName} SET seller_id = ? WHERE seller_id = ?`, [targetSellerId, sourceSellerId]);
+    }
+    await runStatement(this.db, "UPDATE sellers SET status = 'merged', updated_at = ? WHERE id = ?", [new Date().toISOString(), sourceSellerId]);
+  }
+
+  async setSellerStatus(sellerId: string, status: string, updatedAt: string): Promise<D1Result> {
+    return runStatement(this.db, "UPDATE sellers SET status = ?, updated_at = ? WHERE id = ?", [status, updatedAt, sellerId]);
+  }
+
+  async updateResolutionDecision(
+    decisionId: string,
+    status: string,
+    actorId: string,
+    decidedAt: string,
+    mergeAuditJson?: string | null,
+    rollbackPlanJson?: string | null
+  ): Promise<D1Result> {
+    return runStatement(
+      this.db,
+      `UPDATE entity_resolution_decisions
+       SET status = ?, decided_at = ?, decided_by = ?,
+           merge_audit_json = COALESCE(?, merge_audit_json),
+           rollback_plan_json = COALESCE(?, rollback_plan_json)
+       WHERE id = ?`,
+      [status, decidedAt, actorId, nullable(mergeAuditJson), nullable(rollbackPlanJson), decisionId]
+    );
+  }
+
+  async listMergeLinkAudits(decisionId: string): Promise<MergeLinkRow[]> {
+    const result = await this.db
+      .prepare(
+        `SELECT decision_id, table_name, row_id, original_seller_id, target_seller_id,
+                rolled_back_at
+         FROM seller_merge_link_audit
+         WHERE decision_id = ? AND rolled_back_at IS NULL
+         ORDER BY table_name, row_id`
+      )
+      .bind(decisionId)
+      .all<MergeLinkRow>();
+    return result.results ?? [];
+  }
+
+  async restoreCoreMergeLinks(links: MergeLinkRow[], rolledBackAt: string): Promise<void> {
+    const allowedTables = new Set(["marketplace_accounts", "seller_aliases", "score_components", "seller_product_links"]);
+    for (const link of links) {
+      if (!allowedTables.has(link.table_name)) continue;
+      await runStatement(this.db, `UPDATE ${link.table_name} SET seller_id = ? WHERE id = ? AND seller_id = ?`, [link.original_seller_id, link.row_id, link.target_seller_id]);
+    }
+    if (links[0]) {
+      await runStatement(this.db, "UPDATE sellers SET status = 'active', updated_at = ? WHERE id = ?", [rolledBackAt, links[0].original_seller_id]);
+    }
+  }
+
+  async markMergeRolledBack(decisionId: string, rolledBackAt: string): Promise<void> {
+    await runStatement(
+      this.db,
+      "UPDATE seller_merge_link_audit SET rolled_back_at = ? WHERE decision_id = ? AND rolled_back_at IS NULL",
+      [rolledBackAt, decisionId]
+    );
+    await runStatement(
+      this.db,
+      `UPDATE seller_merge_redirects
+       SET rollback_status = 'rolled_back', rollback_decision_id = ?
+       WHERE decision_id = ?`,
+      [decisionId, decisionId]
     );
   }
 }

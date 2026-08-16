@@ -136,9 +136,9 @@ export class OperationsRepository {
          priority = excluded.priority,
          payload_json = excluded.payload_json,
          reason = excluded.reason,
-         status = excluded.status,
-         reviewed_at = excluded.reviewed_at,
-         reviewed_by = excluded.reviewed_by`,
+         status = CASE WHEN review_queue.status = 'pending' THEN excluded.status ELSE review_queue.status END,
+         reviewed_at = COALESCE(review_queue.reviewed_at, excluded.reviewed_at),
+         reviewed_by = COALESCE(review_queue.reviewed_by, excluded.reviewed_by)`,
       [
         record.id,
         record.reviewType,
@@ -152,6 +152,49 @@ export class OperationsRepository {
         nullable(record.reviewedBy)
       ]
     );
+  }
+
+  async resolveReviewByEntity(
+    entityId: string,
+    status: string,
+    reviewedAt: string,
+    reviewedBy: string
+  ): Promise<D1Result> {
+    return runStatement(
+      this.db,
+      `UPDATE review_queue SET status = ?, reviewed_at = ?, reviewed_by = ?
+       WHERE entity_id = ? AND review_type = 'possible_duplicate_seller'`,
+      [status, reviewedAt, reviewedBy, entityId]
+    );
+  }
+
+  async listSellerLinks(sellerId: string): Promise<Array<{ tableName: string; rowId: string }>> {
+    const result = await this.db
+      .prepare("SELECT id FROM sources WHERE seller_id = ?")
+      .bind(sellerId)
+      .all<{ id: string }>();
+    return (result.results ?? []).map((row) => ({ tableName: "sources", rowId: row.id }));
+  }
+
+  async reassignSellerLinks(sourceSellerId: string, targetSellerId: string): Promise<void> {
+    await runStatement(this.db, "UPDATE sources SET seller_id = ? WHERE seller_id = ?", [targetSellerId, sourceSellerId]);
+  }
+
+  async restoreSellerLinks(
+    links: Array<{ table_name: string; row_id: string; original_seller_id: string; target_seller_id: string }>
+  ): Promise<void> {
+    for (const link of links) {
+      if (link.table_name !== "sources") continue;
+      await runStatement(this.db, "UPDATE sources SET seller_id = ? WHERE id = ? AND seller_id = ?", [link.original_seller_id, link.row_id, link.target_seller_id]);
+    }
+  }
+
+  async getSourceBlockedUntil(adapterName: string): Promise<string | null> {
+    const row = await this.db
+      .prepare("SELECT blocked_until FROM source_registry WHERE adapter_name = ? LIMIT 1")
+      .bind(adapterName)
+      .first<{ blocked_until: string | null }>();
+    return row?.blocked_until ?? null;
   }
 
   async upsertSourceRegistry(record: SourceRegistryWrite): Promise<D1Result> {

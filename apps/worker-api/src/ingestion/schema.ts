@@ -464,6 +464,15 @@ export function parseAndValidateBatch(
       requireFields(record, recordRequirements[arrayName], path, errors);
       validateFieldTypes(record, recordFieldTypes[arrayName], path, errors);
       validateUuidFields(record, path, errors);
+      if (
+        arrayName === "contacts" &&
+        typeof record.contact_value_ciphertext === "string" &&
+        !/^si-aesgcm:v1:[A-Za-z0-9._-]{1,32}:[A-Za-z0-9_-]+:[A-Za-z0-9_-]+$/.test(
+          record.contact_value_ciphertext
+        )
+      ) {
+        errors.push(`${path}.contact_value_ciphertext must use the versioned AES-GCM format`);
+      }
     });
   }
 

@@ -1,4 +1,5 @@
 import { CrossDatabaseUnitOfWork } from "../repositories";
+import { prepareEntityResolution } from "../entity-resolution/service";
 import { OperationsRepository } from "../repositories/operations";
 import type { RuntimeEnv } from "../validation/startup";
 import { readAndDecodeBody } from "./body";
@@ -125,12 +126,13 @@ export async function ingestBatchResponse(request: Request, env: RuntimeEnv): Pr
     );
   }
 
+  const changes = await prepareEntityResolution(toUnitOfWorkChanges(schemaResult.payload), env);
   const result = await CrossDatabaseUnitOfWork.fromDatabases({
     core: env.CORE_DB!,
     contacts: env.CONTACTS_DB!,
     operations: env.OPS_DB!,
     history: env.HISTORY_DB!
-  }).commit(toUnitOfWorkChanges(schemaResult.payload));
+  }).commit(changes);
 
   if (!result.ok) {
     logIngestionRejected("partition_write_failed", headers.value.idempotencyKey);

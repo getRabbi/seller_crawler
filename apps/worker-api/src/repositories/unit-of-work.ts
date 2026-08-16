@@ -9,6 +9,7 @@ import type {
   CrawlRunWrite,
   FeatureFlagWrite,
   FieldHistoryWrite,
+  EntityResolutionDecisionWrite,
   IdempotencyKeyWrite,
   MarketplaceAccountWrite,
   OutreachStateWrite,
@@ -17,6 +18,8 @@ import type {
   ReviewQueueWrite,
   ScoreComponentWrite,
   SellerAliasWrite,
+  SellerMergeLinkAuditWrite,
+  SellerMergeRedirectWrite,
   SellerProductLinkWrite,
   SellerWrite,
   SourceRegistryWrite,
@@ -44,6 +47,9 @@ export interface CoreChanges {
   aliases?: SellerAliasWrite[];
   scoreComponents?: ScoreComponentWrite[];
   productLinks?: SellerProductLinkWrite[];
+  resolutionDecisions?: EntityResolutionDecisionWrite[];
+  mergeRedirects?: SellerMergeRedirectWrite[];
+  mergeLinkAudits?: SellerMergeLinkAuditWrite[];
 }
 
 export interface ContactChanges {
@@ -151,6 +157,15 @@ export class CrossDatabaseUnitOfWork {
     }
     for (const productLink of changes?.productLinks ?? []) {
       await this.repositories.core.upsertProductLink(productLink);
+    }
+    for (const decision of changes?.resolutionDecisions ?? []) {
+      await this.repositories.core.upsertResolutionDecision(decision);
+    }
+    for (const redirect of changes?.mergeRedirects ?? []) {
+      await this.repositories.core.upsertMergeRedirect(redirect);
+    }
+    for (const link of changes?.mergeLinkAudits ?? []) {
+      await this.repositories.core.upsertMergeLinkAudit(link);
     }
   }
 

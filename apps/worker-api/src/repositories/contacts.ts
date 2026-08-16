@@ -2,6 +2,16 @@ import { nullable, runStatement, type D1Database, type D1Result } from "./d1";
 import { assertUuidV7Compatible } from "./ids";
 import type { AuditEventWrite, ContactWrite, OutreachStateWrite, SuppressionWrite } from "./types";
 
+export interface ContactSecretRow {
+  id: string;
+  seller_id: string;
+  contact_type: string;
+  contact_value_ciphertext: string;
+  normalized_hash: string;
+  display_value_masked: string | null;
+  status: string;
+}
+
 export class ContactsRepository {
   constructor(private readonly db: D1Database) {}
 
@@ -49,6 +59,62 @@ export class ContactsRepository {
         record.outreachEligible ? 1 : 0
       ]
     );
+  }
+
+  async getActiveContactForReveal(id: string): Promise<ContactSecretRow | null> {
+    assertUuidV7Compatible(id, "contact_id");
+    return this.db
+      .prepare(
+        `SELECT c.id, c.seller_id, c.contact_type, c.contact_value_ciphertext,
+                c.normalized_hash, c.display_value_masked, c.status
+         FROM contacts c
+         WHERE c.id = ? AND c.status = 'active'
+           AND NOT EXISTS (
+             SELECT 1 FROM suppression_list sl
+             WHERE (sl.seller_id = c.seller_id OR sl.contact_hash = c.normalized_hash)
+               AND (sl.expires_at IS NULL OR sl.expires_at > datetime('now'))
+           )
+         LIMIT 1`
+      )
+      .bind(id)
+      .first<ContactSecretRow>();
+  }
+
+  async getNormalizedHashesForSeller(sellerId: string): Promise<string[]> {
+    assertUuidV7Compatible(sellerId, "seller_id");
+    const result = await this.db
+      .prepare("SELECT normalized_hash FROM contacts WHERE seller_id = ? AND status = 'active'")
+      .bind(sellerId)
+      .all<{ normalized_hash: string }>();
+    return (result.results ?? []).map((row) => row.normalized_hash);
+  }
+
+  async listSellerLinks(sellerId: string): Promise<Array<{ tableName: string; rowId: string }>> {
+    const rows: Array<{ tableName: string; rowId: string }> = [];
+    for (const tableName of ["contacts", "outreach_state", "suppression_list"]) {
+      const result = await this.db
+        .prepare(`SELECT id FROM ${tableName} WHERE seller_id = ?`)
+        .bind(sellerId)
+        .all<{ id: string }>();
+      rows.push(...(result.results ?? []).map((row) => ({ tableName, rowId: row.id })));
+    }
+    return rows;
+  }
+
+  async reassignSellerLinks(sourceSellerId: string, targetSellerId: string): Promise<void> {
+    for (const tableName of ["contacts", "outreach_state", "suppression_list"]) {
+      await runStatement(this.db, `UPDATE ${tableName} SET seller_id = ? WHERE seller_id = ?`, [targetSellerId, sourceSellerId]);
+    }
+  }
+
+  async restoreSellerLinks(
+    links: Array<{ table_name: string; row_id: string; original_seller_id: string; target_seller_id: string }>
+  ): Promise<void> {
+    const allowedTables = new Set(["contacts", "outreach_state", "suppression_list"]);
+    for (const link of links) {
+      if (!allowedTables.has(link.table_name)) continue;
+      await runStatement(this.db, `UPDATE ${link.table_name} SET seller_id = ? WHERE id = ? AND seller_id = ?`, [link.original_seller_id, link.row_id, link.target_seller_id]);
+    }
   }
 
   async upsertSuppression(record: SuppressionWrite): Promise<D1Result> {

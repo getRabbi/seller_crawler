@@ -30,6 +30,7 @@ describe("Worker health", () => {
         operationsDb: false,
         historyDb: false,
         ingestionHmac: false,
+        contactEncryption: false,
         access: false
       },
       violations: []
@@ -67,7 +68,7 @@ describe("Worker health", () => {
     const state = readRuntimeState({ ENABLE_AMAZON: "true" });
 
     expect(startupGateViolations(state)).toContain(
-      "Amazon crawling is outside the Solo v1 scope and must remain disabled."
+      "Amazon is outside the Solo v1 scope and must remain disabled."
     );
   });
 });
