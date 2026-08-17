@@ -404,7 +404,7 @@ class UrllibScrapyCloudTransport:
 
 def load_scrapy_cloud_config(env: Mapping[str, str] | None = None) -> ScrapyCloudConfig:
     source = os.environ if env is None else env
-    project_dir = Path(source.get("SCRAPY_CLOUD_PROJECT_DIR", "crawler")).resolve()
+    project_dir = _resolve_project_dir(source.get("SCRAPY_CLOUD_PROJECT_DIR", "crawler"))
     return ScrapyCloudConfig(
         runtime_config=load_runtime_config(source),
         project_id=source.get("SCRAPY_CLOUD_PROJECT_ID"),
@@ -418,6 +418,19 @@ def load_scrapy_cloud_config(env: Mapping[str, str] | None = None) -> ScrapyClou
             "CONTACT_ENCRYPTION_ACTIVE_KEY_VERSION"
         ),
     )
+
+
+def _resolve_project_dir(raw_value: str) -> Path:
+    configured = Path(raw_value)
+    if configured.is_absolute():
+        return configured.resolve()
+    candidate = configured.resolve()
+    current = Path.cwd().resolve()
+    if candidate.is_dir():
+        return candidate
+    if configured == Path(current.name) and (current / "scrapy.cfg").is_file():
+        return current
+    return candidate
 
 
 def valid_cooldown_check_url(value: str | None) -> bool:

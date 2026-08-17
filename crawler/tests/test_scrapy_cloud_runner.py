@@ -175,6 +175,25 @@ def test_scrapy_cloud_config_repr_masks_credentials_and_job_secrets(tmp_path: Pa
     assert READY_ENV["CONTACT_ENCRYPTION_KEYS"] not in config_repr
 
 
+def test_project_dir_resolves_from_root_and_uv_directory_working_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    project = tmp_path / "crawler"
+    project.mkdir()
+    (project / "scrapy.cfg").write_text("[settings]\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    from_root = load_scrapy_cloud_config(
+        {**READY_ENV, "SCRAPY_CLOUD_PROJECT_DIR": "crawler"}
+    )
+    monkeypatch.chdir(project)
+    from_uv_directory = load_scrapy_cloud_config(
+        {**READY_ENV, "SCRAPY_CLOUD_PROJECT_DIR": "crawler"}
+    )
+
+    assert from_root.project_dir == project.resolve()
+    assert from_uv_directory.project_dir == project.resolve()
+
+
 def test_official_site_job_requires_separate_live_gate(tmp_path: Path) -> None:
     runner = ready_runner(tmp_path)
 
