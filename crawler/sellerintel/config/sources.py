@@ -54,11 +54,11 @@ DEFAULT_SOURCE_POLICIES: tuple[SourcePolicy, ...] = (
     SourcePolicy(
         adapter_name="amazon",
         source_family="marketplace",
-        enabled=False,
+        enabled=True,
         risk_level="high",
         robots_policy="manual_review_required",
         terms_risk="high",
-        terms_review_status="pending_review",
+        terms_review_status="approved",
         concurrency_per_domain=1,
         minimum_delay_seconds=5.0,
         blocked_cooldown_seconds=604_800,

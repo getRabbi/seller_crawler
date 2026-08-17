@@ -80,6 +80,22 @@ def test_pipeline_writes_completion_batch_with_cloud_job_and_stats(
     assert completion.crawl_runs[0].zyte_job_id == "123456/1/9"
 
 
+def test_pipeline_uses_spider_stage_metadata_for_amazon_completion() -> None:
+    submitter = FakeSubmitter()
+    pipeline = SignedIngestionPipeline(submitter, started_at="2026-08-04T00:00:00Z")
+    spider = configured_spider()
+    spider.job_type = "amazon_discovery"  # type: ignore[attr-defined]
+    spider.parser_version = "amazon-public-v1"  # type: ignore[attr-defined]
+    spider.completion_batch_number = 2_147_483_646  # type: ignore[attr-defined]
+
+    pipeline.close_spider(spider)
+
+    completion = submitter.batches[-1]
+    assert completion.batch_number == 2_147_483_646
+    assert completion.parser_version == "amazon-public-v1"
+    assert completion.crawl_runs[0].job_type == "amazon_discovery"
+
+
 def test_pipeline_fails_closed_when_ingestion_settings_are_missing() -> None:
     crawler = Crawler(Spider, Settings())
 

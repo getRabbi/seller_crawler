@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 from sellerintel.config.features import (
+    FLAG_CLASSIFICATIONS,
     StartupGateError,
     assert_startup_gates,
     load_runtime_config,
@@ -60,6 +61,37 @@ def test_rejects_unconfirmed_provider_activation() -> None:
     violations = startup_gate_violations(config)
     assert "Zyte student entitlement is not confirmed." in violations
     assert "Scrapy Cloud deploy is not enabled." in violations
+
+
+def test_classifies_operational_and_billing_flags_without_overloading_discovery() -> None:
+    assert FLAG_CLASSIFICATIONS["ENABLE_AMAZON"] == "functional"
+    assert FLAG_CLASSIFICATIONS["ENABLE_OFFICIAL_WEBSITE"] == "functional"
+    assert FLAG_CLASSIFICATIONS["ENABLE_EMAIL_EXTRACTION"] == "functional"
+    assert FLAG_CLASSIFICATIONS["ENABLE_SEARCH_DISCOVERY"] == "safety_billing"
+    assert FLAG_CLASSIFICATIONS["GLOBAL_CRAWL_KILL_SWITCH"] == "safety_billing"
+
+
+def test_accepted_operator_runtime_enables_amazon_while_paid_paths_stay_locked() -> None:
+    config = load_runtime_config(
+        {
+            "RUNNER_MODE": "zyte_student_active",
+            "LIVE_CRAWL_ENABLED": "true",
+            "ENABLE_AMAZON": "true",
+            "ENABLE_OFFICIAL_WEBSITE": "true",
+            "ZYTE_STUDENT_ENTITLEMENT_CONFIRMED": "true",
+            "SCRAPY_CLOUD_DEPLOY_ENABLED": "true",
+            "SCRAPY_CLOUD_MAX_UNITS": "1",
+            "ZYTE_API_ENABLED": "false",
+            "PAID_SERVICES_ALLOWED": "false",
+            "PAID_ADDONS_ALLOWED": "false",
+            "ALLOW_EXTRA_SCRAPY_UNITS": "false",
+        }
+    )
+
+    assert startup_gate_violations(config) == []
+    assert config.feature_flags["ENABLE_AMAZON"] is True
+    assert config.zyte_api_enabled is False
+    assert config.paid_services_allowed is False
 
 
 def test_spool_checksum_is_deterministic() -> None:

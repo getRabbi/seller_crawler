@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from sellerintel.runtime.base import BuildArtifact, CrawlJob, RunHandle
 from sellerintel.runtime.scrapy_cloud import (
+    AMAZON_DISCOVERY_SPIDER,
     NO_NETWORK_SMOKE_SPIDER,
     HttpResult,
     ScrapyCloudRunner,
@@ -179,6 +180,52 @@ def test_official_site_job_requires_separate_live_gate(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="LIVE_CRAWL_ENABLED"):
         runner.start(CrawlJob(job_id="live-test", page_budget=5, spider_name="official_website"))
+
+
+def test_cli_amazon_job_enforces_one_unit_and_locked_paid_paths(tmp_path: Path) -> None:
+    transport = FakeTransport()
+    runner = ready_runner(
+        tmp_path,
+        transport=transport,
+        env_overrides={"LIVE_CRAWL_ENABLED": "true", "ENABLE_AMAZON": "true"},
+    )
+
+    assert main(
+        [
+            "start-amazon",
+            "--keyword",
+            "stainless steel bottle",
+            "--marketplace",
+            "amazon.com",
+            "--crawl-run-id",
+            "018f2d5e-7b3c-7a1d-8f2e-523456789abc",
+            "--target-sellers",
+            "1",
+            "--max-result-pages",
+            "1",
+            "--page-budget",
+            "6",
+            "--country-code",
+            "BD",
+        ],
+        runner=runner,
+    ) == 0
+
+    form = transport.calls[0][2]
+    assert form is not None
+    assert form["spider"] == AMAZON_DISCOVERY_SPIDER
+    assert form["units"] == "1"
+    assert form["target_sellers"] == "1"
+    assert form["max_result_pages"] == "1"
+    assert form["country_codes"] == "BD"
+    assert json.loads(form["keywords"]) == ["stainless steel bottle"]
+    settings = json.loads(form["job_settings"])
+    assert settings["ENABLE_AMAZON"] is True
+    assert settings["ENABLE_SEARCH_DISCOVERY"] is False
+    assert settings["LIVE_CRAWL_ENABLED"] is True
+    assert settings["SCRAPY_CLOUD_MAX_UNITS"] == 1
+    assert settings["ZYTE_API_ENABLED"] is False
+    assert settings["PAID_SERVICES_ALLOWED"] is False
 
 
 def test_job_arguments_cannot_override_unit_limit(tmp_path: Path) -> None:

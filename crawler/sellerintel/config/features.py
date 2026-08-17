@@ -3,8 +3,10 @@ from __future__ import annotations
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import Literal
 
 type RunnerMode = str
+type FlagClassification = Literal["functional", "safety_billing", "test_only"]
 
 ALLOWED_RUNNER_MODES: frozenset[str] = frozenset(
     {
@@ -35,6 +37,23 @@ DEFAULT_FEATURE_FLAGS: dict[str, bool] = {
     "ENABLE_AI_SUMMARY": False,
     "ENABLE_OUTREACH": False,
     "GLOBAL_CRAWL_KILL_SWITCH": False,
+}
+
+FLAG_CLASSIFICATIONS: dict[str, FlagClassification] = {
+    "ENABLE_AMAZON": "functional",
+    "ENABLE_OFFICIAL_WEBSITE": "functional",
+    "ENABLE_EMAIL_EXTRACTION": "functional",
+    "ENABLE_PHONE_EXTRACTION": "functional",
+    "ENABLE_WHATSAPP_EXTRACTION": "functional",
+    "ENABLE_WECHAT_EXTRACTION": "functional",
+    "ENABLE_SEARCH_DISCOVERY": "safety_billing",
+    "ENABLE_ALIBABA": "safety_billing",
+    "ENABLE_1688": "safety_billing",
+    "ENABLE_BUSINESS_REGISTRY": "safety_billing",
+    "ENABLE_LOCAL_PLAYWRIGHT": "test_only",
+    "ENABLE_AI_SUMMARY": "safety_billing",
+    "ENABLE_OUTREACH": "safety_billing",
+    "GLOBAL_CRAWL_KILL_SWITCH": "safety_billing",
 }
 
 
@@ -100,7 +119,10 @@ def load_runtime_config(env: Mapping[str, str] | None = None) -> RuntimeConfig:
             "ALLOW_PAID_GITHUB_ACTIONS_MINUTES",
             False,
         ),
-        allow_paid_addons=_read_bool(source, "ALLOW_PAID_ADDONS", False),
+        allow_paid_addons=(
+            _read_bool(source, "ALLOW_PAID_ADDONS", False)
+            or _read_bool(source, "PAID_ADDONS_ALLOWED", False)
+        ),
         zyte_student_entitlement_confirmed=_read_bool(
             source,
             "ZYTE_STUDENT_ENTITLEMENT_CONFIRMED",
@@ -153,7 +175,6 @@ def startup_gate_violations(config: RuntimeConfig) -> list[str]:
         violations.append("LIVE_CRAWL_ENABLED must be false in development_locked mode.")
 
     deferred_flags = (
-        "ENABLE_AMAZON",
         "ENABLE_ALIBABA",
         "ENABLE_1688",
         "ENABLE_BUSINESS_REGISTRY",

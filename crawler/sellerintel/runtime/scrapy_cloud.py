@@ -5,6 +5,7 @@ import base64
 import json
 import os
 import re
+import shutil
 import subprocess  # nosec B404
 import sys
 import urllib.error
@@ -35,6 +36,7 @@ API_BASE_URL = "https://app.zyte.com/api"
 STORAGE_BASE_URL = "https://storage.zyte.com"
 NO_NETWORK_SMOKE_SPIDER = "solo_no_network_smoke"
 OFFICIAL_SITE_SPIDER = "official_website"
+AMAZON_DISCOVERY_SPIDER = "amazon_discovery"
 PROJECT_ID_PATTERN = re.compile(r"^[0-9]+$")
 JOB_ID_PATTERN = re.compile(r"^[0-9]+/[0-9]+/[0-9]+$")
 RESERVED_JOB_ARGUMENTS = frozenset(
@@ -168,15 +170,22 @@ class ScrapyCloudRunner:
 
     def start(self, job: CrawlJob) -> RunHandle:
         self._assert_ready()
-        if job.spider_name not in {NO_NETWORK_SMOKE_SPIDER, OFFICIAL_SITE_SPIDER}:
+        if job.spider_name not in {
+            NO_NETWORK_SMOKE_SPIDER,
+            OFFICIAL_SITE_SPIDER,
+            AMAZON_DISCOVERY_SPIDER,
+        }:
             raise ValueError("Only Solo v1 Scrapy Cloud spiders may be started.")
         if (
-            job.spider_name == OFFICIAL_SITE_SPIDER
+            job.spider_name != NO_NETWORK_SMOKE_SPIDER
             and not self._config.runtime_config.live_crawl_enabled
         ):
-            raise ValueError("LIVE_CRAWL_ENABLED must be true for an official-site cloud job.")
-        if not 1 <= job.page_budget <= 25:
-            raise ValueError("Scrapy Cloud page_budget must be between 1 and 25.")
+            raise ValueError("LIVE_CRAWL_ENABLED must be true for a live cloud job.")
+        maximum_page_budget = 250 if job.spider_name == AMAZON_DISCOVERY_SPIDER else 25
+        if not 1 <= job.page_budget <= maximum_page_budget:
+            raise ValueError(
+                f"Scrapy Cloud page_budget must be between 1 and {maximum_page_budget}."
+            )
         arguments = dict(job.arguments)
         if RESERVED_JOB_ARGUMENTS.intersection(arguments):
             raise ValueError("Job arguments may not override provider safety fields.")
@@ -190,7 +199,7 @@ class ScrapyCloudRunner:
             "CREDIT_RUNNER_ENABLED": False,
             "DEPTH_LIMIT": 0,
             "DOWNLOAD_TIMEOUT": 30,
-            "ENABLE_AMAZON": False,
+            "ENABLE_AMAZON": job.spider_name == AMAZON_DISCOVERY_SPIDER,
             "ENABLE_ALIBABA": False,
             "ENABLE_1688": False,
             "ENABLE_BUSINESS_REGISTRY": False,
@@ -199,6 +208,10 @@ class ScrapyCloudRunner:
             "ENABLE_OUTREACH": False,
             "ENABLE_LOCAL_PLAYWRIGHT": False,
             "ENABLE_OFFICIAL_WEBSITE": True,
+            "ENABLE_EMAIL_EXTRACTION": True,
+            "ENABLE_PHONE_EXTRACTION": True,
+            "ENABLE_WHATSAPP_EXTRACTION": True,
+            "ENABLE_WECHAT_EXTRACTION": True,
             "GLOBAL_CRAWL_KILL_SWITCH": False,
             "LOG_LEVEL": "WARNING",
             "MAX_EXTERNAL_MONTHLY_SPEND_AUD": 0,
@@ -220,7 +233,7 @@ class ScrapyCloudRunner:
                 self._contact_encryption_active_key_version()
             ),
         }
-        if job.spider_name == OFFICIAL_SITE_SPIDER:
+        if job.spider_name != NO_NETWORK_SMOKE_SPIDER:
             job_settings["LIVE_CRAWL_ENABLED"] = True
             job_settings["SELLERINTEL_OBSERVED_AT"] = datetime.now(UTC).isoformat().replace(
                 "+00:00", "Z"
@@ -438,7 +451,16 @@ def valid_worker_url(value: str | None, *, path: str) -> bool:
 
 
 def run_deploy_command(command: Sequence[str], *, cwd: Path) -> None:
-    subprocess.run(command, cwd=cwd, check=True)  # noqa: S603  # nosec B603
+    if not command or command[0] != "shub":
+        raise ValueError("Only the pinned shub deployment command is allowed.")
+    uvx_path = shutil.which("uvx")
+    if uvx_path is None:
+        raise RuntimeError("uvx is required for the pinned Scrapy Cloud deploy tool.")
+    subprocess.run(  # noqa: S603  # nosec B603
+        [uvx_path, "--from", "shub==2.18.1", *command],
+        cwd=cwd,
+        check=True,
+    )
 
 
 def cloud_log_level(raw_level: object) -> str:
@@ -467,6 +489,25 @@ def _parser() -> argparse.ArgumentParser:
     official.add_argument("--page-budget", type=int, default=8)
     official.add_argument("--max-depth", type=int, default=2)
     official.add_argument("--default-region", default="")
+
+    amazon = actions.add_parser(
+        "start-amazon",
+        help="Start one approved bounded public Amazon identity-discovery job",
+    )
+    amazon.add_argument("--keyword", action="append", required=True)
+    amazon.add_argument("--marketplace", required=True)
+    amazon.add_argument("--crawl-run-id", default="")
+    amazon.add_argument("--target-sellers", type=int, default=1)
+    amazon.add_argument("--max-result-pages", type=int, default=1)
+    amazon.add_argument("--page-budget", type=int, default=6)
+    amazon.add_argument("--country-code", action="append", default=[])
+    amazon.add_argument("--category", default="")
+    amazon.add_argument("--brand-keyword", default="")
+    amazon.add_argument("--seller-name-keyword", default="")
+    amazon.add_argument("--require-public-location", action="store_true")
+    amazon.add_argument("--require-official-website", action="store_true")
+    amazon.add_argument("--manufacturer-likelihood", choices=("any", "likely"), default="any")
+    amazon.add_argument("--trader-likelihood", choices=("any", "likely"), default="any")
 
     status = actions.add_parser("status", help="Read one job status")
     status.add_argument("job_id")
@@ -520,6 +561,36 @@ def main(
                 page_budget=args.page_budget,
                 spider_name=OFFICIAL_SITE_SPIDER,
                 arguments=tuple(arguments),
+            )
+        )
+        print(json.dumps({"provider": handle.provider, "run_id": handle.run_id}))
+        return 0
+    if args.action == "start-amazon":
+        crawl_run_id = args.crawl_run_id or new_uuidv7()
+        amazon_arguments: tuple[tuple[str, str], ...] = (
+            (
+                "keywords",
+                json.dumps([str(value) for value in args.keyword], separators=(",", ":")),
+            ),
+            ("marketplace", str(args.marketplace)),
+            ("crawl_run_id", crawl_run_id),
+            ("target_sellers", str(args.target_sellers)),
+            ("max_result_pages", str(args.max_result_pages)),
+            ("country_codes", ",".join(str(value) for value in args.country_code)),
+            ("category", str(args.category)),
+            ("brand_keyword", str(args.brand_keyword)),
+            ("seller_name_keyword", str(args.seller_name_keyword)),
+            ("require_public_location", str(args.require_public_location).lower()),
+            ("require_official_website", str(args.require_official_website).lower()),
+            ("manufacturer_likelihood", str(args.manufacturer_likelihood)),
+            ("trader_likelihood", str(args.trader_likelihood)),
+        )
+        handle = cloud_runner.start(
+            CrawlJob(
+                job_id=crawl_run_id,
+                page_budget=args.page_budget,
+                spider_name=AMAZON_DISCOVERY_SPIDER,
+                arguments=amazon_arguments,
             )
         )
         print(json.dumps({"provider": handle.provider, "run_id": handle.run_id}))

@@ -114,16 +114,21 @@ class SignedIngestionPipeline:
         elif errors or self._spooled or self._rejected:
             status = "completed_with_errors"
         finished_at = _utc_now()
+        parser_version = str(getattr(spider, "parser_version", "official-site-v1"))
+        job_type = str(getattr(spider, "job_type", "official_website"))
+        completion_batch_number = int(
+            getattr(spider, "completion_batch_number", COMPLETION_BATCH_NUMBER)
+        )
         batch = IngestionBatch(
             schema_version=1,
-            parser_version="official-site-v1",
+            parser_version=parser_version,
             crawl_run_id=crawl_run_id,
-            batch_number=COMPLETION_BATCH_NUMBER,
+            batch_number=completion_batch_number,
             generated_at=finished_at,
             crawl_runs=[
                 CrawlRunRecord(
                     id=crawl_run_id,
-                    job_type="official_website",
+                    job_type=job_type,
                     zyte_job_id=_setting_string(spider, "SHUB_JOBKEY"),
                     started_at=self._started_at,
                     finished_at=finished_at,
@@ -132,11 +137,14 @@ class SignedIngestionPipeline:
                     responses_success=(
                         _stat_int(stats.get_value("downloader/response_count")) if stats else 0
                     ),
-                    candidates_found=self._sources_found,
+                    candidates_found=max(
+                        self._sources_found,
+                        _stat_int(stats.get_value("sellerintel/sellers_found")) if stats else 0,
+                    ),
                     contacts_verified=self._contacts_found,
                     blocked_count=blocked,
                     error_count=errors + self._spooled + self._rejected,
-                    notes="Solo v1 one-unit Scrapy Cloud official-site crawl",
+                    notes=f"One-unit Scrapy Cloud {job_type} crawl",
                 )
             ],
         )

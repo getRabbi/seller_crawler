@@ -29,9 +29,9 @@ def test_default_source_policies_include_required_risk_and_crawl_controls() -> N
     assert policies["official_site"].blocked_cooldown_seconds == 86_400
     assert policies["business_registry"].enabled is False
 
-    assert policies["amazon"].enabled is False
+    assert policies["amazon"].enabled is True
     assert policies["amazon"].source_family == "marketplace"
-    assert policies["amazon"].terms_review_status == "pending_review"
+    assert policies["amazon"].terms_review_status == "approved"
     assert policies["alibaba"].enabled is False
     assert policies["1688"].enabled is False
 
@@ -56,7 +56,7 @@ def test_registry_enables_only_policy_and_feature_allowed_adapters() -> None:
     amazon_enabled_names = [
         adapter.name for adapter in registry.enabled_adapters(amazon_flag_config)
     ]
-    assert "amazon" not in amazon_enabled_names
+    assert "amazon" in amazon_enabled_names
     assert [adapter.name for adapter in registry.enabled_adapters(official_disabled_config)] == []
 
 
