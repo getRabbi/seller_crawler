@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 
 import { fetchWorkerApi, WorkerApiError, workerApiBaseUrl, workerApiUrl } from "../lib/api";
 import { dashboardNav, workerApiPaths } from "../lib/dashboard-data";
@@ -39,6 +40,17 @@ describe("dashboard runtime configuration", () => {
       "/v1/export.csv",
       "/v1/metrics"
     ]);
+  });
+
+  it("ships an operational New Crawl form with bounded custom targets and both modes", () => {
+    const source = readFileSync(new URL("../app/crawls/new/page.tsx", import.meta.url), "utf8");
+
+    expect(source).toContain('mode === "find_sellers"');
+    expect(source).toContain('"known_websites"');
+    expect(source).toContain('list="target-seller-counts"');
+    expect(source).toContain('max="100"');
+    expect(source).toContain('min="1"');
+    expect(source).toContain("START CRAWL");
   });
 
   it("uses the configured public Worker origin without exposing secrets", () => {

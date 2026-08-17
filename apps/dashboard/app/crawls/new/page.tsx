@@ -121,7 +121,7 @@ export default function NewCrawlPage() {
         <section className="form-card">
           <h2>Targets and enrichment</h2>
           <div className="form-grid">
-            <label>Target sellers<select onChange={(event) => setTarget(event.target.value)} value={target}>{[10, 25, 50, 100].map((value) => <option key={value}>{value}</option>)}</select></label>
+            <label>Target sellers<input list="target-seller-counts" max="100" min="1" onChange={(event) => setTarget(event.target.value)} type="number" value={target} /><datalist id="target-seller-counts">{[10, 25, 50, 100].map((value) => <option key={value} value={value} />)}</datalist><small>Choose a preset or enter a bounded value from 1 to 100.</small></label>
             <label>Amazon result pages<input max="3" min="1" onChange={(event) => setMaxResultPages(event.target.value)} type="number" value={maxResultPages} /></label>
             <label>Official pages / seller<input max="25" min="1" onChange={(event) => setMaxOfficialPages(event.target.value)} type="number" value={maxOfficialPages} /></label>
             <label>Crawl depth<input max="3" min="0" onChange={(event) => setDepth(event.target.value)} type="number" value={depth} /></label>
