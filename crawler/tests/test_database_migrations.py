@@ -36,6 +36,10 @@ EXPECTED_TABLES = {
         "ingestion_nonces",
         "quota_state",
         "feature_flags",
+        "operator_crawl_runs",
+        "operator_crawl_events",
+        "operator_crawl_idempotency",
+        "crawl_run_sellers",
     },
     "history": {
         "field_history",
@@ -69,6 +73,9 @@ PRIMARY_KEYS = {
         "ingestion_nonces": "nonce",
         "quota_state": "quota_name",
         "feature_flags": "flag_name",
+        "operator_crawl_runs": "id",
+        "operator_crawl_events": "id",
+        "operator_crawl_idempotency": "idempotency_key",
     },
     "history": {
         "field_history": "id",

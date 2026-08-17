@@ -1,16 +1,22 @@
 import type { RuntimeEnv } from "../validation/startup";
 import type { IngestionConfig } from "./config";
 import { records, type IngestionBatchPayload } from "./schema";
+import { OperatorCrawlService } from "../operator-crawl/service";
 
 const blockedHostnames = new Set(["localhost", "127.0.0.1", "0.0.0.0", "::1"]);
 
-export function validateSourcePolicy(
+export async function validateSourcePolicy(
   payload: IngestionBatchPayload,
   config: IngestionConfig,
   env: RuntimeEnv
-): string[] {
+): Promise<string[]> {
   const errors: string[] = [];
   const allowedDomains = new Set(config.allowedSourceDomains);
+  if (env.OPS_DB) {
+    for (const domain of await new OperatorCrawlService(env).authorizedDomains(payload.crawl_run_id)) {
+      allowedDomains.add(domain);
+    }
+  }
 
   for (const [index, source] of records(payload, "sources").entries()) {
     const path = `$.sources[${index}]`;

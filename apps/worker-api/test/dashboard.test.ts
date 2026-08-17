@@ -117,7 +117,7 @@ describe("Solo dashboard API", () => {
       scoreBreakdown: { domain: 40 }
     });
     expect(runs.items[0]).toMatchObject({
-      jobType: "official_site_fixture",
+      jobType: "official_website",
       status: "completed",
       requestsTotal: 8,
       contactsVerified: 4
@@ -279,7 +279,7 @@ function dashboardEnv(
     if (query.includes("FROM seller_aliases")) {
       return [{ alias: "Acme Export" }];
     }
-    if (query.includes("FROM entity_resolution_decisions")) {
+    if (query.includes("JOIN sellers candidate")) {
       return [duplicateRow()];
     }
     if (query.includes("SELECT id, canonical_name FROM sellers")) {
@@ -301,8 +301,8 @@ function dashboardEnv(
     if (query.includes("FROM sources")) {
       return [evidenceRow()];
     }
-    if (query.includes("FROM crawl_runs")) {
-      return [crawlRunRow()];
+    if (query.includes("FROM operator_crawl_runs")) {
+      return [operatorCrawlRunRow()];
     }
     return [];
   });
@@ -452,23 +452,43 @@ function duplicateRow(): Record<string, unknown> {
   };
 }
 
-function crawlRunRow(): Record<string, unknown> {
+function operatorCrawlRunRow(): Record<string, unknown> {
   return {
     id: "018f2d5e-7b3c-7a1d-8f2e-123456789aaa",
-    job_type: "official_site_fixture",
+    mode: "known_websites",
+    query_json: "[]",
+    marketplace: null,
+    country_codes_json: "[]",
+    filters_json: "{}",
+    seed_urls_json: '["https://example.invalid/"]',
+    contact_types_json: '["email"]',
+    target_seller_count: 1,
+    max_result_pages: 1,
+    max_official_pages: 8,
+    crawl_depth: 2,
+    stop_after_target: 1,
     zyte_job_id: null,
+    retry_of_run_id: null,
+    requested_by: "operator@example.invalid",
+    requested_at: "2026-08-04T00:00:00Z",
     started_at: "2026-08-04T00:00:00Z",
     finished_at: "2026-08-04T00:01:00Z",
     status: "completed",
+    stage: "completed",
+    active_unit_slot: null,
+    updated_at: "2026-08-04T00:01:00Z",
+    approved_domains_json: '["example.invalid"]',
+    artifact_version: "fixture",
+    discovered_sellers: 1,
+    enriched_sellers: 1,
+    contacts_found: 4,
     requests_total: 8,
     responses_success: 8,
-    candidates_found: 1,
-    records_created: 6,
-    records_updated: 0,
-    contacts_verified: 4,
     blocked_count: 0,
     error_count: 0,
-    notes: null,
+    warnings_json: "[]",
+    error_code: null,
+    error_message: null,
     total_count: 1
   };
 }

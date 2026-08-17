@@ -24,8 +24,8 @@ export function isDashboardRoute(pathname: string): boolean {
     CONTACT_REVEAL_PATH.test(pathname) ||
     pathname === "/v1/duplicates" ||
     DUPLICATE_DECISION_PATH.test(pathname) ||
-    pathname === "/v1/crawl-runs" ||
     pathname === "/v1/search" ||
+    pathname === "/v1/metrics" ||
     pathname === "/v1/export.csv"
   );
 }
@@ -52,6 +52,9 @@ export async function dashboardResponse(
     }
     if (request.method === "GET" && url.pathname === "/v1/contacts") {
       return json(await repository.listContacts(parseContactListOptions(url)));
+    }
+    if (request.method === "GET" && url.pathname === "/v1/metrics") {
+      return json(await repository.metrics());
     }
     const revealMatch = url.pathname.match(CONTACT_REVEAL_PATH);
     if (request.method === "POST" && revealMatch) {
@@ -84,9 +87,6 @@ export async function dashboardResponse(
       return json(
         await applyDuplicateDecision(env, duplicateMatch[1], input.action, actorId, input.reason)
       );
-    }
-    if (request.method === "GET" && url.pathname === "/v1/crawl-runs") {
-      return json(await repository.listCrawlRuns(parseListOptions(url)));
     }
     if (request.method === "GET" && url.pathname === "/v1/export.csv") {
       return exportResponse(url, repository);

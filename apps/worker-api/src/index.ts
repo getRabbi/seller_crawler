@@ -4,6 +4,11 @@ import { ingestBatchResponse } from "./ingestion/route";
 import { cooldownAuthorizationResponse, isCooldownRoute } from "./cooldown/route";
 import { healthResponse } from "./routes/health";
 import type { RuntimeEnv } from "./validation/startup";
+import {
+  isOperatorCrawlRoute,
+  operatorCrawlResponse,
+  pumpOperatorQueue
+} from "./operator-crawl/routes";
 
 function corsHeaders(request: Request, env: RuntimeEnv): HeadersInit {
   const origin = request.headers.get("origin");
@@ -29,7 +34,7 @@ export default {
   async fetch(request: Request, env: RuntimeEnv = {}): Promise<Response> {
     const url = new URL(request.url);
 
-    if (request.method === "OPTIONS" && isDashboardRoute(url.pathname)) {
+    if (request.method === "OPTIONS" && (isDashboardRoute(url.pathname) || isOperatorCrawlRoute(url.pathname))) {
       const headers = new Headers(corsHeaders(request, env));
       headers.set("access-control-allow-methods", "GET, POST, OPTIONS");
       headers.set("access-control-allow-headers", "content-type");
@@ -61,6 +66,21 @@ export default {
       );
     }
 
+    if ((request.method === "GET" || request.method === "POST") && isOperatorCrawlRoute(url.pathname)) {
+      const access = await authorizeDashboardRequest(request, env);
+      if (!access.allowed) {
+        return withCors(errorResponse(access.status, access.code, access.message), request, env);
+      }
+      return withCors(
+        await operatorCrawlResponse(request, env, access.actorEmail ?? "local-operator"),
+        request,
+        env
+      );
+    }
+
     return errorResponse(404, "not_found", "Route not found.");
+  },
+  async scheduled(_controller: unknown, env: RuntimeEnv = {}): Promise<void> {
+    await pumpOperatorQueue(env);
   }
 };

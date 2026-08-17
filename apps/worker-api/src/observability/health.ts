@@ -13,6 +13,12 @@ export interface HealthPayload {
     scrapyCloudDeployEnabled: boolean;
     githubActionsCrawlerEnabled: boolean;
     creditRunnerEnabled: boolean;
+    operatorCrawlEnabled: boolean;
+    amazonEnabled: boolean;
+    discoveryEnabled: boolean;
+    officialWebsiteEnabled: boolean;
+    globalCrawlKillSwitch: boolean;
+    scrapyCloudMaxUnits: number;
   };
   bindings: {
     coreDb: boolean;
@@ -22,6 +28,7 @@ export interface HealthPayload {
     ingestionHmac: boolean;
     contactEncryption: boolean;
     access: boolean;
+    scrapyCloudControl: boolean;
   };
   violations: string[];
 }
@@ -35,12 +42,18 @@ export function buildHealthPayload(env: RuntimeEnv = {}): HealthPayload {
     operationsDb: env.OPS_DB !== undefined,
     historyDb: env.HISTORY_DB !== undefined,
     ingestionHmac: Boolean(env.INGESTION_HMAC_SECRET),
-    contactEncryption: Boolean(env.CONTACT_ENCRYPTION_KEYS),
+    contactEncryption: Boolean(
+      env.CONTACT_ENCRYPTION_KEYS && env.CONTACT_ENCRYPTION_ACTIVE_KEY_VERSION
+    ),
     access: Boolean(
       env.ACCESS_ALLOWED_EMAIL &&
         env.ACCESS_AUTH_REQUIRED === "true" &&
         env.TEAM_DOMAIN &&
         env.POLICY_AUD
+    ),
+    scrapyCloudControl: !runtime.operatorCrawlEnabled || Boolean(
+      env.SCRAPY_CLOUD_API_KEY && env.SCRAPY_CLOUD_PROJECT_ID &&
+      env.SOURCE_COOLDOWN_CHECK_URL && env.INGESTION_ENDPOINT_URL
     )
   };
 
@@ -65,7 +78,13 @@ export function buildHealthPayload(env: RuntimeEnv = {}): HealthPayload {
       zyteApiEnabled: runtime.zyteApiEnabled,
       scrapyCloudDeployEnabled: runtime.scrapyCloudDeployEnabled,
       githubActionsCrawlerEnabled: runtime.githubActionsCrawlerEnabled,
-      creditRunnerEnabled: runtime.creditRunnerEnabled
+      creditRunnerEnabled: runtime.creditRunnerEnabled,
+      operatorCrawlEnabled: runtime.operatorCrawlEnabled,
+      amazonEnabled: runtime.amazonEnabled,
+      discoveryEnabled: runtime.amazonEnabled,
+      officialWebsiteEnabled: runtime.officialWebsiteEnabled,
+      globalCrawlKillSwitch: runtime.globalCrawlKillSwitch,
+      scrapyCloudMaxUnits: runtime.scrapyCloudMaxUnits
     },
     bindings,
     violations

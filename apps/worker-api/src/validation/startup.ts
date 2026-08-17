@@ -18,6 +18,13 @@ export interface RuntimeEnv {
   HISTORY_DB?: D1Database;
   INGESTION_HMAC_SECRET?: string;
   CONTACT_ENCRYPTION_KEYS?: string;
+  CONTACT_ENCRYPTION_ACTIVE_KEY_VERSION?: string;
+  SCRAPY_CLOUD_API_KEY?: string;
+  SCRAPY_CLOUD_PROJECT_ID?: string;
+  SCRAPY_CLOUD_ARTIFACT_VERSION?: string;
+  SCRAPY_CLOUD_API_BASE_URL?: string;
+  SOURCE_COOLDOWN_CHECK_URL?: string;
+  INGESTION_ENDPOINT_URL?: string;
   MAX_BATCH_SELLERS?: string;
   MAX_BATCH_CONTACTS?: string;
   MAX_BATCH_D1_STATEMENTS?: string;
@@ -32,6 +39,7 @@ export interface RuntimeEnv {
   ALLOW_EXTRA_SCRAPY_UNITS?: string;
   ALLOW_PAID_GITHUB_ACTIONS_MINUTES?: string;
   ALLOW_PAID_ADDONS?: string;
+  PAID_ADDONS_ALLOWED?: string;
   ZYTE_STUDENT_ENTITLEMENT_CONFIRMED?: string;
   SCRAPY_CLOUD_DEPLOY_ENABLED?: string;
   SCRAPY_CLOUD_MAX_UNITS?: string;
@@ -51,6 +59,8 @@ export interface RuntimeEnv {
   ENABLE_SEARCH_DISCOVERY?: string;
   ENABLE_AI_SUMMARY?: string;
   ENABLE_OUTREACH?: string;
+  OPERATOR_CRAWL_ENABLED?: string;
+  GLOBAL_CRAWL_KILL_SWITCH?: string;
   ACCESS_AUTH_REQUIRED?: string;
   ACCESS_ALLOWED_EMAIL?: string;
   TEAM_DOMAIN?: string;
@@ -85,6 +95,8 @@ export interface RuntimeState {
   aiSummaryEnabled: boolean;
   outreachEnabled: boolean;
   officialWebsiteEnabled: boolean;
+  operatorCrawlEnabled: boolean;
+  globalCrawlKillSwitch: boolean;
 }
 
 const runnerModes: ReadonlySet<string> = new Set([
@@ -129,7 +141,7 @@ export function readRuntimeState(env: RuntimeEnv = {}): RuntimeState {
     maxExternalMonthlySpendAud: readNumber(env.MAX_EXTERNAL_MONTHLY_SPEND_AUD, 0),
     allowExtraScrapyUnits: readBool(env.ALLOW_EXTRA_SCRAPY_UNITS, false),
     allowPaidGithubActionsMinutes: readBool(env.ALLOW_PAID_GITHUB_ACTIONS_MINUTES, false),
-    allowPaidAddons: readBool(env.ALLOW_PAID_ADDONS, false),
+    allowPaidAddons: readBool(env.ALLOW_PAID_ADDONS ?? env.PAID_ADDONS_ALLOWED, false),
     zyteStudentEntitlementConfirmed: readBool(env.ZYTE_STUDENT_ENTITLEMENT_CONFIRMED, false),
     scrapyCloudDeployEnabled: readBool(env.SCRAPY_CLOUD_DEPLOY_ENABLED, false),
     scrapyCloudMaxUnits: readNumber(env.SCRAPY_CLOUD_MAX_UNITS, 1),
@@ -151,7 +163,9 @@ export function readRuntimeState(env: RuntimeEnv = {}): RuntimeState {
     searchDiscoveryEnabled: readBool(env.ENABLE_SEARCH_DISCOVERY, false),
     aiSummaryEnabled: readBool(env.ENABLE_AI_SUMMARY, false),
     outreachEnabled: readBool(env.ENABLE_OUTREACH, false),
-    officialWebsiteEnabled: readBool(env.ENABLE_OFFICIAL_WEBSITE, true)
+    officialWebsiteEnabled: readBool(env.ENABLE_OFFICIAL_WEBSITE, true),
+    operatorCrawlEnabled: readBool(env.OPERATOR_CRAWL_ENABLED, false),
+    globalCrawlKillSwitch: readBool(env.GLOBAL_CRAWL_KILL_SWITCH, false)
   };
 }
 
@@ -188,7 +202,6 @@ export function startupGateViolations(state: RuntimeState): string[] {
   }
 
   const deferredFeatures = [
-    ["Amazon", state.amazonEnabled],
     ["Alibaba", state.alibabaEnabled],
     ["1688", state.marketplace1688Enabled],
     ["business registry", state.businessRegistryEnabled],
@@ -201,6 +214,18 @@ export function startupGateViolations(state: RuntimeState): string[] {
   }
   if (!state.officialWebsiteEnabled) {
     violations.push("Official website crawling must remain enabled for Solo v1.");
+  }
+
+  if (state.operatorCrawlEnabled && state.globalCrawlKillSwitch) {
+    violations.push("Operator crawling is paused by GLOBAL_CRAWL_KILL_SWITCH.");
+  }
+  if (state.operatorCrawlEnabled) {
+    if (!state.liveCrawlEnabled || state.runnerMode !== "zyte_student_active") {
+      violations.push("Operator crawling requires live crawl on the Zyte Student runner.");
+    }
+    if (!state.amazonEnabled || !state.officialWebsiteEnabled) {
+      violations.push("Operator crawling requires Amazon discovery and official-site enrichment.");
+    }
   }
 
   if (state.runnerMode === "zyte_student_active") {

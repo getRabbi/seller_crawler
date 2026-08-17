@@ -19,6 +19,14 @@ export interface SellerListItem {
   firstSeenAt: string;
   lastSeenAt: string;
   updatedAt: string;
+  marketplace: string | null;
+  marketplaceDisplayName: string | null;
+  marketplaceProfileUrl: string | null;
+  manufacturerScore: number;
+  traderScore: number;
+  contactCount: number;
+  contactTypes: string[];
+  duplicateStatus: string | null;
 }
 
 export interface ContactListItem {
@@ -34,6 +42,8 @@ export interface ContactListItem {
   lastSeenAt: string;
   lastVerifiedAt: string | null;
   status: string;
+  sellerCountryCode: string | null;
+  sourceType: string | null;
 }
 
 export interface ContactRevealResponse {
@@ -96,6 +106,79 @@ export interface CrawlRunItem {
   blockedCount: number;
   errorCount: number;
   notes: string | null;
+  mode?: CrawlMode;
+  query?: string[];
+  marketplace?: string | null;
+  countryCodes?: string[];
+  requestedSellerCount?: number;
+  discoveredSellers?: number;
+  enrichedSellers?: number;
+  contactsFound?: number;
+  requestedAt?: string;
+  updatedAt?: string;
+  stage?: string;
+  warnings?: string[];
+  errorCode?: string | null;
+  errorMessage?: string | null;
+}
+
+export type CrawlMode = "find_sellers" | "known_websites";
+
+export interface CrawlFilters {
+  category?: string;
+  brandKeyword?: string;
+  sellerNameKeyword?: string;
+  requirePublicLocation?: boolean;
+  hasOfficialWebsite?: boolean;
+  manufacturerLikelihood?: "any" | "likely";
+  traderLikelihood?: "any" | "likely";
+}
+
+export interface CreateCrawlRunRequest {
+  mode: CrawlMode;
+  keywords?: string[];
+  marketplace?: string;
+  countryCodes?: string[];
+  filters?: CrawlFilters;
+  seedUrls?: string[];
+  contactTypes: Array<"email" | "phone" | "whatsapp" | "wechat">;
+  targetSellerCount: number;
+  maxResultPages: number;
+  maxOfficialPages: number;
+  crawlDepth: number;
+  stopAfterTarget: boolean;
+  idempotencyKey: string;
+}
+
+export interface CrawlRunActionResponse {
+  run: CrawlRunItem;
+  queued: boolean;
+}
+
+export interface CrawlRunDetailResponse {
+  run: CrawlRunItem;
+  sellers: SellerListItem[];
+  events: Array<{
+    id: string;
+    eventType: string;
+    fromStatus: string | null;
+    toStatus: string | null;
+    message: string | null;
+    createdAt: string;
+  }>;
+}
+
+export interface OperatorMetrics {
+  totalSellers: number;
+  newSellersToday: number;
+  amazonIdentitiesDiscovered: number;
+  officialWebsitesResolved: number;
+  contactsFound: number;
+  pendingDuplicates: number;
+  activeCrawls: number;
+  queuedRuns: number;
+  recentFailures: number;
+  cooldownDomains: number;
 }
 
 export interface SellerDetailResponse {

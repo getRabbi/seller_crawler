@@ -6,7 +6,8 @@ import type {
   EvidenceListItem,
   ListResponse,
   SellerDetailResponse,
-  SellerListItem
+  SellerListItem,
+  OperatorMetrics
 } from "@seller-intelligence/shared-types/dashboard";
 
 import type { D1Database, D1Value } from "../repositories/d1";
@@ -24,12 +25,29 @@ export interface ListOptions {
   offset: number;
   query?: string;
   status?: string;
+  marketplace?: string;
+  countryCode?: string;
+  category?: string;
+  brand?: string;
+  sourceType?: string;
+  amazonSeller?: string;
+  hasOfficialWebsite?: boolean;
+  contactType?: string;
+  minimumManufacturerScore?: number;
+  minimumTraderScore?: number;
+  duplicateStatus?: string;
+  updatedSince?: string;
+  sort?: string;
+  sourceRunId?: string;
 }
 
 export interface ContactListOptions extends ListOptions {
   contactType?: string;
   sellerId?: string;
   minimumConfidence?: number;
+  countryCode?: string;
+  sourceType?: string;
+  verifiedStatus?: string;
 }
 
 interface CountedRow {
@@ -50,6 +68,12 @@ interface SellerRow extends CountedRow {
   first_seen_at: string;
   last_seen_at: string;
   updated_at: string;
+  marketplace: string | null;
+  marketplace_display_name: string | null;
+  marketplace_profile_url: string | null;
+  manufacturer_score: number;
+  trader_score: number;
+  duplicate_status: string | null;
 }
 
 interface ContactRow extends CountedRow {
@@ -69,6 +93,12 @@ interface ContactRow extends CountedRow {
 interface SellerNameRow {
   id: string;
   canonical_name: string;
+}
+
+interface ContactMetadataRow {
+  seller_id: string;
+  contact_count: number;
+  contact_types: string;
 }
 
 interface EvidenceRow {
@@ -133,22 +163,85 @@ export class DashboardRepository {
       clauses.push("s.status = ?");
       values.push(options.status);
     }
+    if (options.countryCode) {
+      clauses.push("s.country_code = ?");
+      values.push(options.countryCode.toUpperCase());
+    }
+    if (options.hasOfficialWebsite !== undefined) {
+      clauses.push(options.hasOfficialWebsite ? "s.official_domain IS NOT NULL" : "s.official_domain IS NULL");
+    }
+    if (options.marketplace) {
+      clauses.push("EXISTS (SELECT 1 FROM marketplace_accounts ma WHERE ma.seller_id = s.id AND ma.marketplace = ?)");
+      values.push(options.marketplace);
+    }
+    if (options.amazonSeller) {
+      clauses.push(
+        "EXISTS (SELECT 1 FROM marketplace_accounts ma WHERE ma.seller_id = s.id AND (ma.display_name LIKE ? ESCAPE '\\' OR ma.merchant_token LIKE ? ESCAPE '\\'))"
+      );
+      const pattern = `%${escapeLike(options.amazonSeller)}%`;
+      values.push(pattern, pattern);
+    }
+    if (options.category) {
+      clauses.push("EXISTS (SELECT 1 FROM seller_product_links pl WHERE pl.seller_id = s.id AND pl.category LIKE ? ESCAPE '\\')");
+      values.push(`%${escapeLike(options.category)}%`);
+    }
+    if (options.brand) {
+      clauses.push("EXISTS (SELECT 1 FROM seller_product_links pl WHERE pl.seller_id = s.id AND pl.brand LIKE ? ESCAPE '\\')");
+      values.push(`%${escapeLike(options.brand)}%`);
+    }
+    if (options.minimumManufacturerScore !== undefined) {
+      clauses.push("s.manufacturer_score >= ?");
+      values.push(options.minimumManufacturerScore);
+    }
+    if (options.minimumTraderScore !== undefined) {
+      clauses.push("s.trader_score >= ?");
+      values.push(options.minimumTraderScore);
+    }
+    if (options.duplicateStatus) {
+      clauses.push("EXISTS (SELECT 1 FROM entity_resolution_decisions d WHERE (d.candidate_seller_id = s.id OR d.matched_seller_id = s.id) AND d.status = ?)");
+      values.push(options.duplicateStatus);
+    }
+    if (options.updatedSince) {
+      clauses.push("s.updated_at >= ?");
+      values.push(options.updatedSince);
+    }
+    const prefilteredIds = await this.prefilterSellerIds(options);
+    if (prefilteredIds !== null) {
+      if (prefilteredIds.length === 0) return { items: [], total: 0, limit: options.limit, offset: options.offset };
+      clauses.push(`s.id IN (${prefilteredIds.map(() => "?").join(",")})`);
+      values.push(...prefilteredIds);
+    }
 
+    let orderBy = sellerSort(options.sort);
+    if (options.sort === "most_contacts") {
+      const rank = await this.contactSellerRank();
+      if (rank.length > 0) {
+        orderBy = `CASE s.id ${rank.map((_, index) => `WHEN ? THEN ${index}`).join(" ")} ELSE ${rank.length} END`;
+        values.push(...rank);
+      }
+    }
     values.push(options.limit, options.offset);
     const result = await core
       .prepare(
         `SELECT s.id, s.canonical_name, s.legal_name, s.country_code, s.province, s.city,
-                s.official_domain, s.identity_confidence, s.quality_score, s.status,
-                s.first_seen_at, s.last_seen_at, s.updated_at, COUNT(*) OVER() AS total_count
+                s.official_domain, s.identity_confidence, s.quality_score, s.manufacturer_score,
+                s.trader_score, s.status, s.first_seen_at, s.last_seen_at, s.updated_at,
+                (SELECT ma.marketplace FROM marketplace_accounts ma WHERE ma.seller_id = s.id ORDER BY ma.last_seen_at DESC LIMIT 1) AS marketplace,
+                (SELECT ma.display_name FROM marketplace_accounts ma WHERE ma.seller_id = s.id ORDER BY ma.last_seen_at DESC LIMIT 1) AS marketplace_display_name,
+                (SELECT ma.profile_url FROM marketplace_accounts ma WHERE ma.seller_id = s.id ORDER BY ma.last_seen_at DESC LIMIT 1) AS marketplace_profile_url,
+                (SELECT d.status FROM entity_resolution_decisions d WHERE d.candidate_seller_id = s.id OR d.matched_seller_id = s.id ORDER BY d.created_at DESC LIMIT 1) AS duplicate_status,
+                COUNT(*) OVER() AS total_count
          FROM sellers s
          WHERE ${clauses.join(" AND ")}
-         ORDER BY s.last_seen_at DESC, s.id ASC
+         ORDER BY ${orderBy}, s.id ASC
          LIMIT ? OFFSET ?`
       )
       .bind(...values)
       .all<SellerRow>();
 
-    return listResponse(result.results ?? [], options, mapSeller);
+    const rows = result.results ?? [];
+    const metadata = await this.getContactMetadata(rows.map((row) => row.id));
+    return listResponse(rows, options, (row) => mapSeller(row, metadata.get(row.id)));
   }
 
   async getSeller(sellerId: string): Promise<SellerDetailResponse | null> {
@@ -216,10 +309,22 @@ export class DashboardRepository {
       clauses.push("c.confidence >= ?");
       values.push(options.minimumConfidence);
     }
-    if (options.query) {
-      clauses.push("(c.display_value_masked LIKE ? OR c.classification LIKE ?)");
-      const pattern = `%${escapeLike(options.query)}%`;
-      values.push(pattern, pattern);
+    if (options.verifiedStatus === "verified") {
+      clauses.push("c.last_verified_at IS NOT NULL");
+    } else if (options.verifiedStatus === "unverified") {
+      clauses.push("c.last_verified_at IS NULL");
+    }
+    const contactSellerIds = await this.contactSellerFilterIds(options);
+    if (contactSellerIds !== null) {
+      if (contactSellerIds.length === 0) return { items: [], total: 0, limit: options.limit, offset: options.offset };
+      clauses.push(`c.seller_id IN (${contactSellerIds.map(() => "?").join(",")})`);
+      values.push(...contactSellerIds);
+    }
+    const sourceIds = await this.contactSourceFilterIds(options.sourceType);
+    if (sourceIds !== null) {
+      if (sourceIds.length === 0) return { items: [], total: 0, limit: options.limit, offset: options.offset };
+      clauses.push(`c.source_id IN (${sourceIds.map(() => "?").join(",")})`);
+      values.push(...sourceIds);
     }
     values.push(options.limit, options.offset);
 
@@ -237,8 +342,50 @@ export class DashboardRepository {
       .all<ContactRow>();
 
     const rows = result.results ?? [];
-    const sellerNames = await this.getSellerNames(rows.map((row) => row.seller_id));
-    return listResponse(rows, options, (row) => mapContact(row, sellerNames.get(row.seller_id) ?? null));
+    const [sellerNames, sellerCountries, sourceTypes] = await Promise.all([
+      this.getSellerNames(rows.map((row) => row.seller_id)),
+      this.getSellerCountries(rows.map((row) => row.seller_id)),
+      this.getSourceTypes(rows.map((row) => row.source_id))
+    ]);
+    return listResponse(rows, options, (row) =>
+      mapContact(
+        row,
+        sellerNames.get(row.seller_id) ?? null,
+        sellerCountries.get(row.seller_id) ?? null,
+        sourceTypes.get(row.source_id) ?? null
+      )
+    );
+  }
+
+  async metrics(): Promise<OperatorMetrics> {
+    const core = requireDb(this.env.CORE_DB, "CORE_DB");
+    const contacts = requireDb(this.env.CONTACTS_DB, "CONTACTS_DB");
+    const operations = requireDb(this.env.OPS_DB, "OPS_DB");
+    const [sellers, contactsCount, duplicates, active, queued, failures, cooldowns] = await Promise.all([
+      core.prepare(`SELECT COUNT(*) AS total,
+        SUM(CASE WHEN first_seen_at >= date('now') THEN 1 ELSE 0 END) AS today,
+        SUM(CASE WHEN official_domain IS NOT NULL THEN 1 ELSE 0 END) AS official,
+        (SELECT COUNT(DISTINCT seller_id) FROM marketplace_accounts WHERE marketplace LIKE 'amazon.%') AS amazon
+        FROM sellers WHERE status <> 'merged'`).first<Record<string, number>>(),
+      contacts.prepare("SELECT COUNT(*) AS total FROM contacts WHERE status = 'active'").first<{ total: number }>(),
+      core.prepare("SELECT COUNT(*) AS total FROM entity_resolution_decisions WHERE action = 'review_queue' AND status = 'pending'").first<{ total: number }>(),
+      operations.prepare("SELECT COUNT(*) AS total FROM operator_crawl_runs WHERE active_unit_slot = 1").first<{ total: number }>(),
+      operations.prepare("SELECT COUNT(*) AS total FROM operator_crawl_runs WHERE status = 'queued'").first<{ total: number }>(),
+      operations.prepare("SELECT COUNT(*) AS total FROM operator_crawl_runs WHERE status IN ('failed','blocked') AND updated_at >= datetime('now','-7 days')").first<{ total: number }>(),
+      operations.prepare("SELECT COUNT(DISTINCT source_domain) AS total FROM sources WHERE next_allowed_at > datetime('now')").first<{ total: number }>()
+    ]);
+    return {
+      totalSellers: Number(sellers?.total ?? 0),
+      newSellersToday: Number(sellers?.today ?? 0),
+      amazonIdentitiesDiscovered: Number(sellers?.amazon ?? 0),
+      officialWebsitesResolved: Number(sellers?.official ?? 0),
+      contactsFound: Number(contactsCount?.total ?? 0),
+      pendingDuplicates: Number(duplicates?.total ?? 0),
+      activeCrawls: Number(active?.total ?? 0),
+      queuedRuns: Number(queued?.total ?? 0),
+      recentFailures: Number(failures?.total ?? 0),
+      cooldownDomains: Number(cooldowns?.total ?? 0)
+    };
   }
 
   async revealContact(
@@ -359,6 +506,96 @@ export class DashboardRepository {
       .all<SellerNameRow>();
     return new Map((result.results ?? []).map((row) => [row.id, row.canonical_name]));
   }
+
+  private async getSellerCountries(sellerIds: string[]): Promise<Map<string, string>> {
+    const ids = [...new Set(sellerIds)];
+    if (!ids.length) return new Map();
+    const result = await requireDb(this.env.CORE_DB, "CORE_DB")
+      .prepare(`SELECT id, country_code FROM sellers WHERE id IN (${ids.map(() => "?").join(",")})`)
+      .bind(...ids)
+      .all<{ id: string; country_code: string | null }>();
+    return new Map((result.results ?? []).flatMap((row) => row.country_code ? [[row.id, row.country_code] as const] : []));
+  }
+
+  private async getSourceTypes(sourceIds: string[]): Promise<Map<string, string>> {
+    const ids = [...new Set(sourceIds)];
+    if (!ids.length) return new Map();
+    const result = await requireDb(this.env.OPS_DB, "OPS_DB")
+      .prepare(`SELECT id, source_type FROM sources WHERE id IN (${ids.map(() => "?").join(",")})`)
+      .bind(...ids)
+      .all<{ id: string; source_type: string }>();
+    return new Map((result.results ?? []).map((row) => [row.id, row.source_type]));
+  }
+
+  private async getContactMetadata(sellerIds: string[]): Promise<Map<string, ContactMetadataRow>> {
+    const ids = [...new Set(sellerIds)];
+    if (!ids.length) return new Map();
+    const result = await requireDb(this.env.CONTACTS_DB, "CONTACTS_DB")
+      .prepare(`SELECT seller_id, COUNT(*) AS contact_count, group_concat(DISTINCT contact_type) AS contact_types
+        FROM contacts WHERE status = 'active' AND seller_id IN (${ids.map(() => "?").join(",")}) GROUP BY seller_id`)
+      .bind(...ids)
+      .all<ContactMetadataRow>();
+    return new Map((result.results ?? []).map((row) => [row.seller_id, row]));
+  }
+
+  private async prefilterSellerIds(options: ListOptions): Promise<string[] | null> {
+    const sets: string[][] = [];
+    if (options.contactType) {
+      const result = await requireDb(this.env.CONTACTS_DB, "CONTACTS_DB")
+        .prepare("SELECT DISTINCT seller_id FROM contacts WHERE status = 'active' AND contact_type = ? LIMIT 5000")
+        .bind(options.contactType)
+        .all<{ seller_id: string }>();
+      sets.push((result.results ?? []).map((row) => row.seller_id));
+    }
+    if (options.sourceType) {
+      const result = await requireDb(this.env.OPS_DB, "OPS_DB")
+        .prepare("SELECT DISTINCT seller_id FROM sources WHERE seller_id IS NOT NULL AND source_type = ? LIMIT 5000")
+        .bind(options.sourceType)
+        .all<{ seller_id: string }>();
+      sets.push((result.results ?? []).map((row) => row.seller_id));
+    }
+    if (options.sourceRunId) {
+      const result = await requireDb(this.env.OPS_DB, "OPS_DB")
+        .prepare("SELECT DISTINCT seller_id FROM crawl_run_sellers WHERE crawl_run_id = ? LIMIT 5000")
+        .bind(options.sourceRunId)
+        .all<{ seller_id: string }>();
+      sets.push((result.results ?? []).map((row) => row.seller_id));
+    }
+    if (!sets.length) return null;
+    return sets.slice(1).reduce((current, next) => current.filter((id) => next.includes(id)), sets[0]);
+  }
+
+  private async contactSellerFilterIds(options: ContactListOptions): Promise<string[] | null> {
+    if (!options.countryCode && !options.query) return null;
+    const clauses: string[] = [];
+    const values: D1Value[] = [];
+    if (options.countryCode) { clauses.push("country_code = ?"); values.push(options.countryCode.toUpperCase()); }
+    if (options.query) {
+      const fts = toFtsQuery(options.query);
+      if (fts) { clauses.push("id IN (SELECT seller_id FROM seller_search_fts WHERE seller_search_fts MATCH ?)"); values.push(fts); }
+    }
+    const result = await requireDb(this.env.CORE_DB, "CORE_DB")
+      .prepare(`SELECT id FROM sellers WHERE ${clauses.join(" AND ")} LIMIT 5000`)
+      .bind(...values)
+      .all<{ id: string }>();
+    return (result.results ?? []).map((row) => row.id);
+  }
+
+  private async contactSourceFilterIds(sourceType: string | undefined): Promise<string[] | null> {
+    if (!sourceType) return null;
+    const result = await requireDb(this.env.OPS_DB, "OPS_DB")
+      .prepare("SELECT id FROM sources WHERE source_type = ? LIMIT 5000")
+      .bind(sourceType)
+      .all<{ id: string }>();
+    return (result.results ?? []).map((row) => row.id);
+  }
+
+  private async contactSellerRank(): Promise<string[]> {
+    const result = await requireDb(this.env.CONTACTS_DB, "CONTACTS_DB")
+      .prepare("SELECT seller_id FROM contacts WHERE status = 'active' GROUP BY seller_id ORDER BY COUNT(*) DESC, seller_id LIMIT 5000")
+      .all<{ seller_id: string }>();
+    return (result.results ?? []).map((row) => row.seller_id);
+  }
 }
 
 export function parseListOptions(url: URL): ListOptions {
@@ -366,7 +603,21 @@ export function parseListOptions(url: URL): ListOptions {
     limit: boundedInteger(url.searchParams.get("limit"), DEFAULT_LIMIT, 1, MAX_LIMIT),
     offset: boundedInteger(url.searchParams.get("offset"), 0, 0, 10_000),
     query: cleanText(url.searchParams.get("q"), 100),
-    status: cleanText(url.searchParams.get("status"), 32)
+    status: cleanText(url.searchParams.get("status"), 32),
+    marketplace: cleanText(url.searchParams.get("marketplace"), 32),
+    countryCode: cleanText(url.searchParams.get("country"), 2),
+    category: cleanText(url.searchParams.get("category"), 80),
+    brand: cleanText(url.searchParams.get("brand"), 80),
+    sourceType: cleanText(url.searchParams.get("source"), 40),
+    amazonSeller: cleanText(url.searchParams.get("amazon_seller"), 120),
+    hasOfficialWebsite: optionalBoolean(url.searchParams.get("has_official_website")),
+    contactType: cleanText(url.searchParams.get("contact_type"), 32),
+    minimumManufacturerScore: optionalBoundedInteger(url.searchParams.get("manufacturer_score"), 0, 100),
+    minimumTraderScore: optionalBoundedInteger(url.searchParams.get("trader_score"), 0, 100),
+    duplicateStatus: cleanText(url.searchParams.get("duplicate_status"), 32),
+    updatedSince: cleanText(url.searchParams.get("updated_since"), 40),
+    sort: cleanText(url.searchParams.get("sort"), 32),
+    sourceRunId: cleanText(url.searchParams.get("source_run"), 64)
   };
 }
 
@@ -378,7 +629,10 @@ export function parseContactListOptions(url: URL): ContactListOptions {
     sellerId: cleanText(url.searchParams.get("seller_id"), 64),
     contactType: cleanText(url.searchParams.get("contact_type"), 32),
     minimumConfidence:
-      rawConfidence === null ? undefined : boundedInteger(rawConfidence, 0, 0, 100)
+      rawConfidence === null ? undefined : boundedInteger(rawConfidence, 0, 0, 100),
+    countryCode: cleanText(url.searchParams.get("country"), 2),
+    sourceType: cleanText(url.searchParams.get("source"), 40),
+    verifiedStatus: cleanText(url.searchParams.get("verified"), 16)
   };
 }
 
@@ -410,7 +664,7 @@ function listResponse<TRow extends CountedRow, TItem>(
   };
 }
 
-function mapSeller(row: SellerRow): SellerListItem {
+function mapSeller(row: SellerRow, metadata?: ContactMetadataRow): SellerListItem {
   return {
     id: row.id,
     canonicalName: row.canonical_name,
@@ -424,11 +678,24 @@ function mapSeller(row: SellerRow): SellerListItem {
     status: row.status,
     firstSeenAt: row.first_seen_at,
     lastSeenAt: row.last_seen_at,
-    updatedAt: row.updated_at
+    updatedAt: row.updated_at,
+    marketplace: row.marketplace ?? null,
+    marketplaceDisplayName: row.marketplace_display_name ?? null,
+    marketplaceProfileUrl: row.marketplace_profile_url ?? null,
+    manufacturerScore: Number(row.manufacturer_score ?? 0),
+    traderScore: Number(row.trader_score ?? 0),
+    contactCount: Number(metadata?.contact_count ?? 0),
+    contactTypes: metadata?.contact_types ? metadata.contact_types.split(",") : [],
+    duplicateStatus: row.duplicate_status ?? null
   };
 }
 
-function mapContact(row: ContactRow, sellerName: string | null): ContactListItem {
+function mapContact(
+  row: ContactRow,
+  sellerName: string | null,
+  sellerCountryCode: string | null,
+  sourceType: string | null
+): ContactListItem {
   return {
     id: row.id,
     sellerId: row.seller_id,
@@ -441,7 +708,9 @@ function mapContact(row: ContactRow, sellerName: string | null): ContactListItem
     firstSeenAt: row.first_seen_at,
     lastSeenAt: row.last_seen_at,
     lastVerifiedAt: row.last_verified_at,
-    status: row.status
+    status: row.status,
+    sellerCountryCode,
+    sourceType
   };
 }
 
@@ -501,6 +770,27 @@ function boundedInteger(raw: string | null, fallback: number, minimum: number, m
     return fallback;
   }
   return Math.min(maximum, Math.max(minimum, Number(raw)));
+}
+
+function optionalBoundedInteger(raw: string | null, minimum: number, maximum: number): number | undefined {
+  return raw === null ? undefined : boundedInteger(raw, minimum, minimum, maximum);
+}
+
+function optionalBoolean(raw: string | null): boolean | undefined {
+  if (raw === null) return undefined;
+  if (raw === "true" || raw === "1") return true;
+  if (raw === "false" || raw === "0") return false;
+  return undefined;
+}
+
+function sellerSort(value: string | undefined): string {
+  return {
+    newest: "s.first_seen_at DESC",
+    recently_updated: "s.updated_at DESC",
+    highest_confidence: "s.identity_confidence DESC",
+    most_contacts: "s.last_seen_at DESC",
+    seller_name: "s.canonical_name COLLATE NOCASE ASC"
+  }[value ?? ""] ?? "s.last_seen_at DESC";
 }
 
 function cleanText(raw: string | null, maximumLength: number): string | undefined {

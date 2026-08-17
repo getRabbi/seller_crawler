@@ -31,7 +31,8 @@ describe("Worker health", () => {
         historyDb: false,
         ingestionHmac: false,
         contactEncryption: false,
-        access: false
+        access: false,
+        scrapyCloudControl: true
       },
       violations: []
     });
@@ -64,11 +65,13 @@ describe("Worker health", () => {
     expect(payload.violations[0]).toContain("Required deployment bindings are missing");
   });
 
-  it("keeps Amazon disabled in Solo v1", () => {
+  it("allows bounded Amazon discovery while billing paths remain locked", () => {
     const state = readRuntimeState({ ENABLE_AMAZON: "true" });
 
-    expect(startupGateViolations(state)).toContain(
+    expect(startupGateViolations(state)).not.toContain(
       "Amazon is outside the Solo v1 scope and must remain disabled."
     );
+    expect(state.zyteApiEnabled).toBe(false);
+    expect(state.paidServicesAllowed).toBe(false);
   });
 });

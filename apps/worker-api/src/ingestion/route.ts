@@ -7,8 +7,9 @@ import { readIngestionConfig } from "./config";
 import { constantTimeEqualHex, hmacSha256Hex, sha256Hex } from "./crypto";
 import { errorResponse, jsonResponse } from "./errors";
 import { logIngestionAccepted, logIngestionRejected } from "./logging";
-import { parseAndValidateBatch, toUnitOfWorkChanges } from "./schema";
+import { parseAndValidateBatch, records, toUnitOfWorkChanges } from "./schema";
 import { validateSourcePolicy } from "./source-policy";
+import { OperatorCrawlService } from "../operator-crawl/service";
 
 interface IngestionHeaders {
   timestamp: string;
@@ -94,7 +95,7 @@ export async function ingestBatchResponse(request: Request, env: RuntimeEnv): Pr
     );
   }
 
-  const sourcePolicyErrors = validateSourcePolicy(schemaResult.payload, config, env);
+  const sourcePolicyErrors = await validateSourcePolicy(schemaResult.payload, config, env);
   if (sourcePolicyErrors.length > 0) {
     logIngestionRejected("source_policy_rejected", headers.value.idempotencyKey);
     return errorResponse(
@@ -147,6 +148,13 @@ export async function ingestBatchResponse(request: Request, env: RuntimeEnv): Pr
       ]
     );
   }
+
+  await new OperatorCrawlService(env).recordIngestion(
+    schemaResult.payload.crawl_run_id,
+    records(schemaResult.payload, "sellers").map((record) => String(record.id)),
+    records(schemaResult.payload, "sources").map((record) => String(record.source_type)),
+    records(schemaResult.payload, "contacts").length
+  );
 
   await operations.recordIdempotencyKey({
     idempotencyKey: headers.value.idempotencyKey,
