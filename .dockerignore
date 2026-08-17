@@ -5,6 +5,8 @@
 !.env.example
 .sellerintel
 node_modules
+.venv
+.clean-verification
 apps/dashboard/.next
 apps/dashboard/out
 __pycache__
