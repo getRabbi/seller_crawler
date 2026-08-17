@@ -188,6 +188,7 @@ class ScrapyCloudRunner:
             "CONCURRENT_REQUESTS": 4,
             "CONCURRENT_REQUESTS_PER_DOMAIN": 1,
             "CREDIT_RUNNER_ENABLED": False,
+            "DEPTH_LIMIT": 0,
             "DOWNLOAD_TIMEOUT": 30,
             "ENABLE_AMAZON": False,
             "ENABLE_ALIBABA": False,

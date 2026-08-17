@@ -7,6 +7,10 @@
   controlled runner pins one unit, validates staging/production Worker URLs,
   injects ingestion, cooldown, and encryption settings without printing secret
   payloads, and keeps Zyte API and paid services disabled.
+- Removed the conflicting built-in Scrapy depth counter from the official-site
+  spider. Its deterministic logical-depth, page-budget, same-domain, and robots
+  controls remain authoritative, so sitemap and redirect responses cannot
+  prematurely drop queued contact pages.
 - Added versioned AES-256-GCM contact storage, a masked-by-default API/CSV
   boundary, and an Access-authenticated, reasoned, audited single-operator
   contact reveal path.

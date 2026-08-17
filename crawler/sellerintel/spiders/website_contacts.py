@@ -75,6 +75,7 @@ class OfficialWebsiteSpider(scrapy.Spider):
         "DOWNLOADER_MIDDLEWARES": {
             "sellerintel.middlewares.FixtureOfficialSiteMiddleware": 50,
         },
+        "DEPTH_LIMIT": 0,
         "ROBOTSTXT_OBEY": True,
     }
 

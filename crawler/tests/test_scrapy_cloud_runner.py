@@ -100,6 +100,7 @@ def test_runner_starts_exactly_one_unit_no_network_smoke(tmp_path: Path) -> None
     assert settings["INGESTION_ENDPOINT_URL"] == READY_ENV["INGESTION_ENDPOINT_URL"]
     assert settings["INGESTION_HMAC_SECRET"] == READY_ENV["INGESTION_HMAC_SECRET"]
     assert settings["LOG_LEVEL"] == "WARNING"
+    assert settings["DEPTH_LIMIT"] == 0
 
 
 def test_runner_supports_status_cancel_and_masked_log_transport(tmp_path: Path) -> None:
