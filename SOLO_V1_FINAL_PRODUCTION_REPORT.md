@@ -4,36 +4,37 @@ Report date: 2026-08-17 (Asia/Dhaka)
 
 ## Executive verdict
 
-Solo Mode v1 implementation and local/CI validation are complete. The immutable
-implementation artifact is commit
-`464888d9e837146336e6e0da027950cf0e924823`, and that exact artifact is deployed
-to the staging Worker and staging dashboard.
+Solo Mode v1 implementation and local/CI validation are complete. The final
+immutable crawler artifact is commit
+`a1268d6476f2e35925fda750be0378d40a98b18d`. That exact artifact is deployed to
+the existing Scrapy Cloud Student project. The staging Worker and dashboard
+remain on the previously accepted application artifact because the final
+changes affect only the crawler runner and spider.
 
-Staging infrastructure, ingestion, encrypted persistence, entity-resolution
-review creation, spool replay, cooldown enforcement, and disposable four-D1
-restore have passed. Solo Mode v1 is **not yet fully production-ready** because
-two external acceptance gates still require operator-side authenticated UI
-state:
+Staging infrastructure, one-unit Scrapy Cloud deployment, no-network smoke,
+completion/cancel paths, bounded root-seed crawling, signed ingestion, v5
+encrypted persistence, entity-resolution review creation, spool replay,
+cooldown enforcement, and disposable four-D1 restore have passed. Scrapy Cloud
+custom project settings are no longer required; every verification job uses the
+official `run.json` `job_settings` mechanism with values read from the approved
+local secret environment.
+
+Solo Mode v1 is **not yet fully production-ready** because one external
+acceptance gate still requires operator-side authenticated UI state:
 
 1. Complete a Cloudflare Access login as the configured single allowed
    operator so the authenticated dashboard/API/reveal/duplicate-action suite can
    be exercised remotely.
-2. Add the new cooldown URL and versioned contact-encryption settings to the
-   existing Scrapy Cloud project's private custom settings. The available
-   Scrapy Cloud API credential can read project settings, but the provider's
-   undocumented write endpoint returns success while silently ignoring new
-   settings; the supported web UI is therefore required.
-
-Production provisioning, Zyte deployment, and the final production crawl have
-not been started because staging acceptance must be green first.
+Production provisioning and the final production crawl have not been started
+because authenticated staging acceptance must be green first.
 
 ## Final commit SHA
 
-- Immutable implementation/release-candidate SHA:
-  `464888d9e837146336e6e0da027950cf0e924823`
+- Immutable crawler release-candidate SHA:
+  `a1268d6476f2e35925fda750be0378d40a98b18d`
 - Branch: `main`
-- Remote branch at the same SHA before this report-only commit: `origin/main`
-- Staging deployments use the immutable implementation SHA above.
+- Remote branch at the same SHA before this report-only update: `origin/main`
+- Scrapy Cloud deploy version matches the immutable SHA exactly.
 
 ## GitHub CI status
 
@@ -41,8 +42,8 @@ Both required workflows passed for the immutable implementation SHA:
 
 | Workflow | Run ID | Result |
 | --- | ---: | --- |
-| CI Python | 31969844806 | success |
-| CI Web | 31969844781 | success |
+| CI Python | 32000661657 | success |
+| CI Web | 32000661661 | success |
 
 No production deployment was attempted before these checks became green.
 
@@ -67,6 +68,12 @@ No production deployment was attempted before these checks became green.
   registry, Amazon, Alibaba, 1688, search discovery, Zyte API, paid services,
   AI summaries, and outreach disabled.
 - Stale launch documentation was updated without adding deferred features.
+- Scrapy Cloud jobs receive the ingestion endpoint/HMAC, cooldown endpoint, and
+  encryption keyring/version through per-job `run.json` settings. Credentials
+  and keyrings are excluded from repr, CLI output, items, and crawler logs.
+- The conflicting built-in Scrapy depth counter is disabled for this spider;
+  deterministic page budget, logical depth, same-domain, and robots controls
+  remain authoritative after sitemap and redirect responses.
 
 ## Local validation results
 
@@ -74,7 +81,7 @@ No production deployment was attempted before these checks became green.
 | --- | --- |
 | `uv run ruff check crawler` | pass |
 | `uv run mypy crawler/sellerintel crawler/tests` | pass, 92 files |
-| `uv run pytest crawler/tests` | pass, 110 tests |
+| `uv run pytest crawler/tests` | pass, 113 tests |
 | extractor coverage command | pass, 5 tests, 95.36% |
 | `uv run bandit -r crawler/sellerintel` | pass, 0 issues |
 | `uv run pip-audit` | pass, no known vulnerabilities |
@@ -92,10 +99,10 @@ No production deployment was attempted before these checks became green.
 
 ## Clean-clone results
 
-A Git-only checkout was created from the immutable SHA. From that checkout:
+A Git-only checkout was created during launch remediation. From that checkout:
 
 - Python dependency sync passed.
-- All 110 Python tests passed.
+- All then-current Python tests passed.
 - Ruff passed.
 - `npm ci` passed.
 - Web lint, typecheck, all 43 tests, and static build passed.
@@ -103,8 +110,9 @@ A Git-only checkout was created from the immutable SHA. From that checkout:
 - The temporary checkout was removed after verification.
 
 The crawler Docker image also built successfully from the Git-controlled
-context. No required source is ignored, and generated runtime/build/backup
-artifacts remain ignored.
+context. The final SHA subsequently passed both clean GitHub workflows with all
+113 Python tests and the full web build. No required source is ignored, and
+generated runtime/build/backup artifacts remain ignored.
 
 ## Staging verification results
 
@@ -114,7 +122,7 @@ artifacts remain ignored.
 - Worker route: `api-stg.scalemyprints.com/*`
 - Code deployment version: `fe699a02-7a57-4880-8dc1-8be4f38872b6`
 - Current version after secret-only updates:
-  `e286ba57-4b2a-459c-ab71-90421f859112`
+  `4577d2d0-0a74-465d-baf7-9c924a08a60a`
 - Pages project: `seller-intelligence-staging`
 - Pages deployment: `4bfc2370-bbdc-4cc6-b3ef-70002a849414`
 - Pages deployment URL:
@@ -138,19 +146,25 @@ artifacts remain ignored.
 
 ### Bounded staging ingestion
 
-A bounded synthetic official-site run used only
-`https://seed-stg.scalemyprints.com/`, a four-page budget, depth one, the local
-fallback, no browser profile/cookies, no provider fallback, no Zyte API, and no
-paid service.
+The final Scrapy Cloud verification used only
+`https://seed-stg.scalemyprints.com/`, an eight-page budget, logical depth two,
+same-domain enforcement, robots enforcement, one Student unit, no browser
+profile/cookies, no provider fallback, no Zyte API, and no paid service.
 
-Result: accepted, five signed batches including completion, four pages, four
-contacts, zero blocks, zero errors, and no spool.
+Result: six receipt items accepted, four contacts across all four Solo v1
+contact types, zero blocks, zero errors, zero spool, and no rejection. D1
+recorded the final job as completed with six source batches and four verified
+contacts. The final job used artifact
+`a1268d6476f2e35925fda750be0378d40a98b18d`.
 
 ### Staging database observations
 
-After the bounded crawl and duplicate fixture ingestion:
+After the bounded crawl and the operator-approved staging encryption reset:
 
-- All six contact records use the current staging key version.
+- All four current contact records use `staging-2026-08-v5`; no ciphertext uses
+  another key version.
+- Six superseded synthetic v4 rows were removed under a persisted retention
+  audit before the Worker keyring changed.
 - A real entity-resolution decision exists with action `review_queue`, score 75,
   and pending status.
 - A corresponding `possible_duplicate_seller` review record exists.
@@ -179,8 +193,12 @@ that a real 429 stops further requests for that domain.
 
 ## Backup and restore result
 
-- Checksummed staging backup manifest:
-  `.sellerintel/backups/staging-20260816T204546Z/manifest.json`
+- Current checksummed v5 staging backup manifest:
+  `.sellerintel/backups/staging-20260817T061845Z/manifest.json`
+- Four of four current SQL checksums passed. The contacts export contains four
+  v5 ciphertexts and no keyring value.
+- The earlier disposable restore acceptance used manifest
+  `.sellerintel/backups/staging-20260816T204546Z/manifest.json`.
 - Four of four SQL checksums verified before restore.
 - Four uniquely named disposable D1 databases were created in the approved
   account.
@@ -197,20 +215,21 @@ Result: **PASS**.
 
 ## Zyte one-unit smoke result
 
-Not run yet. The existing Student project and credential are present, but its
-private custom settings currently contain only the ingestion endpoint and HMAC
-secret. These settings are still required before deployment/smoke:
+**PASS.** Manual custom project settings are no longer a dependency.
 
-- `SOURCE_COOLDOWN_CHECK_URL`
-- `CONTACT_ENCRYPTION_KEYS`
-- `CONTACT_ENCRYPTION_ACTIVE_KEY_VERSION`
-
-The next key version must be installed in both the Zyte project and the staging
-Worker secret store, followed by one bounded re-encryption/upsert pass. No new
-project or unit is needed.
-
-No-network smoke, status/completion/cancel, and crawler artifact deployment are
-pending. Exactly one unit remains the hard limit; Zyte API remains disabled.
+- Existing Scrapy Cloud project only; no new project or unit was created.
+- Deployed version:
+  `a1268d6476f2e35925fda750be0378d40a98b18d`.
+- Deployment contains exactly the two Solo v1 spiders.
+- `run.json` pins `units=1` and injects the endpoint/HMAC, cooldown endpoint,
+  and contact encryption keyring/version from the approved local environment.
+- No-network smoke job `871778/2/3` finished with one item reporting
+  `network=none` and `units=1`; it had zero error logs and a clean secret scan.
+- Cancel-path job `871778/2/4` finished with `close_reason=cancelled`.
+- Final bounded root-seed job `871778/1/7` finished on the exact final SHA with
+  six accepted receipts, no rejection/spool/error, and a clean secret scan.
+- Exactly one unit remains the hard limit; Zyte API and paid services remained
+  disabled throughout.
 
 ## Production resource status
 
@@ -257,7 +276,7 @@ Still requiring the authenticated Access session:
 
 - Encryption and decryption tests: pass.
 - Authorization, Origin, masked-default, CSV, and audit tests: pass.
-- Six staging contact ciphertexts use the current staging key version.
+- Four staging contact ciphertexts use the current v5 key version.
 - Remote single-operator reveal: pending authenticated Access session.
 
 ## Duplicate workflow status
@@ -280,8 +299,8 @@ Still requiring the authenticated Access session:
 - No CAPTCHA bypass or source-block bypass exists.
 - No live crawl remains enabled after a bounded job.
 
-Security verdict: **SAFE, with production promotion blocked until the two
-external acceptance gates pass.**
+Security verdict: **SAFE, with production promotion blocked until the remaining
+authenticated Access acceptance gate passes.**
 
 ## Zero-charge status
 
@@ -300,33 +319,28 @@ Enforced values remain:
 - official website enabled
 - live crawl disabled except inside an explicitly bounded process
 
-No Zyte job, new unit, new Zyte project, paid provider, or automatic fallback
-was invoked. Zero-charge verdict: **SAFE**.
+Only explicitly bounded jobs ran on the existing one-unit Student project. No
+new unit, new Zyte project, Zyte API request, paid provider, or automatic
+fallback was invoked. Zero-charge verdict: **SAFE**.
 
 ## Remaining blockers
 
 1. Operator must authenticate once at the staging dashboard with the configured
    allowed email so remote dashboard/API/reveal/duplicate/CSV acceptance can run.
-2. Operator must use the existing Scrapy Cloud project's Settings UI to add the
-   cooldown URL and a new versioned contact keyring/active version. The same
-   keyring must be supplied through the approved local environment so the
-   staging Worker can be updated without exposing the value.
 
-These are external UI/session inputs, not missing implementation.
+This is an external Access session input, not missing implementation. Zyte UI
+settings are no longer a blocker.
 
 ## Exact next sequence
 
-1. Complete the two operator actions above without posting any secret in chat.
-2. Synchronize the new keyring to the staging Worker secret store and re-run the
-   four-page synthetic staging upsert.
-3. Execute the authenticated staging API/dashboard/reveal/duplicate/CSV suite.
-4. Deploy the immutable crawler artifact to the existing Student project, run
-   one no-network smoke, and verify completion plus cancel with one unit.
-5. Only after all staging gates pass, create the four production D1 databases,
+1. Complete the authenticated staging API/dashboard/reveal/duplicate/CSV suite
+   through Cloudflare Access.
+2. Only after that final staging gate passes, create the four production D1 databases,
    production Worker, Pages project, Access applications, bindings, and secrets.
-6. Apply production migrations, deploy the exact accepted artifact, and verify
+3. Apply production migrations, deploy the exact accepted application and
+   crawler artifacts, and verify
    health, auth, search, dashboard, reveal, duplicate actions, CSV, and backup.
-7. Run exactly one tiny official-site crawl for the approved
+4. Run exactly one tiny official-site crawl for the approved
    `https://scalemyprints.com/` seed with one Student unit, strict limits, no
    Zyte API, no paid service, and no fallback; verify end to end.
 
@@ -335,7 +349,7 @@ These are external UI/session inputs, not missing implementation.
 Immediately before creating this report:
 
 - branch: `main`
-- HEAD: `464888d9e837146336e6e0da027950cf0e924823`
+- HEAD: `a1268d6476f2e35925fda750be0378d40a98b18d`
 - origin/main: same SHA
 - tracked working tree: clean
 - required implementation: committed and pushed
@@ -346,7 +360,9 @@ This report is the only new tracked deliverable after that clean checkpoint.
 ## Final readiness answer
 
 Solo Mode v1 code is complete, reproducible, locally verified, CI-green, and
-substantially staging-verified. It is **not fully production-ready yet**. The
-only current launch blockers are the authenticated Access acceptance session and
-the three private Zyte project settings. Production must remain untouched until
-those gates pass.
+substantially staging-verified. The engine, one-unit Scrapy Cloud deployment,
+per-job secret injection, no-network smoke, cancel path, bounded root-seed
+crawl, encrypted D1 persistence, and current backup are complete. It is **not
+fully production-ready yet**. The only current launch blocker is the
+authenticated Access acceptance session. Production must remain untouched until
+that gate passes.
