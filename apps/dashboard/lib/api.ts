@@ -16,10 +16,18 @@ export class WorkerApiError extends Error {
 }
 
 export function workerApiBaseUrl(): string {
-  return (process.env.NEXT_PUBLIC_WORKER_API_BASE_URL ?? "http://127.0.0.1:8787").replace(
-    /\/$/,
-    ""
-  );
+  const configured = process.env.NEXT_PUBLIC_WORKER_API_BASE_URL?.trim();
+  if (configured) {
+    const url = new URL(configured);
+    if (process.env.NODE_ENV !== "development" && url.protocol !== "https:") {
+      throw new Error("NEXT_PUBLIC_WORKER_API_BASE_URL must use HTTPS outside local development.");
+    }
+    return configured.replace(/\/$/, "");
+  }
+  if (process.env.NODE_ENV === "development") {
+    return "http://127.0.0.1:8787";
+  }
+  throw new Error("NEXT_PUBLIC_WORKER_API_BASE_URL is required outside local development.");
 }
 
 export function workerApiUrl(path: string): string {

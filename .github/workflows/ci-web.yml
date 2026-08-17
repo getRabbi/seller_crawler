@@ -20,4 +20,6 @@ jobs:
       - run: npm run test
       - run: npm run health:worker
       - run: npm run build
+        env:
+          NEXT_PUBLIC_WORKER_API_BASE_URL: https://api.example.invalid
       - run: npm audit --omit=dev

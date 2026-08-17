@@ -47,7 +47,23 @@ describe("dashboard runtime configuration", () => {
     expect(() => workerApiUrl("v1/sellers")).toThrow("must start with '/'");
   });
 
+  it("keeps the localhost fallback only for explicit local development", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("NEXT_PUBLIC_WORKER_API_BASE_URL", "");
+
+    expect(workerApiBaseUrl()).toBe("http://127.0.0.1:8787");
+  });
+
+  it("fails closed when a non-local build has no Worker origin", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("NEXT_PUBLIC_WORKER_API_BASE_URL", "");
+
+    expect(() => workerApiBaseUrl()).toThrow("required outside local development");
+  });
+
   it("sends credentialed no-store requests to the Worker", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("NEXT_PUBLIC_WORKER_API_BASE_URL", "");
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ items: [], total: 0, limit: 50, offset: 0 }), {
         status: 200,
@@ -65,6 +81,7 @@ describe("dashboard runtime configuration", () => {
   });
 
   it("classifies Cloudflare Access failures as locked", async () => {
+    vi.stubEnv("NEXT_PUBLIC_WORKER_API_BASE_URL", "https://api.example.invalid");
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(

@@ -11,7 +11,7 @@
     "lint": "eslint app components lib tests next.config.ts",
     "typecheck": "next typegen && tsc -p tsconfig.json --noEmit",
     "test": "vitest run --root ../.. apps/dashboard/tests",
-    "build": "next build"
+    "build": "node scripts/validate-build-env.mjs && next build"
   },
   "devDependencies": {
     "next": "^15.0.0",
