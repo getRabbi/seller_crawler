@@ -2,6 +2,23 @@
 
 ## Unreleased - Solo Mode v1 Implementation
 
+- Added the explicitly approved single-operator Amazon identity-discovery
+  extension: bounded public search/product/seller parsing, product-to-seller
+  relationships, real business-country evidence, source provenance, block and
+  Retry-After cooldown handling, normalization, D1 persistence, and credible
+  official-domain handoff. No Amazon contact scraping, hidden API, login,
+  CAPTCHA bypass, proxy rotation, Zyte API, or paid provider was added.
+- Added an Access-authenticated New Crawl control plane and dashboard form for
+  Amazon keyword discovery and direct official-site enrichment. OPS_DB now
+  stores idempotent requests, events, queue state, one-unit ownership, retries,
+  cancellations, warnings, and run-to-seller results through migration 0005.
+- Made accepted staging/production profiles operator-ready while preserving the
+  emergency pause and all zero-charge locks. Generic paid search remains off;
+  Amazon/public-source keyword discovery is represented separately and active.
+- Added server-backed seller/contact filters, operational crawl-run actions,
+  source-run result views, dynamic truthful runtime status, and overview
+  metrics without exposing contact or crawler credentials to the frontend.
+
 - Replaced the unreliable manual Scrapy Cloud custom-setting dependency with
   per-job `run.json` settings sourced from the approved local environment. The
   controlled runner pins one unit, validates staging/production Worker URLs,
@@ -22,9 +39,10 @@
 - Tracked the spool package, aligned replay headers with normal ingestion,
   restored the sanitized environment example, and made package scripts
   Linux-compatible.
-- Locked Solo v1 source defaults to official websites only; business registry,
-  marketplace/search discovery, Zyte API, paid services, and deferred features
-  remain disabled.
+- Kept local/no-network defaults locked while making accepted operator
+  environments explicitly configurable for bounded Amazon discovery and
+  official-site enrichment. Alibaba, 1688, business registry, generic search,
+  Zyte API, paid services, and other deferred features remain disabled.
 - Approved the Solo Mode v1 delivery overlay and amended the authoritative master
   specification to version 2.1.0 before implementation.
 - Kept live crawling, Scrapy Cloud deployment, Zyte API, paid services, extra units,

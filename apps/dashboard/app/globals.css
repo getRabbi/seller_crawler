@@ -1,20 +1,20 @@
 :root {
-  color-scheme: light;
-  --bg: #f5f6f8;
-  --surface: #ffffff;
-  --surface-soft: #eef6f4;
-  --ink: #17202a;
-  --muted: #5d6875;
-  --line: #d9dee7;
-  --line-strong: #b9c1cd;
-  --accent: #0f766e;
-  --accent-dark: #115e59;
-  --good: #146c43;
-  --good-bg: #e9f7ef;
-  --warn: #946200;
-  --warn-bg: #fff7df;
-  --danger: #b42318;
-  --danger-bg: #fff1f0;
+  color-scheme: dark;
+  --bg: #09111f;
+  --surface: #101b2d;
+  --surface-soft: #15283a;
+  --ink: #edf5ff;
+  --muted: #9aabc0;
+  --line: #26364b;
+  --line-strong: #3a5069;
+  --accent: #22c7a9;
+  --accent-dark: #79ead5;
+  --good: #62d9a2;
+  --good-bg: #123a32;
+  --warn: #f5c96a;
+  --warn-bg: #3b311b;
+  --danger: #ff8b83;
+  --danger-bg: #3e2228;
 }
 
 * {
@@ -49,7 +49,8 @@ a:hover {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -97,7 +98,7 @@ button:hover {
 
 .sidebar {
   border-right: 1px solid var(--line);
-  background: #fbfcfd;
+  background: #0c1728;
   padding: 18px 14px;
 }
 
@@ -223,7 +224,7 @@ small {
 
 .runtime-strip {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
   gap: 10px;
   padding: 18px 0;
 }
@@ -362,7 +363,7 @@ td {
 }
 
 th {
-  background: #fbfcfd;
+  background: #0c1728;
   color: var(--muted);
   font-size: 12px;
   font-weight: 800;
@@ -402,7 +403,7 @@ tbody tr:last-child td {
 
 .status-neutral,
 .audit-chip {
-  background: #eef1f5;
+  background: #1c2a3d;
   color: var(--muted);
 }
 
@@ -427,7 +428,7 @@ tbody tr:last-child td {
   display: block;
   height: 8px;
   border-radius: 999px;
-  background: #e1e6ee;
+  background: #2b3b50;
   content: "";
 }
 
@@ -458,7 +459,10 @@ tbody tr:last-child td {
 }
 
 .toolbar input,
-.toolbar select {
+.toolbar select,
+.crawl-form input,
+.crawl-form select,
+.crawl-form textarea {
   min-height: 36px;
   min-width: 160px;
   border: 1px solid var(--line-strong);
@@ -468,6 +472,116 @@ tbody tr:last-child td {
   padding: 6px 8px;
   font-size: 13px;
   text-transform: none;
+}
+
+.crawl-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.mode-switch,
+.form-actions,
+.checkbox-row,
+.row-actions,
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.mode-switch .selected,
+.primary-action {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #05140f;
+}
+
+.form-card {
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  padding: 16px;
+}
+
+.form-card h2 {
+  margin-bottom: 14px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.form-card label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.form-card label.wide {
+  grid-column: span 2;
+}
+
+.form-card label.check {
+  display: flex;
+  align-items: center;
+  color: var(--ink);
+}
+
+.form-card input,
+.form-card select,
+.form-card textarea {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  background: #0b1626;
+  color: var(--ink);
+  padding: 8px;
+}
+
+.form-card input[type="checkbox"] {
+  width: 16px;
+  min-height: 16px;
+}
+
+.form-card fieldset {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 12px;
+}
+
+.form-card legend {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.form-actions span,
+.filter-chips {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.filter-chips {
+  margin: 10px 0;
+}
+
+.filter-chips span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  padding: 4px 8px;
+}
+
+.row-actions {
+  min-width: 180px;
 }
 
 .toolbar input[type="number"] {
@@ -560,6 +674,10 @@ tbody tr:last-child td {
   .detail-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 680px) {
@@ -597,5 +715,13 @@ tbody tr:last-child td {
 
   .definition-list div {
     grid-template-columns: 1fr;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-card label.wide {
+    grid-column: auto;
   }
 }

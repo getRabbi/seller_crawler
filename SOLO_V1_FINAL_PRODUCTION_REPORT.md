@@ -1,5 +1,11 @@
 # Seller Intelligence Solo Mode v1 — Final Production Report
 
+> Historical Solo launch checkpoint. The later explicitly approved Amazon and
+> dashboard operator-control extension supersedes its statements that Amazon,
+> operator crawling, and public-source keyword discovery must remain disabled.
+> See `AMAZON_OPERATOR_WORKFLOW_FINAL_REPORT.md` for the current acceptance and
+> deployment state once that workflow is promoted.
+
 Report date: 2026-08-17 (Asia/Dhaka)
 
 ## Executive verdict

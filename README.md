@@ -1,27 +1,22 @@
 # Seller Intelligence Platform
 
-Seller Intelligence Solo Mode v1 release candidate for the zero-cost hybrid
+Private single-operator Seller Intelligence system for the zero-cost hybrid
 runner architecture in `SELLER_INTELLIGENCE_MASTER_SPEC.md`.
 
 ## Current Phase Status
 
-- Active milestone: authenticated dashboard acceptance and production promotion
-- Phases 0-8: complete and verified for Solo v1
-- Phase 9: Cloudflare staging deployed; authenticated feature verification and
-  production promotion remain pending
-- Phase 10A: complete and verified locally, including the Docker artifact
-- Phase 10B: code deployed to Scrapy Cloud; one-unit no-network completion,
-  controlled cancellation, and bounded signed-ingestion crawl verified
-- Post-launch provider phases: deferred
-- Runner mode: `development_locked`
-- Live crawling: disabled
+- Active milestone: Amazon operator workflow staging acceptance
+- Solo foundations: complete, encrypted, and previously staging-verified
+- Operator extension: Amazon public identity discovery, official-site handoff,
+  one-unit queue/control APIs, filters, and dashboard UI implemented locally
+- Accepted staging/production runner mode: `zyte_student_active`
+- Accepted live crawling state: authenticated and operator controlled
+- Emergency pause: available but not triggered in an accepted environment
 - Zyte API: disabled
-- Scrapy Cloud deploy: disabled
+- Scrapy Cloud units: exactly one existing Student unit
 - GitHub Actions crawler: disabled
 - Credit runner: disabled
-- Cloudflare staging and Scrapy Cloud code: deployed; the controlled synthetic
-  seed crawl completed on one unit with signed D1 ingestion. Production and
-  broad live crawling have not started.
+- Broad or scheduled Amazon crawling is not enabled automatically.
 
 The current hosted inventory, verification evidence, security review, quota
 impact, and recovery path are recorded in `STAGING_DEPLOYMENT_REPORT.md`.
@@ -46,11 +41,16 @@ snippet or masked extraction context, content hash, parser/schema versions, and
 timestamps in D1. Full HTML, screenshot archives, batch archives, and longer R2
 retention are deferred until after launch.
 
-Deferred from Solo v1: Zyte API, extra Scrapy Cloud units, GitHub Actions
+The sole operator has explicitly approved the compatible Amazon/public-source
+identity-discovery extension and dashboard-driven bounded crawl workflow.
+Amazon supplies identity evidence; email, phone, WhatsApp, and WeChat normally
+come from a credibly resolved public official website.
+
+Still deferred: Zyte API, extra Scrapy Cloud units, GitHub Actions
 crawler fallback, credit-backed fallback, automatic provider orchestration, AI
 summaries, outreach automation, team roles, advanced monitoring, complex
-approval workflows, full raw-evidence R2 storage, Amazon, marketplaces, supplier
-directories, and broad search discovery.
+approval workflows, full raw-evidence R2 storage, Alibaba, 1688, supplier
+directories, and paid/generic search discovery.
 
 Required safety posture remains:
 
@@ -60,7 +60,11 @@ SCRAPY_CLOUD_MAX_UNITS=1
 ZYTE_API_ENABLED=false
 PAID_SERVICES_ALLOWED=false
 ALLOW_EXTRA_SCRAPY_UNITS=false
-ENABLE_AMAZON=false
+ENABLE_AMAZON=true
+ENABLE_OFFICIAL_WEBSITE=true
+OPERATOR_CRAWL_ENABLED=true
+GLOBAL_CRAWL_KILL_SWITCH=false
+ENABLE_SEARCH_DISCOVERY=false
 ```
 
 ## Local Setup Commands
@@ -146,12 +150,13 @@ redacts street-level detail before downstream display or history use.
 
 ## Source Adapter Framework
 
-Phase 6 adds policy-backed source adapter scaffolding under
+Phase 6 adds policy-backed source adapter implementations under
 `crawler/sellerintel/adapters` and source policy defaults under
 `crawler/sellerintel/config/sources.py`. Each adapter carries risk level, robots
 policy, terms risk/review status, per-domain concurrency, minimum delay,
-blocked-page cooldown, and a feature flag. Marketplace, supplier-directory, and
-search-discovery adapters remain disabled by default.
+blocked-page cooldown, and a feature flag. The approved Amazon adapter is
+available only in accepted operator environments. Alibaba, 1688, registry, and
+generic search adapters remain disabled.
 
 ## Official Website Enrichment
 

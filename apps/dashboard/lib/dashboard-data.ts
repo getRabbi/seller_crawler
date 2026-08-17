@@ -1,5 +1,6 @@
 export type DashboardRoute =
   | "overview"
+  | "new-crawl"
   | "sellers"
   | "seller-detail"
   | "contacts"
@@ -27,11 +28,13 @@ export const workerApiPaths = {
   duplicates: "/v1/duplicates",
   crawlRuns: "/v1/crawl-runs",
   search: "/v1/search",
-  export: "/v1/export.csv"
+  export: "/v1/export.csv",
+  metrics: "/v1/metrics"
 } as const;
 
 export const dashboardNav: NavItem[] = [
   { route: "overview", href: "/", label: "Overview" },
+  { route: "new-crawl", href: "/crawls/new", label: "New Crawl" },
   { route: "sellers", href: "/sellers", label: "Sellers" },
   { route: "contacts", href: "/contacts", label: "Contacts" },
   { route: "review-queue", href: "/review-queue", label: "Duplicates" },

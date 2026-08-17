@@ -10,15 +10,16 @@ describe("dashboard runtime configuration", () => {
     vi.unstubAllEnvs();
   });
 
-  it("shows locked provider state", () => {
-    expect(runtimePanels.map((panel) => panel.value)).toContain("development_locked");
-    expect(runtimePanels.map((panel) => panel.value)).toContain("disabled");
-    expect(runtimePanels.map((panel) => panel.value)).toContain("manual only");
+  it("shows the accepted operator runtime and billing lock", () => {
+    expect(runtimePanels.map((panel) => panel.value)).toContain("Zyte Student — Active");
+    expect(runtimePanels.map((panel) => panel.value)).toContain("Operator Controlled");
+    expect(runtimePanels.map((panel) => panel.value)).toContain("Locked");
   });
 
   it("contains only Solo v1 operational pages", () => {
     expect(dashboardNav.map((item) => item.href)).toEqual([
       "/",
+      "/crawls/new",
       "/sellers",
       "/contacts",
       "/review-queue",
@@ -35,7 +36,8 @@ describe("dashboard runtime configuration", () => {
       "/v1/duplicates",
       "/v1/crawl-runs",
       "/v1/search",
-      "/v1/export.csv"
+      "/v1/export.csv",
+      "/v1/metrics"
     ]);
   });
 

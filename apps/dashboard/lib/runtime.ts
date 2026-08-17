@@ -7,22 +7,37 @@ export interface RuntimePanel {
 export const runtimePanels: RuntimePanel[] = [
   {
     label: "Runner",
-    value: "development_locked",
-    detail: "Local development fixtures only; production runner selection is blocked."
+    value: "Zyte Student — Active",
+    detail: "One existing Student Scrapy Cloud unit is the operator runner."
   },
   {
     label: "Live crawl",
-    value: "disabled",
-    detail: "No live crawling, marketplace crawling, or production schedule is active."
+    value: "Operator Controlled",
+    detail: "Only authenticated, bounded operator requests can start a crawl."
   },
   {
-    label: "Zyte API",
-    value: "disabled",
-    detail: "The PAYG Zyte API remains off and has a zero request budget."
+    label: "Amazon",
+    value: "Active",
+    detail: "Public-page identity discovery is available within source policy limits."
   },
   {
-    label: "Fallbacks",
-    value: "manual only",
-    detail: "Actions burst and credit-backed runners cannot activate automatically."
+    label: "Discovery",
+    value: "Active",
+    detail: "Amazon keyword/product discovery is active; paid generic search remains off."
+  },
+  {
+    label: "Official enrichment",
+    value: "Active",
+    detail: "Public official-site contact enrichment is active."
+  },
+  {
+    label: "Zyte unit",
+    value: "1 / 1",
+    detail: "Additional work queues; no second unit or paid fallback can start."
+  },
+  {
+    label: "Paid services",
+    value: "Locked",
+    detail: "Zyte API, extra units, paid add-ons, and credit runners remain disabled."
   }
 ];

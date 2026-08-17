@@ -69,13 +69,13 @@ export function TableShell({ title, action, children }: TableShellProps) {
 }
 
 function statusTone(value: string): string {
-  if (["active", "ready", "accepted", "enabled"].includes(value)) {
+  if (["active", "ready", "accepted", "enabled", "running", "completed"].includes(value)) {
     return "good";
   }
-  if (["review", "pending", "idle"].includes(value)) {
+  if (["review", "pending", "idle", "queued", "starting", "enriching", "ingesting", "completed_with_warnings", "cooldown"].includes(value)) {
     return "warn";
   }
-  if (["paused", "disabled", "locked"].includes(value)) {
+  if (["paused", "disabled", "locked", "failed", "blocked", "cancelled"].includes(value)) {
     return "danger";
   }
   return "neutral";

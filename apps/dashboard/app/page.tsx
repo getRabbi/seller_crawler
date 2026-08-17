@@ -4,6 +4,7 @@ import Link from "next/link";
 import type {
   DuplicateReviewItem,
   ListResponse,
+  OperatorMetrics,
   SellerListItem
 } from "@seller-intelligence/shared-types/dashboard";
 
@@ -26,29 +27,30 @@ export default function OverviewPage() {
     `${workerApiPaths.duplicates}?limit=5&status=pending`
   );
   const health = useApiResource<HealthResponse>(workerApiPaths.health);
+  const operatorMetrics = useApiResource<OperatorMetrics>(workerApiPaths.metrics);
   const metrics = [
     {
-      label: "Sellers",
-      value: sellers.data ? String(sellers.data.total) : "--",
-      detail: "Canonical active records",
+      label: "Total sellers",
+      value: operatorMetrics.data ? String(operatorMetrics.data.totalSellers) : "--",
+      detail: `${operatorMetrics.data?.newSellersToday ?? 0} new today`,
       tone: "good" as const
     },
     {
-      label: "Duplicate review",
-      value: duplicates.data ? String(duplicates.data.total) : "--",
-      detail: "Pending entity decisions",
+      label: "Amazon identities",
+      value: operatorMetrics.data ? String(operatorMetrics.data.amazonIdentitiesDiscovered) : "--",
+      detail: `${operatorMetrics.data?.officialWebsitesResolved ?? 0} official sites resolved`,
       tone: "warn" as const
     },
     {
-      label: "Live crawl",
-      value: health.data?.runtime.liveCrawlEnabled ? "Enabled" : "Disabled",
-      detail: "Controlled operator gate",
+      label: "Contacts",
+      value: operatorMetrics.data ? String(operatorMetrics.data.contactsFound) : "--",
+      detail: `${operatorMetrics.data?.pendingDuplicates ?? duplicates.data?.total ?? 0} pending duplicates`,
       tone: health.data?.runtime.liveCrawlEnabled ? ("warn" as const) : ("neutral" as const)
     },
     {
-      label: "Paid services",
-      value: health.data?.runtime.paidServicesAllowed ? "Enabled" : "Locked",
-      detail: "External spend control",
+      label: "Crawl queue",
+      value: operatorMetrics.data ? `${operatorMetrics.data.activeCrawls} active / ${operatorMetrics.data.queuedRuns} queued` : "--",
+      detail: `${operatorMetrics.data?.recentFailures ?? 0} recent failures · ${operatorMetrics.data?.cooldownDomains ?? 0} cooldown domains`,
       tone: health.data?.runtime.paidServicesAllowed ? ("danger" as const) : ("good" as const)
     }
   ];

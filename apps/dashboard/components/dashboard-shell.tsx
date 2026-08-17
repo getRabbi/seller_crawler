@@ -1,8 +1,26 @@
+"use client";
+
 import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { dashboardNav, type DashboardRoute } from "../lib/dashboard-data";
 import { runtimePanels } from "../lib/runtime";
+import { useApiResource } from "../lib/use-api-resource";
+import { workerApiPaths } from "../lib/dashboard-data";
+
+interface HealthRuntime {
+  runtime: {
+    runnerMode: string;
+    liveCrawlEnabled: boolean;
+    operatorCrawlEnabled: boolean;
+    amazonEnabled: boolean;
+    discoveryEnabled: boolean;
+    officialWebsiteEnabled: boolean;
+    globalCrawlKillSwitch: boolean;
+    scrapyCloudMaxUnits: number;
+    paidServicesAllowed: boolean;
+  };
+}
 
 interface DashboardShellProps {
   active: DashboardRoute;
@@ -13,6 +31,19 @@ interface DashboardShellProps {
 
 export function DashboardShell({ active, title, eyebrow, children }: DashboardShellProps) {
   const activeNav = active === "seller-detail" ? "sellers" : active;
+  const health = useApiResource<HealthRuntime>(workerApiPaths.health);
+  const runtime = health.data?.runtime;
+  const panels = runtime
+    ? [
+        { label: "Runner", value: runtime.runnerMode === "zyte_student_active" ? "Zyte Student — Active" : runtime.runnerMode, detail: "Configured crawler runner." },
+        { label: "Live crawl", value: runtime.globalCrawlKillSwitch ? "Emergency Paused" : runtime.operatorCrawlEnabled && runtime.liveCrawlEnabled ? "Operator Controlled" : "Unavailable", detail: "Authenticated bounded crawl gate." },
+        { label: "Amazon", value: runtime.amazonEnabled ? "Active" : "Unavailable", detail: "Public identity discovery." },
+        { label: "Discovery", value: runtime.discoveryEnabled ? "Active" : "Unavailable", detail: "Amazon keyword/product discovery." },
+        { label: "Official enrichment", value: runtime.officialWebsiteEnabled ? "Active" : "Unavailable", detail: "Public official-site extraction." },
+        { label: "Zyte unit", value: `1 / ${runtime.scrapyCloudMaxUnits}`, detail: "Single-unit queue enforcement." },
+        { label: "Paid services", value: runtime.paidServicesAllowed ? "Enabled" : "Locked", detail: "Zero-charge billing protection." }
+      ]
+    : runtimePanels;
 
   return (
     <main className="app-shell">
@@ -48,7 +79,7 @@ export function DashboardShell({ active, title, eyebrow, children }: DashboardSh
         </header>
 
         <section className="runtime-strip" aria-label="Runtime locks">
-          {runtimePanels.map((panel) => (
+          {panels.map((panel) => (
             <div className="runtime-item" key={panel.label}>
               <span>{panel.label}</span>
               <strong>{panel.value}</strong>

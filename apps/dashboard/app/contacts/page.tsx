@@ -16,8 +16,12 @@ import { useApiResource } from "../../lib/use-api-resource";
 import { postWorkerApi } from "../../lib/api";
 
 export default function ContactsPage() {
+  const [sellerSearch, setSellerSearch] = useState("");
+  const [country, setCountry] = useState("");
   const [channel, setChannel] = useState("");
   const [confidence, setConfidence] = useState("70");
+  const [source, setSource] = useState("");
+  const [verified, setVerified] = useState("");
   const [query, setQuery] = useState("&minimum_confidence=70");
   const result = useApiResource<ListResponse<ContactListItem>>(
     `${workerApiPaths.contacts}?limit=100${query}`
@@ -44,12 +48,18 @@ export default function ContactsPage() {
     event.preventDefault();
     const params = new URLSearchParams({ minimum_confidence: confidence || "0" });
     if (channel) params.set("contact_type", channel);
+    if (sellerSearch.trim()) params.set("q", sellerSearch.trim());
+    if (country) params.set("country", country);
+    if (source) params.set("source", source);
+    if (verified) params.set("verified", verified);
     setQuery(`&${params.toString()}`);
   }
 
   return (
     <DashboardShell active="contacts" eyebrow="Contacts" title="Contact Directory">
       <form className="toolbar" aria-label="Contact filters" onSubmit={applyFilters}>
+        <label>Seller search<input onChange={(event) => setSellerSearch(event.target.value)} type="search" value={sellerSearch} /></label>
+        <label>Country<select onChange={(event) => setCountry(event.target.value)} value={country}><option value="">All</option>{["BD","CN","IN","VN","PK","US","GB","CA","AU","DE","FR","IT","ES"].map((value) => <option key={value}>{value}</option>)}</select></label>
         <label>
           Channel
           <select onChange={(event) => setChannel(event.target.value)} value={channel}>
@@ -60,6 +70,8 @@ export default function ContactsPage() {
             <option value="wechat">WeChat</option>
           </select>
         </label>
+        <label>Source<select onChange={(event) => setSource(event.target.value)} value={source}><option value="">All</option><option value="official_site">Official website</option><option value="amazon_seller">Amazon seller</option></select></label>
+        <label>Verification<select onChange={(event) => setVerified(event.target.value)} value={verified}><option value="">Current and unverified</option><option value="verified">Verified/current</option><option value="unverified">Not yet verified</option></select></label>
         <label>
           Minimum confidence
           <input
@@ -90,6 +102,7 @@ export default function ContactsPage() {
                 <th scope="col">Classification</th>
                 <th scope="col">Confidence</th>
                 <th scope="col">Last verified</th>
+                <th scope="col">Country / source</th>
                 <th scope="col">Operator action</th>
               </tr>
             </thead>
@@ -108,6 +121,7 @@ export default function ContactsPage() {
                   <td>
                     {contact.lastVerifiedAt ? new Date(contact.lastVerifiedAt).toLocaleString() : "--"}
                   </td>
+                  <td>{[contact.sellerCountryCode, contact.sourceType].filter(Boolean).join(" / ") || "--"}</td>
                   <td>
                     <button onClick={() => void reveal(contact)} type="button">
                       Reveal (audited)
