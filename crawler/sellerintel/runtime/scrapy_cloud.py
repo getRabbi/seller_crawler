@@ -74,7 +74,7 @@ class HttpTransport(Protocol):
 
 
 class DeployCommandRunner(Protocol):
-    def __call__(self, command: Sequence[str], *, cwd: Path) -> None: ...
+    def __call__(self, command: Sequence[str], *, cwd: Path, api_key: str) -> None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,6 +165,7 @@ class ScrapyCloudRunner:
         self._deploy_runner(
             ["shub", "deploy", "--version", artifact.version, self._project_id()],
             cwd=artifact_path,
+            api_key=self._api_key(),
         )
         return DeploymentResult(deployed=True, provider=self.name)
 
@@ -331,6 +332,11 @@ class ScrapyCloudRunner:
             raise ValueError("SCRAPY_CLOUD_PROJECT_ID is required.")
         return self._config.project_id
 
+    def _api_key(self) -> str:
+        if self._config.api_key is None:
+            raise ValueError("SCRAPY_CLOUD_API_KEY is required.")
+        return self._config.api_key
+
     def _source_cooldown_check_url(self) -> str:
         if self._config.source_cooldown_check_url is None:
             raise ValueError("SOURCE_COOLDOWN_CHECK_URL is required.")
@@ -463,7 +469,7 @@ def valid_worker_url(value: str | None, *, path: str) -> bool:
     )
 
 
-def run_deploy_command(command: Sequence[str], *, cwd: Path) -> None:
+def run_deploy_command(command: Sequence[str], *, cwd: Path, api_key: str) -> None:
     if not command or command[0] != "shub":
         raise ValueError("Only the pinned shub deployment command is allowed.")
     uvx_path = shutil.which("uvx")
@@ -473,6 +479,7 @@ def run_deploy_command(command: Sequence[str], *, cwd: Path) -> None:
         [uvx_path, "--from", "shub==2.18.1", *command],
         cwd=cwd,
         check=True,
+        env={**os.environ, "SHUB_APIKEY": api_key},
     )
 
 

@@ -76,7 +76,8 @@ class FakeDeployRunner:
     def __init__(self) -> None:
         self.calls: list[tuple[tuple[str, ...], Path]] = []
 
-    def __call__(self, command: Sequence[str], *, cwd: Path) -> None:
+    def __call__(self, command: Sequence[str], *, cwd: Path, api_key: str) -> None:
+        assert api_key == READY_ENV["SCRAPY_CLOUD_API_KEY"]
         self.calls.append((tuple(command), cwd))
 
 
