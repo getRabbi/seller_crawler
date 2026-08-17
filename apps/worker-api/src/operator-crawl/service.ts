@@ -508,6 +508,7 @@ export class OperatorCrawlService {
       CONCURRENT_REQUESTS: 4,
       CONCURRENT_REQUESTS_PER_DOMAIN: 1,
       DOWNLOAD_TIMEOUT: 30,
+      SELLERINTEL_OBSERVED_AT: new Date().toISOString(),
       ITEM_PIPELINES: { "sellerintel.pipelines.SignedIngestionPipeline": 300 },
       SOURCE_COOLDOWN_CHECK_URL: requiredSecret(this.env.SOURCE_COOLDOWN_CHECK_URL, "SOURCE_COOLDOWN_CHECK_URL"),
       INGESTION_ENDPOINT_URL: requiredSecret(this.env.INGESTION_ENDPOINT_URL, "INGESTION_ENDPOINT_URL"),

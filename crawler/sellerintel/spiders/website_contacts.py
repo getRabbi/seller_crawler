@@ -110,6 +110,7 @@ class OfficialWebsiteSpider(scrapy.Spider):
         self._company_names: dict[str, str] = {}
         self._contact_cipher: ContactCipher | None = None
         self._cooldown_client: CooldownClient | None = None
+        self._observed_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
         if self.fixture_dir is not None and not self.fixture_dir.is_dir():
             raise ValueError("fixture_dir must be an existing directory")
@@ -126,6 +127,9 @@ class OfficialWebsiteSpider(scrapy.Spider):
         return spider
 
     def _validate_runtime(self, settings: BaseSettings) -> None:
+        configured_observed_at = settings.get("SELLERINTEL_OBSERVED_AT")
+        if isinstance(configured_observed_at, str) and configured_observed_at.strip():
+            self._observed_at = configured_observed_at.strip()
         runtime_values = dict(os.environ)
         for key in RUNTIME_SETTING_KEYS:
             value = settings.get(key)
@@ -301,7 +305,7 @@ class OfficialWebsiteSpider(scrapy.Spider):
             errback=self.handle_request_error,
             meta={
                 "crawl_depth": depth,
-                "observed_at": str(self.crawler.settings.get("SELLERINTEL_OBSERVED_AT")),
+                "observed_at": self._observed_at,
             },
         )
 

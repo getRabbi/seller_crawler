@@ -5,6 +5,7 @@ import json
 import os
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -131,3 +132,18 @@ def test_cloud_runtime_settings_open_only_the_explicit_one_unit_live_gate() -> N
             }
         )
     )
+
+    assert spider._observed_at != "None"
+    datetime.fromisoformat(spider._observed_at.replace("Z", "+00:00"))
+
+
+def test_explicit_cloud_observation_timestamp_is_preserved() -> None:
+    spider = OfficialWebsiteSpider(
+        seed_urls="https://approved.example/",
+        crawl_run_id="018f2d5e-7b3c-7a1d-8f2e-523456789abc",
+        fixture_dir=str(FIXTURE_SITE),
+    )
+
+    spider._validate_runtime(Settings({"SELLERINTEL_OBSERVED_AT": "2026-08-17T09:45:00Z"}))
+
+    assert spider._observed_at == "2026-08-17T09:45:00Z"

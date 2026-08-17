@@ -2,6 +2,10 @@
 
 ## Unreleased - Solo Mode v1 Implementation
 
+- Fixed operator-launched official-site crawl timestamps so every request uses
+  a real ISO-8601 observation time even when a caller omits the optional
+  override; the Worker now supplies a per-job timestamp and the spider retains
+  a safe UTC fallback instead of persisting the literal string `None`.
 - Added the explicitly approved single-operator Amazon identity-discovery
   extension: bounded public search/product/seller parsing, product-to-seller
   relationships, real business-country evidence, source provenance, block and

@@ -187,6 +187,9 @@ describe("operator crawl control", () => {
       ENABLE_AMAZON: true,
       LIVE_CRAWL_ENABLED: true
     });
+    expect(typeof settings.SELLERINTEL_OBSERVED_AT).toBe("string");
+    expect(settings.SELLERINTEL_OBSERVED_AT).not.toBe("None");
+    expect(Number.isNaN(Date.parse(String(settings.SELLERINTEL_OBSERVED_AT)))).toBe(false);
   });
 
   it("cancels the active job and immediately advances the queued run", async () => {
