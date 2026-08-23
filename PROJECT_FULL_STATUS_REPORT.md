@@ -1,5 +1,10 @@
 # Seller Intelligence Solo Mode v1 — Full Status Report
 
+> Historical pre-promotion audit. Its production blockers were addressed on
+> 2026-08-23; use `PRODUCTION_PROMOTION_REPORT.md` for authoritative current
+> status, deployment identifiers, tests, backup/restore proof, and the remaining
+> manual Access-login walkthrough.
+
 Audit date: 2026-08-17 (Asia/Dhaka)  
 Audit mode: read-only, except creation of this report  
 Repository: E:\seller_crawler  

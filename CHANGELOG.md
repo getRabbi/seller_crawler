@@ -2,6 +2,10 @@
 
 ## Unreleased - Solo Mode v1 Implementation
 
+- Promoted the bounded single-operator runtime to production at immutable
+  release `6bc8b45b05f5561adec15fefbf87ff435b931f0c`, with four current D1
+  partitions, Access-protected Worker/Pages, one-unit Scrapy Cloud execution,
+  a successful no-network cloud smoke, and a verified sequential restore drill.
 - Hardened four-D1 backup and restore so an environment label cannot target
   database names from a different environment.
 - Updated the locked development `pip` dependency to `26.2.1`, clearing

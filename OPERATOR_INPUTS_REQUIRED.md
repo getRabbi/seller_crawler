@@ -1,5 +1,11 @@
 # Operator Inputs Required
 
+> Historical pre-production inventory. The required runtime values and hosted
+> resources were configured on 2026-08-23. See
+> `PRODUCTION_PROMOTION_REPORT.md` for authoritative current state. No secret
+> value is recorded here. The only remaining acceptance action is the operator's
+> interactive Cloudflare Access dashboard walkthrough.
+
 Solo v1 is blocked at the consolidated external-resource boundary. No secret
 values are stored in this file. `SET` means only that the current audit shell
 contained a non-empty value; it does not prove the credential has sufficient

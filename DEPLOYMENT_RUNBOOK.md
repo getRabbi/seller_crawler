@@ -167,6 +167,11 @@ Load the four database-name variables for the target environment, then run:
 uv run --directory crawler python -m sellerintel.operations.d1_transfer backup --environment staging --workspace-root .. --output-root .sellerintel/backups
 ```
 
+The utility requires every configured database name to contain the requested
+`staging` or `production` environment token. A mismatch stops before any export
+or restore command. Inspect the generated manifest and confirm all four
+`database_name` values before treating the backup as valid.
+
 The output directory contains four SQL files and a SHA-256 manifest under
 `.sellerintel/backups`. Move the completed backup to operator-controlled,
 encrypted storage. The repository does not upload backups to R2.
@@ -276,10 +281,13 @@ production templates and distinct D1 databases, Access audience, allowed-email
 secret, and ingestion HMAC secret. Repeat the four migrations, Worker deploy,
 Access checks, dashboard build/deploy, and backup in the same order.
 
-Point the Scrapy Cloud project settings at the production Worker endpoint and
-production HMAC secret only after production health succeeds. Rotate the prior
-staging HMAC if it is no longer needed. Keep `LIVE_CRAWL_ENABLED=false`; do not
-schedule broad crawling as part of deployment.
+Point Scrapy Cloud job settings at the production Worker endpoint and production
+HMAC secret only after production health succeeds. Rotate the prior staging HMAC
+if it is no longer needed. After authenticated queue acceptance passes,
+`LIVE_CRAWL_ENABLED=true` may be used only with
+`OPERATOR_CRAWL_ENABLED=true`, the one-active-slot constraint, `units=1`, and
+the bounded operator API. A one-minute queue-pump cron may advance persisted
+operator requests; it must never create broad crawl requests by itself.
 
 ## 9. Final Verification And Rollback
 

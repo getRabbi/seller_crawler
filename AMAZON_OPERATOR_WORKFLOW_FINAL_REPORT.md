@@ -1,5 +1,11 @@
 # Amazon Operator Workflow Final Report
 
+> Historical staging report from 2026-08-17. A later bounded run persisted and
+> matched live Amazon product/seller identity, the discovered parser and retry
+> issues were fixed, and Solo Mode v1 was promoted on 2026-08-23. See
+> `PRODUCTION_PROMOTION_REPORT.md` for the authoritative current verdict. Do not
+> repeat the Amazon source requests in this historical report.
+
 Date: 2026-08-17  
 Application/deployment commit: `ff3ade8696857c011742a7aa8fd177bdd256e163`  
 Baseline: `1844bc6c699d76e9c301a65ff83e06f86b80199c`  
@@ -15,8 +21,9 @@ Official-site enrichment, encrypted contact persistence, masked APIs/CSV,
 audited reveal, search, duplicate actions, and crawl history are working in
 staging.
 
-The system is **not promoted to production and is not yet fully
-production-ready**. The one permitted real Amazon staging verification reached
+At the time of this 2026-08-17 report, the system was **not promoted to
+production and was not yet fully production-ready**. The one permitted real
+Amazon staging verification reached
 Amazon, but Amazon returned HTTP 503 for both bounded search attempts. No
 product or seller page was served, so no Amazon identity could be validated and
 the live Amazon-to-official-site handoff could not occur. The source was not

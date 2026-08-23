@@ -5,10 +5,10 @@ runner architecture in `SELLER_INTELLIGENCE_MASTER_SPEC.md`.
 
 ## Current Phase Status
 
-- Active milestone: Amazon operator workflow staging acceptance
-- Solo foundations: complete, encrypted, and previously staging-verified
+- Active milestone: controlled Solo Mode v1 production operation
+- Solo foundations: complete, encrypted, restore-verified, and deployed
 - Operator extension: Amazon public identity discovery, official-site handoff,
-  one-unit queue/control APIs, filters, and dashboard UI implemented locally
+  one-unit queue/control APIs, filters, and dashboard UI deployed to production
 - Accepted staging/production runner mode: `zyte_student_active`
 - Accepted live crawling state: authenticated and operator controlled
 - Emergency pause: available but not triggered in an accepted environment
@@ -18,8 +18,9 @@ runner architecture in `SELLER_INTELLIGENCE_MASTER_SPEC.md`.
 - Credit runner: disabled
 - Broad or scheduled Amazon crawling is not enabled automatically.
 
-The current hosted inventory, verification evidence, security review, quota
-impact, and recovery path are recorded in `STAGING_DEPLOYMENT_REPORT.md`.
+The current hosted inventory, immutable release evidence, security review,
+quota impact, recovery path, and sole manual login check are recorded in
+`PRODUCTION_PROMOTION_REPORT.md`. Earlier staging reports are historical.
 
 Zyte Support has confirmed that the GitHub Student Scrapy Cloud entitlement is
 applied and that exactly one Scrapy Cloud unit is free. Repository defaults now
@@ -200,8 +201,9 @@ audited. Contact CSV remains masked by design.
 
 The Worker validates Cloudflare Access JWT signatures, issuer, audience,
 expiration, and the single allowed email before serving private API routes.
-Cloudflare Pages and Access are configured by examples and the deployment
-runbook, but no hosted resource has been deployed.
+Cloudflare Pages, the Worker API, four production D1 partitions, DNS, and
+single-user Access are deployed. Exact deployment evidence is recorded in
+`PRODUCTION_PROMOTION_REPORT.md`.
 
 ## Local Runner Readiness
 
@@ -228,11 +230,11 @@ and explicitly opens only the deployment gate.
 
 ## Stop Conditions
 
-Do not run live crawling, use Zyte API, add a Scrapy Cloud unit, activate a
-fallback provider, or push. Do not deploy until the consolidated values in
-`OPERATOR_INPUTS_REQUIRED.md` are supplied and the appropriate runbook gate is
-followed. Keep broad live crawling disabled after deployment until the single
-approved-seed smoke has passed end to end.
+Do not use Zyte API, add a Scrapy Cloud unit, activate a fallback provider,
+enable paid services, bypass a source block, or launch an unbounded crawl.
+Production crawling is available only through the authenticated bounded
+operator workflow. Stop on robots denial, CAPTCHA, explicit blocking, unexpected
+domain navigation, ingestion spool, or a charge warning.
 
 ## Rollback Or Recovery
 
@@ -248,12 +250,8 @@ documented retention operation.
 
 ## Free-Tier Impact
 
-The current release candidate has no hosted infrastructure use and no recurring
-cost. Local dependency installation and Docker image creation may download
-packages, but no Cloudflare, Zyte job, live crawl, R2, hosted D1, or provider
-runtime has been activated.
-Local SQLite migration tests, Worker ingestion tests, crawler client tests,
-extractor fixture tests, normalization tests, adapter policy tests,
-official-site enrichment tests, entity-resolution fixture tests, dashboard
-tests, local runner smoke/replay tests, and migration tests consume only
-workstation disk and CPU. Local spool files are ignored by git.
+Production uses one existing Student Scrapy Cloud unit, four production plus
+four staging D1 databases, one production Worker, and one production Pages
+project. Sequential restore drills leave no disposable database behind. Zyte
+API, extra units, R2 archive expansion, paid services, and paid fallbacks remain
+disabled; configured external spend is zero.
