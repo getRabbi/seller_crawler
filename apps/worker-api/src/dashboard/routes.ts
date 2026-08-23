@@ -10,6 +10,7 @@ import {
 import type { RuntimeEnv } from "../validation/startup";
 import type { DuplicateDecisionAction } from "@seller-intelligence/shared-types/dashboard";
 import { applyDuplicateDecision, DuplicateDecisionError } from "../entity-resolution/decisions";
+import { OperatorCrawlService } from "../operator-crawl/service";
 
 const UUID_V7 = "([0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12})";
 const SELLER_DETAIL_PATH = new RegExp(`^/v1/sellers/${UUID_V7}$`, "i");
@@ -89,7 +90,7 @@ export async function dashboardResponse(
       );
     }
     if (request.method === "GET" && url.pathname === "/v1/export.csv") {
-      return exportResponse(url, repository);
+      return exportResponse(url, repository, env);
     }
     return errorResponse(404, "not_found", "Route not found.");
   } catch (error) {
@@ -165,7 +166,11 @@ export function errorResponse(status: number, code: string, message: string): Re
   return json(payload, status);
 }
 
-async function exportResponse(url: URL, repository: DashboardRepository): Promise<Response> {
+async function exportResponse(
+  url: URL,
+  repository: DashboardRepository,
+  env: RuntimeEnv
+): Promise<Response> {
   const dataset = url.searchParams.get("dataset") ?? "sellers";
   if (dataset === "sellers") {
     const result = await repository.listSellers(exportListOptions(url));
@@ -231,5 +236,65 @@ async function exportResponse(url: URL, repository: DashboardRepository): Promis
       ])
     );
   }
-  return errorResponse(400, "invalid_dataset", "dataset must be sellers or contacts.");
+  if (dataset === "crawls") {
+    const result = await new OperatorCrawlService(env).listSnapshot(repository.exportLimit(), 0);
+    return csvResponse(
+      "seller-intelligence-crawl-runs.csv",
+      [
+        "id",
+        "mode",
+        "job_type",
+        "query",
+        "marketplace",
+        "country_codes",
+        "requested_sellers",
+        "discovered_sellers",
+        "enriched_sellers",
+        "contacts_found",
+        "status",
+        "stage",
+        "zyte_job_id",
+        "requested_at",
+        "started_at",
+        "finished_at",
+        "requests_total",
+        "responses_success",
+        "blocked_count",
+        "error_count",
+        "warnings",
+        "error_code",
+        "error_message"
+      ],
+      result.items.map((run) => [
+        run.id,
+        run.mode ?? null,
+        run.jobType,
+        run.query?.join(" | ") ?? null,
+        run.marketplace ?? null,
+        run.countryCodes?.join(" | ") ?? null,
+        run.requestedSellerCount ?? 0,
+        run.discoveredSellers ?? run.candidatesFound,
+        run.enrichedSellers ?? run.recordsUpdated,
+        run.contactsFound ?? run.contactsVerified,
+        run.status,
+        run.stage ?? null,
+        run.zyteJobId,
+        run.requestedAt ?? run.startedAt,
+        run.startedAt,
+        run.finishedAt,
+        run.requestsTotal,
+        run.responsesSuccess,
+        run.blockedCount,
+        run.errorCount,
+        run.warnings?.join(" | ") ?? null,
+        run.errorCode ?? null,
+        run.errorMessage ?? null
+      ])
+    );
+  }
+  return errorResponse(
+    400,
+    "invalid_dataset",
+    "dataset must be sellers, contacts, or crawls."
+  );
 }

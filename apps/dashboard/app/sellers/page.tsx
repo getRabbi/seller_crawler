@@ -88,6 +88,17 @@ export default function SellersPage() {
                   <td>
                     <Link href={`/sellers/detail?id=${seller.id}`}>{seller.canonicalName}</Link>
                     <small>{seller.officialDomain ?? "No official domain"}</small>
+                    {!seller.officialDomain ? (
+                      <small>
+                        <a
+                          href={googleOfficialWebsiteSearchUrl(seller)}
+                          rel="noreferrer"
+                          target="_blank"
+                        >
+                          Verify via Google
+                        </a>
+                      </small>
+                    ) : null}
                   </td>
                   <td>{[seller.city, seller.countryCode].filter(Boolean).join(", ") || "--"}</td>
                   <td>
@@ -114,4 +125,14 @@ export default function SellersPage() {
 
 function formatTimestamp(value: string): string {
   return new Date(value).toLocaleString();
+}
+
+function googleOfficialWebsiteSearchUrl(seller: SellerListItem): string {
+  const query = [
+    `"${seller.canonicalName}"`,
+    seller.marketplaceDisplayName,
+    seller.countryCode,
+    "official website"
+  ].filter(Boolean).join(" ");
+  return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
 }

@@ -2,6 +2,11 @@
 
 ## Unreleased - Solo Mode v1 Implementation
 
+- Added authenticated Crawl Runs CSV export with operational status, bounded
+  result counts, warnings, and error metadata while excluding operator identity
+  and secrets. Sellers without a resolved official domain now include a
+  user-initiated Google verification link; automated Google result-page scraping
+  remains disabled.
 - Fixed production dashboard-to-API JSON requests by allowing unauthenticated
   `OPTIONS` preflight through the API's Cloudflare Access application. The
   Worker continues to allow CORS only for the configured dashboard origin, and

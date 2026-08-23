@@ -186,6 +186,10 @@ export class OperatorCrawlService {
 
   async list(limit: number, offset: number, status?: string): Promise<{ items: CrawlRunItem[]; total: number; limit: number; offset: number }> {
     await this.pump();
+    return this.listSnapshot(limit, offset, status);
+  }
+
+  async listSnapshot(limit: number, offset: number, status?: string): Promise<{ items: CrawlRunItem[]; total: number; limit: number; offset: number }> {
     const clauses: string[] = [];
     const values: D1Value[] = [];
     if (status) {

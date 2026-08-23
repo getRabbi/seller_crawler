@@ -140,6 +140,24 @@ describe("Solo dashboard API", () => {
     expect(body).not.toContain("sealed-contact-value");
   });
 
+  it("exports operator crawl runs without operator identity or secrets", async () => {
+    const response = await worker.fetch(
+      new Request("http://local.test/v1/export.csv?dataset=crawls"),
+      dashboardEnv()
+    );
+    const body = await response.text();
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-disposition")).toContain(
+      "seller-intelligence-crawl-runs.csv"
+    );
+    expect(body).toContain('"mode","job_type","query","marketplace"');
+    expect(body).toContain('"known_websites","official_website"');
+    expect(body).toContain('"completed","completed"');
+    expect(body).not.toContain("operator@example.invalid");
+    expect(body).not.toContain("fixture-secret");
+  });
+
   it("reveals an authenticated contact only through an audited operator mutation", async () => {
     const env = dashboardEnv({ appEnv: "production" });
     const token = await accessToken("operator@example.invalid");

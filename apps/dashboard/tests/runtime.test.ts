@@ -43,6 +43,21 @@ describe("dashboard runtime configuration", () => {
     ]);
   });
 
+  it("offers crawl runs as an authenticated CSV export dataset", () => {
+    const source = readFileSync(new URL("../app/export/page.tsx", import.meta.url), "utf8");
+
+    expect(source).toContain('<option value="crawls">Crawl runs</option>');
+    expect(source).toContain("Crawl runs include operational status");
+  });
+
+  it("offers a user-initiated Google verification link for unresolved seller domains", () => {
+    const source = readFileSync(new URL("../app/sellers/page.tsx", import.meta.url), "utf8");
+
+    expect(source).toContain("Verify via Google");
+    expect(source).toContain("https://www.google.com/search?q=");
+    expect(source).toContain('rel="noreferrer"');
+  });
+
   it("ships an operational New Crawl form with bounded custom targets and both modes", () => {
     const source = readFileSync(new URL("../app/crawls/new/page.tsx", import.meta.url), "utf8");
 

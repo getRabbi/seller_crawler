@@ -165,7 +165,15 @@ preflight returns HTTP 204 with the expected CORS headers, while the same API
 `POST` without an Access session still redirects to or is denied by Access.
 
 Verify seller list/detail, masked contacts, duplicate review, crawl runs, search,
-retry/empty/error states, and both CSV exports.
+retry/empty/error states, and all three CSV exports: sellers, masked contacts,
+and crawl runs. The crawl-run export must omit operator identity and secrets and
+must not advance the one-unit queue as a side effect.
+
+For sellers without an official domain, the dashboard may provide a
+user-initiated Google verification link. Do not automate or scrape Google's
+result pages. Automatic Google resolution requires an approved official API,
+an explicit provider activation, and zero-charge quota enforcement; until then,
+the operator must verify a domain and submit it through Known Websites mode.
 
 ## 5. Four-D1 Backup And Restore Drill
 
