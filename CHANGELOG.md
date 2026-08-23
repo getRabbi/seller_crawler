@@ -2,6 +2,10 @@
 
 ## Unreleased - Solo Mode v1 Implementation
 
+- Fixed production dashboard-to-API JSON requests by allowing unauthenticated
+  `OPTIONS` preflight through the API's Cloudflare Access application. The
+  Worker continues to allow CORS only for the configured dashboard origin, and
+  every non-`OPTIONS` API request remains protected by Access.
 - Marked every New Crawl required field in the dashboard, added mode-aware
   pre-submit validation, and replaced raw browser `Failed to fetch` errors with
   an actionable Worker API Access-session recovery link.

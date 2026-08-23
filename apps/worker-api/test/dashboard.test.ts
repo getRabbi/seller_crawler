@@ -238,6 +238,45 @@ describe("Solo dashboard API", () => {
     expect(response.headers.get("access-control-allow-credentials")).toBe("true");
   });
 
+  it("answers unauthenticated preflight only for the configured dashboard origin", async () => {
+    const env = dashboardEnv({ appEnv: "production" });
+    const allowed = await worker.fetch(
+      new Request("https://api.example.invalid/v1/crawl-runs", {
+        method: "OPTIONS",
+        headers: {
+          origin: "https://dashboard.example.invalid",
+          "access-control-request-method": "POST",
+          "access-control-request-headers": "content-type"
+        }
+      }),
+      env
+    );
+    const denied = await worker.fetch(
+      new Request("https://api.example.invalid/v1/crawl-runs", {
+        method: "OPTIONS",
+        headers: {
+          origin: "https://attacker.invalid",
+          "access-control-request-method": "POST",
+          "access-control-request-headers": "content-type"
+        }
+      }),
+      env
+    );
+
+    expect(allowed.status).toBe(204);
+    expect(allowed.headers.get("access-control-allow-origin")).toBe(
+      "https://dashboard.example.invalid"
+    );
+    expect(allowed.headers.get("access-control-allow-credentials")).toBe("true");
+    expect(allowed.headers.get("access-control-allow-methods")).toBe(
+      "GET, POST, OPTIONS"
+    );
+    expect(allowed.headers.get("access-control-allow-headers")).toBe("content-type");
+    expect(denied.status).toBe(204);
+    expect(denied.headers.get("access-control-allow-origin")).toBeNull();
+    expect(denied.headers.get("access-control-allow-credentials")).toBeNull();
+  });
+
   it("does not echo unapproved origins and rejects other Access users", async () => {
     const token = await accessToken("other@example.invalid");
     const response = await worker.fetch(

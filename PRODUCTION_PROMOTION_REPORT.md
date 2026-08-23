@@ -64,6 +64,11 @@ after use; the final account count returned to eight.
 
 - Unauthenticated production health and dashboard requests return Cloudflare
   Access HTTP 302 redirects.
+- The production API Access application bypasses authentication only for
+  browser `OPTIONS` preflight. A live dashboard-origin preflight returns HTTP
+  204 with the exact allowed origin, credentials, `content-type`, and
+  `GET, POST, OPTIONS`; an unauthenticated API `POST` still returns an Access
+  HTTP 302 redirect.
 - API, dashboard, Pages root, and Pages preview Access policies allow exactly
   the configured operator email.
 - Only exact machine paths `/v1/ingest/batch` and `/v1/crawl/authorize` bypass
@@ -122,7 +127,7 @@ does not upload it.
 - Contact extractor coverage: 95.36% against a 90% requirement.
 - Bandit and `pip-audit`: clean.
 - ESLint and TypeScript typecheck: passed.
-- Vitest: 52 passed; Worker health suite: 5 passed.
+- Vitest: 56 passed; Worker health suite: 5 passed.
 - `npm audit --omit=dev`: 0 vulnerabilities.
 - Next.js production export: 11 static pages generated.
 - Docker build passed; `--network none` smoke crawled 8 fixture pages, found 4
@@ -142,6 +147,11 @@ Worker version and Pages deployment, or the prior Scrapy artifact
 `376084e994eadf6fd383514ccc1ceb413674ad5d`; do not reverse migration `0005` by
 deleting tables. Use a forward migration for schema repair and the checksummed
 backup for disaster recovery.
+
+For the Access preflight configuration specifically, rollback is to disable
+**Bypass options requests to origin** on the production API Access application.
+That restores the previous fail-closed behavior but also prevents browser crawl
+creation until another authenticated preflight design is deployed.
 
 ## Operator login walkthrough
 

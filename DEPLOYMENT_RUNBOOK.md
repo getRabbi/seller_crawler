@@ -156,6 +156,14 @@ the Access Allow policy protects the Pages hostname before sharing the URL. The
 dashboard uses credentialed requests to the API origin, so both origins must be
 in the intended Access and CORS configuration.
 
+The dashboard sends cross-origin JSON requests, which require an unauthenticated
+browser `OPTIONS` preflight. On the dashboard-facing Worker Access application,
+enable **Bypass options requests to origin**. Do not add an Access Bypass policy
+for `GET`, `POST`, or any API path. The Worker must retain its exact
+`DASHBOARD_ORIGIN` check and credentialed CORS response. Verify an allowed-origin
+preflight returns HTTP 204 with the expected CORS headers, while the same API
+`POST` without an Access session still redirects to or is denied by Access.
+
 Verify seller list/detail, masked contacts, duplicate review, crawl runs, search,
 retry/empty/error states, and both CSV exports.
 
