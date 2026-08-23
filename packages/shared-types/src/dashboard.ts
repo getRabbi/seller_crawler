@@ -141,6 +141,7 @@ export interface CreateCrawlRunRequest {
   countryCodes?: string[];
   filters?: CrawlFilters;
   seedUrls?: string[];
+  targetSellerId?: string;
   contactTypes: Array<"email" | "phone" | "whatsapp" | "wechat">;
   targetSellerCount: number;
   maxResultPages: number;

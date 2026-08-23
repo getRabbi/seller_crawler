@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
+import re
 from collections.abc import AsyncIterator, Iterable, Mapping
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from ipaddress import ip_address
 from pathlib import Path
@@ -29,6 +32,7 @@ from sellerintel.clients.cooldown import CooldownClient, cooldown_endpoint_from_
 from sellerintel.config.features import assert_startup_gates, load_runtime_config
 from sellerintel.normalization.domain import canonicalize_domain
 from sellerintel.schemas.ingestion import (
+    UUIDV7_PATTERN,
     ContactRecord,
     CrawlRunRecord,
     IngestionBatch,
@@ -39,6 +43,7 @@ from sellerintel.schemas.ingestion import (
 from sellerintel.security.contact_crypto import ContactCipher
 
 MAX_CONTACTS_PER_PAGE_BATCH = 17
+CONTACT_TYPES = frozenset({"email", "phone", "whatsapp", "wechat"})
 RUNTIME_SETTING_KEYS = (
     "RUNNER_MODE",
     "LIVE_CRAWL_ENABLED",
@@ -67,6 +72,13 @@ RUNTIME_SETTING_KEYS = (
 )
 
 
+@dataclass(frozen=True, slots=True)
+class OfficialSellerTarget:
+    seller_id: str
+    seller_name: str
+    seed_url: str
+
+
 class OfficialWebsiteSpider(scrapy.Spider):
     name = "official_website"
     handle_httpstatus_all = True
@@ -89,6 +101,8 @@ class OfficialWebsiteSpider(scrapy.Spider):
         fixture_dir: str = "",
         default_region: str = "",
         seller_name: str = "",
+        seller_targets: str = "",
+        contact_types: str = "",
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -99,6 +113,8 @@ class OfficialWebsiteSpider(scrapy.Spider):
         self.default_region = default_region or None
         self.explicit_seller_name = seller_name.strip()
         self.seed_urls = _parse_seed_urls(seed_urls)
+        self.contact_types = _parse_contact_types(contact_types)
+        self._seller_targets = _parse_seller_targets(seller_targets, self.seed_urls)
         self._seed_by_domain = {_domain(url): url for url in self.seed_urls}
         self.allowed_domains = sorted({_domain(url) for url in self.seed_urls})
         self._queues: dict[str, list[tuple[str, int]]] = {
@@ -213,14 +229,18 @@ class OfficialWebsiteSpider(scrapy.Spider):
             default_region=self.default_region,
             observed_at=observed_at,
         )
+        target = self._seller_targets.get(domain)
         company_name = self._company_names.setdefault(
             domain,
-            self.explicit_seller_name or _company_name(enrichment.page_title, domain),
+            target.seller_name
+            if target is not None
+            else self.explicit_seller_name or _company_name(enrichment.page_title, domain),
         )
         seller = seller_record_for_domain(
             domain,
             company_name=company_name,
             observed_at=observed_at,
+            seller_id=target.seller_id if target else None,
         )
         source = source_record_for_page(
             enrichment,
@@ -233,6 +253,7 @@ class OfficialWebsiteSpider(scrapy.Spider):
             seller_id=seller.id,
             source_id=source.id,
             contact_cipher=self._required_contact_cipher(),
+            allowed_contact_types=set(self.contact_types),
         )
         yield from self._page_batches(seller, source, contacts, response.url, observed_at)
 
@@ -463,6 +484,60 @@ def _parse_seed_urls(value: str) -> tuple[str, ...]:
     if not seeds:
         raise ValueError("At least one explicit http or https seed URL is required")
     return tuple(seeds)
+
+
+def _parse_contact_types(value: str) -> frozenset[str]:
+    if not value.strip():
+        return CONTACT_TYPES
+    selected = frozenset(
+        item.strip().lower() for item in value.replace("\n", ",").split(",") if item.strip()
+    )
+    if not selected or not selected.issubset(CONTACT_TYPES):
+        raise ValueError("contact_types contains an unsupported contact type")
+    return selected
+
+
+def _parse_seller_targets(
+    value: str,
+    seed_urls: tuple[str, ...],
+) -> dict[str, OfficialSellerTarget]:
+    if not value.strip():
+        return {}
+    try:
+        decoded = json.loads(value)
+    except json.JSONDecodeError as error:
+        raise ValueError("seller_targets must be valid JSON") from error
+    if not isinstance(decoded, list) or not 1 <= len(decoded) <= 20:
+        raise ValueError("seller_targets must contain between 1 and 20 targets")
+
+    approved_seeds = set(seed_urls)
+    targets: dict[str, OfficialSellerTarget] = {}
+    for item in decoded:
+        if not isinstance(item, dict) or set(item) != {"seller_id", "seller_name", "seed_url"}:
+            raise ValueError(
+                "seller_targets entries must contain seller_id, seller_name, and seed_url"
+            )
+        seller_id = item.get("seller_id")
+        seller_name = item.get("seller_name")
+        raw_seed_url = item.get("seed_url")
+        if not isinstance(seller_id, str) or re.fullmatch(UUIDV7_PATTERN, seller_id) is None:
+            raise ValueError("seller_targets seller_id must be UUIDv7-compatible")
+        if not isinstance(seller_name, str) or not 1 <= len(seller_name.strip()) <= 200:
+            raise ValueError("seller_targets seller_name must be 1-200 characters")
+        if not isinstance(raw_seed_url, str):
+            raise ValueError("seller_targets seed_url must be a string")
+        canonical_seed = canonicalize_official_url(raw_seed_url)
+        if canonical_seed is None or canonical_seed not in approved_seeds:
+            raise ValueError("seller_targets seed_url must exactly match an approved seed URL")
+        domain = _domain(canonical_seed)
+        if domain in targets:
+            raise ValueError("seller_targets may link only one seller to each official domain")
+        targets[domain] = OfficialSellerTarget(
+            seller_id=seller_id,
+            seller_name=seller_name.strip(),
+            seed_url=canonical_seed,
+        )
+    return targets
 
 
 def _setting_value(value: object) -> str:

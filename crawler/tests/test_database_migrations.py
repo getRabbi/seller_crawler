@@ -40,6 +40,7 @@ EXPECTED_TABLES = {
         "operator_crawl_events",
         "operator_crawl_idempotency",
         "crawl_run_sellers",
+        "crawl_run_contacts",
     },
     "history": {
         "field_history",

@@ -2,6 +2,20 @@
 
 ## Unreleased - Solo Mode v1 Implementation
 
+- Hardened official-site production enrichment: substantive public pages no
+  longer stop merely because a theme script contains a challenge token, while
+  HTTP blocks and visible or short challenge pages still stop without bypass.
+  Discovered contact and wholesale paths now precede guessed fallbacks, and the
+  global response cap reserves bounded robots and sitemap overhead.
+- Added canonical seller-linked website crawls. An operator can verify a public
+  HTTPS URL for one existing seller, the Worker validates seller existence and
+  domain conflicts, and the crawler persists versioned evidence and encrypted
+  contacts against that seller ID instead of creating a domain duplicate.
+- Added operations migration `0006_crawl_run_contacts.sql` so per-run contact
+  counts are idempotent. Operator completion now reports policy blocks,
+  ingestion failures, crawler warnings, and zero-contact outcomes truthfully,
+  honors selected contact types, and caps official-site work at 100 pages per
+  run while keeping one Scrapy Cloud unit and every paid path locked.
 - Added authenticated Crawl Runs CSV export with operational status, bounded
   result counts, warnings, and error metadata while excluding operator identity
   and secrets. Sellers without a resolved official domain now include a

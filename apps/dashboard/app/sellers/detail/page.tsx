@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import type { SellerDetailResponse } from "@seller-intelligence/shared-types/dashboard";
 
 import { DashboardShell } from "../../../components/dashboard-shell";
@@ -58,6 +59,14 @@ function SellerDetail({ detail }: { detail: SellerDetailResponse }) {
             <div><dt>Status</dt><dd><StatusPill value={seller.status} /></dd></div>
             <div><dt>Aliases</dt><dd>{detail.aliases.join(", ") || "--"}</dd></div>
           </dl>
+          {!seller.officialDomain ? (
+            <Link
+              className="button-link"
+              href={`/crawls/new?${new URLSearchParams({ mode: "known_websites", sellerId: seller.id, sellerName: seller.canonicalName }).toString()}`}
+            >
+              Crawl verified website
+            </Link>
+          ) : null}
         </div>
         <div className="detail-panel">
           <h2>Scores</h2>

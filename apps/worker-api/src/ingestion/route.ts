@@ -151,9 +151,18 @@ export async function ingestBatchResponse(request: Request, env: RuntimeEnv): Pr
 
   await new OperatorCrawlService(env).recordIngestion(
     schemaResult.payload.crawl_run_id,
-    records(schemaResult.payload, "sellers").map((record) => String(record.id)),
+    [
+      ...records(schemaResult.payload, "sellers").map((record) => String(record.id)),
+      ...records(schemaResult.payload, "contacts").map((record) => String(record.seller_id)),
+      ...records(schemaResult.payload, "sources")
+        .map((record) => record.seller_id)
+        .filter((sellerId): sellerId is string => typeof sellerId === "string")
+    ],
     records(schemaResult.payload, "sources").map((record) => String(record.source_type)),
-    records(schemaResult.payload, "contacts").length
+    records(schemaResult.payload, "contacts").map((record) => ({
+      id: String(record.id),
+      sellerId: String(record.seller_id)
+    }))
   );
 
   await operations.recordIdempotencyKey({

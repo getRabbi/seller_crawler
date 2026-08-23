@@ -5,9 +5,12 @@ from pathlib import Path
 from sellerintel.adapters.official_site import (
     build_official_site_crawl_plan,
     canonicalize_official_url,
+    contact_records_for_page,
+    deterministic_uuidv7,
     enrich_official_page,
     is_allowed_official_url,
 )
+from sellerintel.security.contact_crypto import ContactCipher
 from sellerintel.spool.checksums import sha256_hex
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "extractors"
@@ -45,17 +48,31 @@ def test_builds_same_domain_budgeted_crawl_plan_from_html_and_sitemap() -> None:
     assert plan.page_budget == 12
     assert plan.urls == (
         "https://acme-industrial.testmail/",
+        "https://acme-industrial.testmail/contact-us",
+        "https://acme-industrial.testmail/wholesale/exports",
+        "https://acme-industrial.testmail/company/export-sales",
         "https://acme-industrial.testmail/about",
         "https://acme-industrial.testmail/about-us",
         "https://acme-industrial.testmail/contact",
-        "https://acme-industrial.testmail/contact-us",
         "https://acme-industrial.testmail/support",
         "https://acme-industrial.testmail/wholesale",
         "https://acme-industrial.testmail/distributor",
         "https://acme-industrial.testmail/privacy",
         "https://acme-industrial.testmail/terms",
-        "https://acme-industrial.testmail/wholesale/exports",
-        "https://acme-industrial.testmail/company/export-sales",
+    )
+
+
+def test_prioritizes_discovered_shopify_contact_path_before_guessed_fallbacks() -> None:
+    plan = build_official_site_crawl_plan(
+        "https://shop.example/",
+        html='<a href="/pages/contact">Contact</a><a href="/pages/dealer-wholesale">Wholesale</a>',
+        page_budget=3,
+    )
+
+    assert plan.urls == (
+        "https://shop.example/",
+        "https://shop.example/pages/contact",
+        "https://shop.example/pages/dealer-wholesale",
     )
 
 
@@ -99,6 +116,23 @@ def test_enrich_official_page_hashes_evidence_and_extracts_contacts() -> None:
     assert contacts[("phone", "+14155552671")].confidence >= 80
     assert contacts[("whatsapp", "+14155552672")].confidence >= 80
     assert contacts[("wechat", "acmeexport_88")].confidence >= 80
+
+
+def test_contact_record_creation_honors_operator_selected_types() -> None:
+    enrichment = enrich_official_page(
+        fixture("official_contact.html"),
+        page_url="https://acme-industrial.testmail/contact-us",
+        default_region="US",
+    )
+    records = contact_records_for_page(
+        enrichment,
+        seller_id="018f2d5e-7b3c-7a1d-8f2e-123456789abc",
+        source_id=deterministic_uuidv7("source-url", enrichment.canonical_url),
+        contact_cipher=ContactCipher.for_fixture_tests(),
+        allowed_contact_types={"email", "whatsapp"},
+    )
+
+    assert {record.contact_type for record in records} == {"email", "whatsapp"}
 
 
 def test_disallows_blocked_paths_and_non_sitemap_business_pages() -> None:

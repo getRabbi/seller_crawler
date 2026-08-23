@@ -48,10 +48,22 @@ Source adapter activation requires both feature-flag enablement and source
 policy approval. Blocked-page detection and restricted robots/terms policies are
 stop signals, not prompts to switch providers or evade access controls.
 
+Challenge detection evaluates HTTP status and user-visible page content. A
+theme's non-visible script token alone is not an explicit block when a
+substantive public page is available, but a visible verification message, a
+short script-only challenge, robots denial, or blocked HTTP status remains a
+hard stop. The crawler never executes a CAPTCHA or challenge script.
+
 Official-site enrichment must stay inside canonical same-domain crawl plans and
 the configured page budget. Do not fetch live pages, retrieve sitemaps, upload
 R2 evidence, follow account/cart/login paths, bypass access controls, or expand
 to another provider during the local enrichment phase.
+
+Seller-linked website runs accept one existing UUIDv7 seller and one verified
+public HTTPS URL. The Worker validates the canonical seller and rejects domain
+conflicts; the crawler may update missing official-domain evidence but
+repository upserts preserve stronger existing identity fields. Run/contact
+linkage stores identifiers and counts only, never contact plaintext.
 
 Entity-resolution output must keep only public identifiers, normalized values,
 and contact hashes in score payloads. Do not include raw contact values in review

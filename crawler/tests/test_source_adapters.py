@@ -108,6 +108,28 @@ def test_blocked_response_detection_and_cooldown_behavior() -> None:
     assert adapter.cooldown_for(ok) == timedelta(seconds=2.5)
 
 
+def test_block_detection_ignores_theme_script_tokens_on_a_substantive_public_page() -> None:
+    normal_page = response(
+        status=200,
+        text=(
+            "<html><head><script>window.themeCaptchaChallenge = true;</script></head>"
+            "<body><h1>Contact our export team</h1><p>"
+            + "Public company information and product support. " * 30
+            + "</p></body></html>"
+        ),
+    )
+    script_only_challenge = response(
+        status=200,
+        text=(
+            "<html><script src='/captcha.js'></script>"
+            "<body>Please enable JavaScript.</body></html>"
+        ),
+    )
+
+    assert is_blocked_response(normal_page) is False
+    assert is_blocked_response(script_only_challenge) is True
+
+
 def response(status: int, text: str) -> AdapterResponse:
     return SyntheticResponse(
         url="https://example.test/contact",

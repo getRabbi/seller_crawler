@@ -115,26 +115,33 @@ export class CoreRepository {
        )
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(id) DO UPDATE SET
-         canonical_name = excluded.canonical_name,
-         normalized_name = excluded.normalized_name,
-         legal_name = excluded.legal_name,
-         legal_name_local = excluded.legal_name_local,
-         country_code = excluded.country_code,
-         province = excluded.province,
-         city = excluded.city,
-         address_private = excluded.address_private,
-         address_public_masked = excluded.address_public_masked,
-         official_domain = excluded.official_domain,
-         china_confidence = excluded.china_confidence,
-         identity_confidence = excluded.identity_confidence,
-         manufacturer_score = excluded.manufacturer_score,
-         trader_score = excluded.trader_score,
-         quality_score = excluded.quality_score,
+         canonical_name = CASE
+           WHEN excluded.identity_confidence >= sellers.identity_confidence THEN excluded.canonical_name
+           ELSE sellers.canonical_name END,
+         normalized_name = CASE
+           WHEN excluded.identity_confidence >= sellers.identity_confidence THEN excluded.normalized_name
+           ELSE sellers.normalized_name END,
+         legal_name = COALESCE(excluded.legal_name, sellers.legal_name),
+         legal_name_local = COALESCE(excluded.legal_name_local, sellers.legal_name_local),
+         country_code = COALESCE(excluded.country_code, sellers.country_code),
+         province = COALESCE(excluded.province, sellers.province),
+         city = COALESCE(excluded.city, sellers.city),
+         address_private = COALESCE(excluded.address_private, sellers.address_private),
+         address_public_masked = COALESCE(excluded.address_public_masked, sellers.address_public_masked),
+         official_domain = CASE
+           WHEN sellers.official_domain IS NULL OR sellers.official_domain = excluded.official_domain
+             THEN COALESCE(excluded.official_domain, sellers.official_domain)
+           ELSE sellers.official_domain END,
+         china_confidence = MAX(sellers.china_confidence, excluded.china_confidence),
+         identity_confidence = MAX(sellers.identity_confidence, excluded.identity_confidence),
+         manufacturer_score = MAX(sellers.manufacturer_score, excluded.manufacturer_score),
+         trader_score = MAX(sellers.trader_score, excluded.trader_score),
+         quality_score = MAX(sellers.quality_score, excluded.quality_score),
          schema_version = excluded.schema_version,
          parser_version = excluded.parser_version,
          status = excluded.status,
          last_seen_at = excluded.last_seen_at,
-         last_material_change_at = excluded.last_material_change_at,
+         last_material_change_at = COALESCE(excluded.last_material_change_at, sellers.last_material_change_at),
          updated_at = excluded.updated_at`,
       [
         record.id,

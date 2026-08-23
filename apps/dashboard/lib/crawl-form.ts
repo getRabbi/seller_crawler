@@ -9,6 +9,7 @@ export interface CrawlFormValues {
   maxResultPages: string;
   maxOfficialPages: string;
   depth: string;
+  targetSellerId?: string;
 }
 
 export function validateCrawlForm(values: CrawlFormValues): string | null {
@@ -28,6 +29,12 @@ export function validateCrawlForm(values: CrawlFormValues): string | null {
     } else if (urls.length > 20) {
       errors.push("use no more than twenty website URLs");
     }
+    if (values.targetSellerId && !/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(values.targetSellerId)) {
+      errors.push("use a valid UUIDv7 seller ID");
+    }
+    if (values.targetSellerId && urls.length !== 1) {
+      errors.push("use exactly one website URL when linking an existing seller");
+    }
   }
 
   if (!boundedInteger(values.target, 1, 100)) {
@@ -44,6 +51,16 @@ export function validateCrawlForm(values: CrawlFormValues): string | null {
   }
   if (values.contacts.length === 0) {
     errors.push("select at least one contact priority");
+  }
+  const plannedSites = values.mode === "known_websites"
+    ? Math.max(1, lines(values.seedUrls).length)
+    : Number(values.target);
+  if (
+    boundedInteger(values.maxOfficialPages, 1, 25) &&
+    Number.isInteger(plannedSites) &&
+    plannedSites * Number(values.maxOfficialPages) > 100
+  ) {
+    errors.push("keep the official website budget at or below 100 pages per run");
   }
 
   return errors.length > 0

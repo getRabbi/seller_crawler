@@ -13,6 +13,11 @@ to roll back a migration. Create a forward migration that preserves existing
 rows, marks superseded columns or tables as inactive, and records the retention
 or recovery operation in operations notes.
 
+Operations migration `0006_crawl_run_contacts.sql` is additive. Its rows are
+run-level idempotency and audit evidence and must not be deleted during an
+application rollback. A prior Worker can run with the table present. Any future
+retention of these rows requires a documented forward retention migration.
+
 Entity-resolution merges are rolled back with a new forward decision. Use
 `entity_resolution_decisions` and `seller_merge_redirects` metadata to restore
 source-seller links, mark the redirect rollback status, and write the rollback

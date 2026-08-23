@@ -94,6 +94,15 @@ npm.cmd run test --workspace @seller-intelligence/dashboard
 npm.cmd run build --workspace @seller-intelligence/dashboard
 ```
 
+The official-site queue is bounded to 100 planned pages per operator run.
+Robots and sitemap overhead stays inside the Scrapy Cloud close limit, and only
+one Student unit may be active. The `crawl_run_contacts` operations table makes
+contact counters unique by `(crawl_run_id, contact_id)`; it stores identifiers
+and timestamps only, never contact ciphertext or plaintext. At current one-unit
+throughput its free-tier D1 impact is proportional to verified contacts and
+stays inside the existing ingestion write envelope. Archive or retention must
+be a documented forward operation.
+
 Phase 10A local runner readiness is complete and fixture-only by default. The
 real spider, signed/spooled ingestion path, and offline Docker smoke work
 locally. Runbook details are in `docs/local-runner.md`. The local smoke command validates startup gates,

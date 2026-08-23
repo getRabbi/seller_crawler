@@ -31,6 +31,21 @@ const TERMINAL_STATUSES = new Set([
   "cancelled"
 ]);
 const API_BASE = "https://app.zyte.com/api";
+const UUID_V7_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const MAX_OFFICIAL_PAGES_PER_RUN = 100;
+
+interface OfficialSellerTarget {
+  sellerId: string;
+  sellerName: string;
+  seedUrl: string;
+}
+
+interface CrawlerOutcome {
+  status: string;
+  contacts_verified: number;
+  blocked_count: number;
+  error_count: number;
+}
 
 interface OperatorRunRow {
   id: string;
@@ -128,6 +143,8 @@ export class OperatorCrawlService {
       return { run: mapRun(run), queued: run.status === "queued" };
     }
 
+    const knownSellerTarget = await this.resolveKnownSellerTarget(input);
+
     const id = newUuidV7();
     const now = new Date();
     const approvedDomains =
@@ -150,7 +167,16 @@ export class OperatorCrawlService {
         JSON.stringify(input.keywords ?? []),
         input.marketplace ?? null,
         JSON.stringify(input.countryCodes ?? []),
-        JSON.stringify(input.filters ?? {}),
+        JSON.stringify(
+          input.mode === "find_sellers"
+            ? input.filters ?? {}
+            : knownSellerTarget
+              ? {
+                  targetSellerId: knownSellerTarget.sellerId,
+                  targetSellerName: knownSellerTarget.sellerName
+                }
+              : {}
+        ),
         JSON.stringify(input.seedUrls ?? []),
         JSON.stringify(input.contactTypes),
         input.targetSellerCount,
@@ -177,7 +203,16 @@ export class OperatorCrawlService {
         new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString()
       )
       .run();
-    await this.event(id, "created", actorId, null, "queued", "Operator created a bounded crawl run.");
+    await this.event(
+      id,
+      "created",
+      actorId,
+      null,
+      "queued",
+      knownSellerTarget
+        ? "Operator created a bounded crawl run linked to an existing canonical seller."
+        : "Operator created a bounded crawl run."
+    );
     await this.pump();
     const run = await this.getRun(id);
     if (!run) throw new OperatorCrawlError(503, "crawl_create_failed", "Crawl run could not be loaded after creation.");
@@ -366,7 +401,7 @@ export class OperatorCrawlService {
     crawlRunId: string,
     sellerIds: string[],
     sourceTypes: string[],
-    contactCount: number
+    contacts: Array<{ id: string; sellerId: string }>
   ): Promise<void> {
     const run = await this.getRun(crawlRunId);
     if (!run) return;
@@ -380,6 +415,14 @@ export class OperatorCrawlService {
         .bind(crawlRunId, sellerId, stage, now)
         .run();
     }
+    for (const contact of contacts) {
+      await this.db
+        .prepare(
+          "INSERT INTO crawl_run_contacts (crawl_run_id, contact_id, seller_id, first_seen_at) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING"
+        )
+        .bind(crawlRunId, contact.id, contact.sellerId, now)
+        .run();
+    }
     const counts = await this.db
       .prepare(
         `SELECT
@@ -389,16 +432,20 @@ export class OperatorCrawlService {
       )
       .bind(crawlRunId)
       .first<{ discovered: number; enriched: number }>();
+    const contactCounts = await this.db
+      .prepare("SELECT COUNT(*) AS contacts_found FROM crawl_run_contacts WHERE crawl_run_id = ?")
+      .bind(crawlRunId)
+      .first<{ contacts_found: number }>();
     await this.db
       .prepare(
         `UPDATE operator_crawl_runs SET discovered_sellers = ?, enriched_sellers = ?,
-         contacts_found = contacts_found + ?,
+         contacts_found = ?,
          status = CASE WHEN status = 'running' THEN 'ingesting' ELSE status END, updated_at = ? WHERE id = ?`
       )
       .bind(
         Number(counts?.discovered ?? 0),
         Number(counts?.enriched ?? 0),
-        Math.max(0, contactCount),
+        Number(contactCounts?.contacts_found ?? 0),
         now,
         crawlRunId
       )
@@ -433,9 +480,52 @@ export class OperatorCrawlService {
       await this.transition(run, "cancelled", "cancelled", null, "Scrapy Cloud confirmed cancellation.", true);
       return;
     }
+    const outcome = await this.crawlerOutcome(run.id);
+    if (closeReason.includes("ingestion_rejected") || closeReason.includes("ingestion_spooled")) {
+      await this.transition(
+        run,
+        "failed",
+        "failed",
+        null,
+        "Crawler output could not be persisted safely.",
+        true,
+        closeReason.includes("ingestion_spooled") ? "ingestion_spooled" : "ingestion_rejected",
+        "Signed ingestion did not reach a durable accepted state."
+      );
+      return;
+    }
+    if (outcome?.status === "paused_by_policy" || Number(outcome?.blocked_count ?? 0) > 0) {
+      await this.transition(
+        run,
+        "blocked",
+        "blocked",
+        null,
+        "Source policy stopped the crawl; no bypass or provider rotation was attempted.",
+        true,
+        "source_blocked",
+        "The source returned an explicit access challenge or policy block.",
+        ["source_blocked"]
+      );
+      return;
+    }
+    if (outcome?.status === "completed_with_errors" || Number(outcome?.error_count ?? 0) > 0) {
+      await this.transition(
+        run,
+        "completed_with_warnings",
+        "completed",
+        null,
+        "Crawl finished with one or more bounded crawler errors.",
+        true,
+        "crawler_errors",
+        "Review crawl evidence and source health before retrying.",
+        ["crawler_errors"]
+      );
+      return;
+    }
     if (run.mode === "find_sellers" && run.stage === "discovering") {
-      const domains = await this.officialDomainsForRun(run.id);
-      if (domains.length > 0) {
+      const targets = await this.officialTargetsForRun(run.id);
+      if (targets.length > 0) {
+        const domains = targets.map((target) => new URL(target.seedUrl).hostname.toLowerCase());
         const approved = [...new Set([...parseStringArray(run.approved_domains_json), ...domains])];
         await this.db
           .prepare(
@@ -445,7 +535,7 @@ export class OperatorCrawlService {
           .run();
         const enriching = await this.requireRun(run.id);
         try {
-          const jobId = await this.launch(enriching, domains);
+          const jobId = await this.launch(enriching, targets);
           await this.db
             .prepare("UPDATE operator_crawl_runs SET zyte_job_id = ?, status = 'running', updated_at = ? WHERE id = ?")
             .bind(jobId, new Date().toISOString(), run.id)
@@ -469,6 +559,20 @@ export class OperatorCrawlService {
       );
       return;
     }
+    if (Number(outcome?.contacts_verified ?? run.contacts_found) === 0) {
+      await this.transition(
+        run,
+        "completed_with_warnings",
+        "completed",
+        null,
+        "Official-site crawl completed but no supported public business contact was found.",
+        true,
+        null,
+        null,
+        ["no_public_contacts_found"]
+      );
+      return;
+    }
     await this.transition(run, "completed", "completed", null, "Crawl run completed.", true);
   }
 
@@ -477,7 +581,7 @@ export class OperatorCrawlService {
     if (run?.active_unit_slot === 1) await this.syncActive(run);
   }
 
-  private async launch(run: OperatorRunRow, overrideSeeds?: string[]): Promise<string> {
+  private async launch(run: OperatorRunRow, overrideTargets?: OfficialSellerTarget[]): Promise<string> {
     const commonSettings: Record<string, unknown> = {
       RUNNER_MODE: "zyte_student_active",
       LIVE_CRAWL_ENABLED: true,
@@ -552,12 +656,28 @@ export class OperatorCrawlService {
         run.max_result_pages + run.target_seller_count * 2
       );
     } else {
-      const seeds = overrideSeeds ?? parseStringArray(run.seed_urls_json);
+      const storedTarget = this.storedKnownSellerTarget(run);
+      const targets = overrideTargets ?? (storedTarget ? [storedTarget] : []);
+      const seeds = targets.length > 0
+        ? targets.map((target) => target.seedUrl)
+        : parseStringArray(run.seed_urls_json);
       form.spider = "official_website";
       form.seed_urls = seeds.map((domain) => (domain.startsWith("https://") ? domain : `https://${domain}/`)).join(",");
-      form.page_budget = String(Math.min(25, run.max_official_pages * Math.max(1, seeds.length)));
+      form.page_budget = String(Math.min(25, run.max_official_pages));
       form.max_depth = String(run.crawl_depth);
-      commonSettings.CLOSESPIDER_PAGECOUNT = Number(form.page_budget);
+      form.contact_types = parseStringArray(run.contact_types_json).join(",");
+      if (targets.length > 0) {
+        form.seller_targets = JSON.stringify(
+          targets.map((target) => ({
+            seller_id: target.sellerId,
+            seller_name: target.sellerName,
+            seed_url: target.seedUrl
+          }))
+        );
+      }
+      const seedCount = Math.max(1, seeds.length);
+      commonSettings.CLOSESPIDER_PAGECOUNT =
+        Number(form.page_budget) * seedCount + 2 * seedCount;
       commonSettings.ENABLE_AMAZON = false;
     }
     form.job_settings = JSON.stringify(commonSettings);
@@ -686,15 +806,85 @@ export class OperatorCrawlService {
     return (result.results ?? []).map((row) => row.seller_id);
   }
 
-  private async officialDomainsForRun(id: string): Promise<string[]> {
+  private async officialTargetsForRun(id: string): Promise<OfficialSellerTarget[]> {
     const ids = await this.runSellerIds(id);
     if (!this.env.CORE_DB || ids.length === 0) return [];
     const placeholders = ids.map(() => "?").join(",");
     const result = await this.env.CORE_DB
-      .prepare(`SELECT DISTINCT official_domain FROM sellers WHERE id IN (${placeholders}) AND official_domain IS NOT NULL`)
+      .prepare(
+        `SELECT id, canonical_name, official_domain, identity_confidence, last_seen_at
+         FROM sellers WHERE id IN (${placeholders}) AND official_domain IS NOT NULL
+         ORDER BY identity_confidence DESC, last_seen_at DESC, id ASC`
+      )
       .bind(...ids)
-      .all<{ official_domain: string }>();
-    return (result.results ?? []).map((row) => row.official_domain.toLowerCase());
+      .all<{
+        id: string;
+        canonical_name: string;
+        official_domain: string;
+        identity_confidence: number;
+        last_seen_at: string;
+      }>();
+    const targets = new Map<string, OfficialSellerTarget>();
+    for (const row of result.results ?? []) {
+      const domain = normalizeDomain(row.official_domain);
+      if (!domain || targets.has(domain)) continue;
+      targets.set(domain, {
+        sellerId: row.id,
+        sellerName: row.canonical_name,
+        seedUrl: `https://${domain}/`
+      });
+    }
+    return [...targets.values()];
+  }
+
+  private async resolveKnownSellerTarget(
+    input: CreateCrawlRunRequest
+  ): Promise<OfficialSellerTarget | null> {
+    if (input.mode !== "known_websites" || !input.targetSellerId) return null;
+    if (!this.env.CORE_DB) {
+      throw new OperatorCrawlError(503, "core_db_missing", "CORE_DB is required to link an official website.");
+    }
+    const row = await this.env.CORE_DB
+      .prepare(
+        "SELECT id, canonical_name, official_domain, status FROM sellers WHERE id = ? LIMIT 1"
+      )
+      .bind(input.targetSellerId)
+      .first<{ id: string; canonical_name: string; official_domain: string | null; status: string }>();
+    if (!row || row.status !== "active") {
+      throw new OperatorCrawlError(404, "target_seller_not_found", "The target canonical seller is unavailable.");
+    }
+    const seedUrl = input.seedUrls?.[0];
+    if (!seedUrl) throw invalid("A linked seller crawl requires exactly one approved website URL.");
+    const requestedDomain = normalizeDomain(new URL(seedUrl).hostname);
+    const existingDomain = normalizeDomain(row.official_domain ?? "");
+    if (existingDomain && existingDomain !== requestedDomain) {
+      throw new OperatorCrawlError(
+        409,
+        "official_domain_conflict",
+        "The seller already has a different official domain; review the identity before crawling."
+      );
+    }
+    return { sellerId: row.id, sellerName: row.canonical_name, seedUrl };
+  }
+
+  private storedKnownSellerTarget(run: OperatorRunRow): OfficialSellerTarget | null {
+    if (run.mode !== "known_websites") return null;
+    const filters = parseObject(run.filters_json);
+    const sellerId = stringValue(filters.targetSellerId);
+    const sellerName = stringValue(filters.targetSellerName);
+    const seedUrl = parseStringArray(run.seed_urls_json)[0] ?? "";
+    if (!UUID_V7_PATTERN.test(sellerId) || !sellerName || !seedUrl) return null;
+    return { sellerId, sellerName, seedUrl };
+  }
+
+  private async crawlerOutcome(id: string): Promise<CrawlerOutcome | null> {
+    return this.db
+      .prepare(
+        `SELECT status, contacts_verified, blocked_count, error_count
+         FROM crawl_runs WHERE id = ? LIMIT 1`
+      )
+      .bind(id)
+      .first<CrawlerOutcome>();
   }
 
   private async sellersByIds(ids: string[]): Promise<SellerListItem[]> {
@@ -767,6 +957,18 @@ function validateCreateRequest(raw: unknown): CreateCrawlRunRequest {
   } else {
     request.seedUrls = stringArray(value.seedUrls, 20, 2048).map(validatePublicHttpsUrl);
     if (request.seedUrls.length === 0) throw invalid("At least one approved HTTPS website URL is required.");
+    const targetSellerId = optionalText(value.targetSellerId, 36);
+    if (targetSellerId) {
+      if (!UUID_V7_PATTERN.test(targetSellerId)) throw invalid("targetSellerId must be UUIDv7-compatible.");
+      if (request.seedUrls.length !== 1) throw invalid("A linked seller crawl requires exactly one website URL.");
+      request.targetSellerId = targetSellerId;
+    }
+  }
+  const plannedOfficialPages =
+    request.maxOfficialPages *
+    (request.mode === "known_websites" ? request.seedUrls?.length ?? 1 : request.targetSellerCount);
+  if (plannedOfficialPages > MAX_OFFICIAL_PAGES_PER_RUN) {
+    throw invalid(`Official website page budget must not exceed ${MAX_OFFICIAL_PAGES_PER_RUN} pages per run.`);
   }
   return request;
 }
@@ -796,7 +998,7 @@ function validatePublicHttpsUrl(raw: string): string {
   let url: URL;
   try { url = new URL(raw); } catch { throw invalid("Each website must be a valid URL."); }
   if (url.protocol !== "https:" || url.username || url.password || url.port || url.search || url.hash) throw invalid("Website URLs must be credential-free HTTPS origins or paths without port, query, or fragment.");
-  const host = url.hostname.toLowerCase().replace(/\.$/, "");
+  const host = normalizeDomain(url.hostname);
   if (isPrivateHost(host)) throw invalid("Website URLs may not target local, private, or reserved hosts.");
   url.hostname = host;
   return url.toString();
@@ -891,6 +1093,9 @@ function requiredSecret(value: string | undefined, name: string): string {
   return value;
 }
 function safeError(error: unknown): string { return error instanceof Error ? error.message.slice(0, 300) : "Unknown external error."; }
+function normalizeDomain(value: string): string {
+  return value.trim().toLowerCase().replace(/\.$/, "").replace(/^www\./, "");
+}
 function stableJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
   if (value && typeof value === "object") {

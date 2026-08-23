@@ -94,13 +94,12 @@ def build_official_site_crawl_plan(
     source_domain = _domain_for_url(canonical_seed)
     origin = _origin_for_url(canonical_seed)
     candidates: list[tuple[str, bool]] = [(canonical_seed, False)]
-    candidates.extend((f"{origin}{path}", False) for path in ALLOWED_STATIC_PATHS if path != "/")
-
     if html:
         document = parse_contact_document(html)
         candidates.extend((link, True) for link in document.links)
     if sitemap_text:
         candidates.extend((url, True) for url in _urls_from_sitemap(sitemap_text))
+    candidates.extend((f"{origin}{path}", False) for path in ALLOWED_STATIC_PATHS if path != "/")
 
     urls: list[str] = []
     seen: set[str] = set()

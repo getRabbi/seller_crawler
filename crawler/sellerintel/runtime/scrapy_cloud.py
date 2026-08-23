@@ -190,11 +190,18 @@ class ScrapyCloudRunner:
         arguments = dict(job.arguments)
         if RESERVED_JOB_ARGUMENTS.intersection(arguments):
             raise ValueError("Job arguments may not override provider safety fields.")
+        close_page_count = job.page_budget
+        if job.spider_name == OFFICIAL_SITE_SPIDER:
+            seed_count = max(
+                1,
+                len([value for value in arguments.get("seed_urls", "").split(",") if value]),
+            )
+            close_page_count = job.page_budget * seed_count + 2 * seed_count
         job_settings: dict[str, object] = {
             "ALLOW_EXTRA_SCRAPY_UNITS": False,
             "ALLOW_PAID_ADDONS": False,
             "ALLOW_PAID_GITHUB_ACTIONS_MINUTES": False,
-            "CLOSESPIDER_PAGECOUNT": job.page_budget,
+            "CLOSESPIDER_PAGECOUNT": close_page_count,
             "CONCURRENT_REQUESTS": 4,
             "CONCURRENT_REQUESTS_PER_DOMAIN": 1,
             "CREDIT_RUNNER_ENABLED": False,
@@ -509,6 +516,14 @@ def _parser() -> argparse.ArgumentParser:
     official.add_argument("--page-budget", type=int, default=8)
     official.add_argument("--max-depth", type=int, default=2)
     official.add_argument("--default-region", default="")
+    official.add_argument("--seller-id", default="")
+    official.add_argument("--seller-name", default="")
+    official.add_argument(
+        "--contact-type",
+        action="append",
+        choices=("email", "phone", "whatsapp", "wechat"),
+        default=[],
+    )
 
     amazon = actions.add_parser(
         "start-amazon",
@@ -567,14 +582,38 @@ def main(
         return 0
     if args.action == "start-official":
         crawl_run_id = args.crawl_run_id or new_uuidv7()
+        if bool(args.seller_id) != bool(args.seller_name):
+            raise ValueError("--seller-id and --seller-name must be supplied together.")
+        if args.seller_id and len(args.seed_url) != 1:
+            raise ValueError("A linked seller crawl must contain exactly one seed URL.")
         arguments = [
             ("seed_urls", ",".join(args.seed_url)),
             ("crawl_run_id", crawl_run_id),
             ("page_budget", str(args.page_budget)),
             ("max_depth", str(args.max_depth)),
+            (
+                "contact_types",
+                ",".join(args.contact_type or ("email", "phone", "whatsapp", "wechat")),
+            ),
         ]
         if args.default_region:
             arguments.append(("default_region", args.default_region))
+        if args.seller_id:
+            arguments.append(
+                (
+                    "seller_targets",
+                    json.dumps(
+                        [
+                            {
+                                "seller_id": args.seller_id,
+                                "seller_name": args.seller_name,
+                                "seed_url": args.seed_url[0],
+                            }
+                        ],
+                        separators=(",", ":"),
+                    ),
+                )
+            )
         handle = cloud_runner.start(
             CrawlJob(
                 job_id=crawl_run_id,

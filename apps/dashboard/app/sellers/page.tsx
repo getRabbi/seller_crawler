@@ -89,15 +89,18 @@ export default function SellersPage() {
                     <Link href={`/sellers/detail?id=${seller.id}`}>{seller.canonicalName}</Link>
                     <small>{seller.officialDomain ?? "No official domain"}</small>
                     {!seller.officialDomain ? (
-                      <small>
-                        <a
-                          href={googleOfficialWebsiteSearchUrl(seller)}
-                          rel="noreferrer"
-                          target="_blank"
-                        >
-                          Verify via Google
-                        </a>
-                      </small>
+                      <>
+                        <small>
+                          <a
+                            href={googleOfficialWebsiteSearchUrl(seller)}
+                            rel="noreferrer"
+                            target="_blank"
+                          >
+                            Verify via Google
+                          </a>
+                        </small>
+                        <small><Link href={verifiedWebsiteCrawlUrl(seller)}>Crawl verified website</Link></small>
+                      </>
                     ) : null}
                   </td>
                   <td>{[seller.city, seller.countryCode].filter(Boolean).join(", ") || "--"}</td>
@@ -135,4 +138,13 @@ function googleOfficialWebsiteSearchUrl(seller: SellerListItem): string {
     "official website"
   ].filter(Boolean).join(" ");
   return `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+}
+
+function verifiedWebsiteCrawlUrl(seller: SellerListItem): string {
+  const params = new URLSearchParams({
+    mode: "known_websites",
+    sellerId: seller.id,
+    sellerName: seller.canonicalName
+  });
+  return `/crawls/new?${params.toString()}`;
 }

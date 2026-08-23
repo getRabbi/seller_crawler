@@ -147,3 +147,39 @@ def test_explicit_cloud_observation_timestamp_is_preserved() -> None:
     spider._validate_runtime(Settings({"SELLERINTEL_OBSERVED_AT": "2026-08-17T09:45:00Z"}))
 
     assert spider._observed_at == "2026-08-17T09:45:00Z"
+
+
+def test_spider_validates_linked_seller_target_and_selected_contact_types() -> None:
+    seller_id = "018f2d5e-7b3c-7a1d-8f2e-523456789abc"
+    spider = OfficialWebsiteSpider(
+        seed_urls="https://approved.example/contact",
+        crawl_run_id="018f2d5e-7b3c-7a1d-8f2e-623456789abc",
+        seller_targets=json.dumps(
+            [{
+                "seller_id": seller_id,
+                "seller_name": "Approved Seller",
+                "seed_url": "https://approved.example/contact",
+            }]
+        ),
+        contact_types="email,whatsapp",
+        fixture_dir=str(FIXTURE_SITE),
+    )
+
+    assert spider._seller_targets["approved.example"].seller_id == seller_id
+    assert spider.contact_types == {"email", "whatsapp"}
+
+
+def test_spider_rejects_target_mapping_that_does_not_match_seed() -> None:
+    with pytest.raises(ValueError, match="exactly match"):
+        OfficialWebsiteSpider(
+            seed_urls="https://approved.example/contact",
+            crawl_run_id="018f2d5e-7b3c-7a1d-8f2e-623456789abc",
+            seller_targets=json.dumps(
+                [{
+                    "seller_id": "018f2d5e-7b3c-7a1d-8f2e-523456789abc",
+                    "seller_name": "Approved Seller",
+                    "seed_url": "https://other.example/contact",
+                }]
+            ),
+            fixture_dir=str(FIXTURE_SITE),
+        )

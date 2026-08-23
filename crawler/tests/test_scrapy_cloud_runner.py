@@ -322,6 +322,14 @@ def test_cli_official_job_passes_only_explicit_bounded_spider_arguments(
             "3",
             "--max-depth",
             "1",
+            "--seller-id",
+            "018f2d5e-7b3c-7a1d-8f2e-623456789abc",
+            "--seller-name",
+            "Approved Seller",
+            "--contact-type",
+            "email",
+            "--contact-type",
+            "whatsapp",
         ],
         runner=runner,
     ) == 0
@@ -332,12 +340,21 @@ def test_cli_official_job_passes_only_explicit_bounded_spider_arguments(
     assert form["seed_urls"] == "https://approved.example/"
     assert form["page_budget"] == "3"
     assert form["max_depth"] == "1"
+    assert form["contact_types"] == "email,whatsapp"
+    assert json.loads(form["seller_targets"]) == [
+        {
+            "seller_id": "018f2d5e-7b3c-7a1d-8f2e-623456789abc",
+            "seller_name": "Approved Seller",
+            "seed_url": "https://approved.example/",
+        }
+    ]
     settings = json.loads(form["job_settings"])
     assert settings["RUNNER_MODE"] == "zyte_student_active"
     assert settings["LIVE_CRAWL_ENABLED"] is True
     assert settings["SCRAPY_CLOUD_MAX_UNITS"] == 1
     assert settings["ZYTE_API_ENABLED"] is False
     assert settings["PAID_SERVICES_ALLOWED"] is False
+    assert settings["CLOSESPIDER_PAGECOUNT"] == 5
     assert settings["SOURCE_COOLDOWN_CHECK_URL"] == READY_ENV["SOURCE_COOLDOWN_CHECK_URL"]
     assert settings["CONTACT_ENCRYPTION_KEYS"] == READY_ENV["CONTACT_ENCRYPTION_KEYS"]
     assert settings["CONTACT_ENCRYPTION_ACTIVE_KEY_VERSION"] == "fixture-v1"

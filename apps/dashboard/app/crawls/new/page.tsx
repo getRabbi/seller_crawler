@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import type {
   CreateCrawlRunRequest,
   CrawlRunActionResponse
@@ -49,6 +49,21 @@ export default function NewCrawlPage() {
   const [result, setResult] = useState<CrawlRunActionResponse | null>(null);
   const [error, setError] = useState("");
   const [showApiSignIn, setShowApiSignIn] = useState(false);
+  const [targetSellerId, setTargetSellerId] = useState("");
+  const [targetSellerName, setTargetSellerName] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("mode") === "known_websites" || params.get("sellerId")) {
+      setMode("known_websites");
+    }
+    const sellerId = params.get("sellerId") ?? "";
+    if (sellerId) {
+      setTargetSellerId(sellerId);
+      setTargetSellerName((params.get("sellerName") ?? "").slice(0, 200));
+      setTarget("1");
+    }
+  }, []);
 
   function toggleContact(value: string) {
     setContacts((current) => current.includes(value)
@@ -70,7 +85,8 @@ export default function NewCrawlPage() {
       target,
       maxResultPages,
       maxOfficialPages,
-      depth
+      depth,
+      targetSellerId
     });
     if (validationError) {
       setError(validationError);
@@ -103,7 +119,10 @@ export default function NewCrawlPage() {
               traderLikelihood: trader
             }
           }
-        : { seedUrls: lines(seedUrls) })
+        : {
+            seedUrls: lines(seedUrls),
+            targetSellerId: targetSellerId || undefined
+          })
     };
 
     try {
@@ -147,7 +166,10 @@ export default function NewCrawlPage() {
               <label className="check"><input checked={requireWebsite} onChange={(event) => setRequireWebsite(event.target.checked)} type="checkbox" /> Has official website</label>
             </div>
           ) : (
-            <label><FieldLabel text="Approved HTTPS website URLs" /><textarea onChange={(event) => setSeedUrls(event.target.value)} placeholder="https://example.com/" required rows={7} value={seedUrls} /><small>One public HTTPS URL per line, maximum twenty. Private/local targets are rejected.</small></label>
+            <div className="form-grid">
+              <label className="wide"><FieldLabel text="Approved HTTPS website URLs" /><textarea onChange={(event) => setSeedUrls(event.target.value)} placeholder="https://example.com/" required rows={7} value={seedUrls} /><small>One public HTTPS URL per line, maximum twenty. Private/local targets are rejected.</small></label>
+              <label className="wide">Existing seller ID (optional)<input onChange={(event) => setTargetSellerId(event.target.value.trim())} placeholder="UUIDv7 seller ID" value={targetSellerId} /><small>{targetSellerName ? `Contacts will be linked to ${targetSellerName}. ` : ""}Linking requires exactly one verified website URL. The API rejects missing sellers and domain conflicts.</small></label>
+            </div>
           )}
         </section>
 
@@ -156,7 +178,7 @@ export default function NewCrawlPage() {
           <div className="form-grid">
             <label><FieldLabel text="Target sellers" /><input list="target-seller-counts" max="100" min="1" onChange={(event) => setTarget(event.target.value)} required type="number" value={target} /><datalist id="target-seller-counts">{[10, 25, 50, 100].map((value) => <option key={value} value={value} />)}</datalist><small>Choose a preset or enter a bounded value from 1 to 100.</small></label>
             {mode === "find_sellers" ? <label><FieldLabel text="Amazon result pages" /><input max="3" min="1" onChange={(event) => setMaxResultPages(event.target.value)} required type="number" value={maxResultPages} /></label> : null}
-            <label><FieldLabel text="Official pages / seller" /><input max="25" min="1" onChange={(event) => setMaxOfficialPages(event.target.value)} required type="number" value={maxOfficialPages} /></label>
+            <label><FieldLabel text="Official pages / seller" /><input max="25" min="1" onChange={(event) => setMaxOfficialPages(event.target.value)} required type="number" value={maxOfficialPages} /><small>Maximum 100 official pages across the whole run.</small></label>
             <label><FieldLabel text="Crawl depth" /><input max="3" min="0" onChange={(event) => setDepth(event.target.value)} required type="number" value={depth} /></label>
           </div>
           <fieldset aria-describedby="contact-priority-help">

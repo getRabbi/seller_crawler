@@ -15,6 +15,7 @@ from sellerintel.config.sources import (
     TermsReviewStatus,
     TermsRisk,
 )
+from sellerintel.extractors.common import parse_contact_document
 from sellerintel.extractors.models import ContactCandidate
 
 
@@ -154,20 +155,36 @@ class PolicyBackedAdapter:
 BLOCKED_MARKERS = (
     "access denied",
     "are you human",
-    "captcha",
-    "challenge",
     "explicit block",
-    "forbidden",
     "unusual traffic",
     "verify you are human",
+    "complete the security check",
+    "attention required",
+)
+
+SHORT_BLOCKED_MARKERS = ("captcha", "challenge", "forbidden")
+RAW_CHALLENGE_MARKERS = (
+    "captcha",
+    "cf-chl-",
+    "challenge-platform",
+    "hcaptcha",
 )
 
 
 def is_blocked_response(response: AdapterResponse) -> bool:
     if response.status in {401, 403, 407, 429, 451}:
         return True
-    text = response.text.casefold()
-    return any(marker in text for marker in BLOCKED_MARKERS)
+    raw_text = response.text.casefold()
+    visible_text = parse_contact_document(response.text).text.casefold()
+    if any(marker in visible_text for marker in BLOCKED_MARKERS):
+        return True
+    if len(visible_text) <= 600 and any(
+        marker in visible_text for marker in SHORT_BLOCKED_MARKERS
+    ):
+        return True
+    return len(visible_text) <= 120 and any(
+        marker in raw_text for marker in RAW_CHALLENGE_MARKERS
+    )
 
 
 def retry_after_seconds(

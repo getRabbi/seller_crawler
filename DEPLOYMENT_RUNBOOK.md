@@ -290,6 +290,25 @@ signed ingestion, compact evidence, search, masked dashboard display, duplicate
 handling, crawl status, and CSV export. Stop on robots denial, CAPTCHA, explicit
 block, unexpected domain navigation, ingestion spool, or charge warning.
 
+For a seller-linked acceptance test, open the seller directory, use the
+operator-initiated search link to verify a credible public official domain, then
+choose **Crawl verified website**. The New Crawl form must contain exactly one
+HTTPS URL and the UUIDv7 seller ID. The Worker rejects unknown sellers and a
+domain that conflicts with an already stored official domain. Do not paste a
+search-result page URL; only the verified official company URL is a seed.
+
+The operator API caps each run at 100 planned official pages. The spider's page
+budget applies per domain; the Scrapy Cloud response cap adds only two bounded
+responses per domain for robots and sitemap handling. Selected contact types
+are enforced by the spider. A visible CAPTCHA, short challenge page, HTTP
+401/403/407/429/451, robots denial, or explicit block must produce a blocked
+operator status and must not trigger provider rotation.
+
+Migration `operations/0006_crawl_run_contacts.sql` must be applied before the
+new Worker is deployed. Verify `crawl_run_contacts` exists, repeated ingestion
+does not increase the run's unique contact count, and no raw contact value is
+present in the operations database.
+
 ## 8. Production Promotion
 
 Production is allowed only after staging and backup verification pass. Use the
@@ -312,3 +331,8 @@ versions, Access application audience, Scrapy Cloud deploy/job IDs, and backup
 manifest path without recording secret values. A failed final gate rolls back
 code to the prior commit while preserving databases. Stop specific jobs through
 the runner CLI and leave all provider-selection automation disabled.
+
+Rolling back application code does not require deleting
+`crawl_run_contacts`. Leave the table and rows in place; older Workers ignore
+them. If the linkage feature must be disabled, deploy a forward code change that
+removes the seller-linked form action while preserving run/contact audit rows.

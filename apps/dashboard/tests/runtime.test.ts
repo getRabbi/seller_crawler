@@ -56,6 +56,8 @@ describe("dashboard runtime configuration", () => {
     expect(source).toContain("Verify via Google");
     expect(source).toContain("https://www.google.com/search?q=");
     expect(source).toContain('rel="noreferrer"');
+    expect(source).toContain("Crawl verified website");
+    expect(source).toContain("sellerId");
   });
 
   it("ships an operational New Crawl form with bounded custom targets and both modes", () => {
@@ -71,6 +73,8 @@ describe("dashboard runtime configuration", () => {
     expect(source).toContain('required type="number"');
     expect(source).toContain("OPEN API SIGN-IN CHECK");
     expect(source).toContain("START CRAWL");
+    expect(source).toContain("Existing seller ID (optional)");
+    expect(source).toContain("Maximum 100 official pages across the whole run.");
   });
 
   it("validates mode-specific required crawl fields before submission", () => {
@@ -89,6 +93,13 @@ describe("dashboard runtime configuration", () => {
     expect(validateCrawlForm({ ...base, mode: "known_websites", keywords: "" })).toContain("HTTPS website URL");
     expect(validateCrawlForm({ ...base, keywords: "bottle", contacts: [] })).toContain("contact priority");
     expect(validateCrawlForm({ ...base, keywords: "bottle", target: "101" })).toContain("1 to 100");
+    expect(validateCrawlForm({ ...base, keywords: "bottle", target: "20", maxOfficialPages: "6" })).toContain("100 pages");
+    expect(validateCrawlForm({
+      ...base,
+      mode: "known_websites",
+      seedUrls: "https://example.com/\nhttps://example.org/",
+      targetSellerId: "018f2d5e-7b3c-7a1d-8f2e-123456789abc"
+    })).toContain("exactly one website URL");
     expect(validateCrawlForm({ ...base, keywords: "bottle" })).toBeNull();
   });
 

@@ -13,6 +13,8 @@ from sellerintel.adapters.base import retry_after_seconds
 from sellerintel.clients.cooldown import CooldownClient, CooldownDecision, CooldownHttpResponse
 from sellerintel.spiders.website_contacts import OfficialWebsiteSpider
 
+FIXTURE_SITE = Path(__file__).resolve().parent / "fixtures" / "official_site"
+
 
 @dataclass(frozen=True)
 class SyntheticResponse:
@@ -103,7 +105,7 @@ def fixture_spider() -> OfficialWebsiteSpider:
         crawler,
         seed_urls="https://approved.example/",
         crawl_run_id="018f2d5e-7b3c-7a1d-8f2e-523456789abc",
-        fixture_dir=str(Path("crawler/tests/fixtures/official_site").resolve()),
+        fixture_dir=str(FIXTURE_SITE),
     )
 
 

@@ -11,6 +11,8 @@ class OperatorD1 implements D1Database {
   readonly idempotency: Row[] = [];
   readonly events: Row[] = [];
   readonly runSellers: Row[] = [];
+  readonly runContacts: Row[] = [];
+  readonly crawlerRuns: Row[] = [];
 
   prepare(query: string): D1PreparedStatement {
     return new OperatorStatement(this, query);
@@ -82,6 +84,11 @@ class OperatorStatement implements D1PreparedStatement {
       if (!this.state.runSellers.some((item) => item.crawl_run_id === crawlRunId && item.seller_id === sellerId && item.stage === stage)) {
         this.state.runSellers.push({ crawl_run_id: crawlRunId, seller_id: sellerId, stage, first_seen_at: firstSeenAt });
       }
+    } else if (query.startsWith("INSERT INTO crawl_run_contacts")) {
+      const [crawlRunId, contactId, sellerId, firstSeenAt] = this.values;
+      if (!this.state.runContacts.some((item) => item.crawl_run_id === crawlRunId && item.contact_id === contactId)) {
+        this.state.runContacts.push({ crawl_run_id: crawlRunId, contact_id: contactId, seller_id: sellerId, first_seen_at: firstSeenAt });
+      }
     } else if (query.startsWith("UPDATE operator_crawl_runs SET status = 'starting'")) {
       const run = this.state.runs.find((item) => item.id === this.values[3] && item.status === "queued");
       if (run && !this.state.runs.some((item) => item.active_unit_slot === 1)) {
@@ -92,7 +99,7 @@ class OperatorStatement implements D1PreparedStatement {
     } else if (query.startsWith("UPDATE operator_crawl_runs SET discovered_sellers = ?")) {
       Object.assign(this.requireRun(this.values[4]), {
         discovered_sellers: this.values[0], enriched_sellers: this.values[1],
-        contacts_found: Number(this.requireRun(this.values[4]).contacts_found) + Number(this.values[2]),
+        contacts_found: Number(this.values[2]),
         updated_at: this.values[3]
       });
     } else if (query.startsWith("UPDATE operator_crawl_runs SET stage = 'enriching'")) {
@@ -126,6 +133,9 @@ class OperatorStatement implements D1PreparedStatement {
     if (query.includes("FROM operator_crawl_runs WHERE id = ?")) {
       return this.state.runs.filter((item) => item.id === this.values[0]).slice(0, 1);
     }
+    if (query.includes("FROM crawl_runs WHERE id = ?")) {
+      return this.state.crawlerRuns.filter((item) => item.id === this.values[0]).slice(0, 1);
+    }
     if (query.includes("SELECT o.*") && query.includes("FROM operator_crawl_runs o")) {
       return this.state.runs.map((run) => ({ ...run, total_count: this.state.runs.length }));
     }
@@ -140,6 +150,9 @@ class OperatorStatement implements D1PreparedStatement {
       return this.state.runSellers
         .filter((item) => item.crawl_run_id === this.values[0])
         .map((item) => ({ seller_id: item.seller_id }));
+    }
+    if (query.includes("SELECT COUNT(*) AS contacts_found FROM crawl_run_contacts")) {
+      return [{ contacts_found: this.state.runContacts.filter((item) => item.crawl_run_id === this.values[0]).length }];
     }
     if (query.includes("SELECT id FROM operator_crawl_runs WHERE active_unit_slot = 1")) {
       return this.state.runs.filter((item) => item.active_unit_slot === 1).map((item) => ({ id: item.id })).slice(0, 1);
@@ -288,7 +301,7 @@ describe("operator crawl control", () => {
       created.run.id,
       ["018f2d5e-7b3c-7a1d-8f2e-123456789abc"],
       ["amazon_seller"],
-      0
+      []
     );
 
     await service.pump();
@@ -297,7 +310,129 @@ describe("operator crawl control", () => {
     expect(launches[0].get("spider")).toBe("amazon_discovery");
     expect(launches[1].get("spider")).toBe("official_website");
     expect(launches[1].get("seed_urls")).toBe("https://official.example/");
+    expect(JSON.parse(String(launches[1].get("seller_targets")))).toEqual([{
+      seller_id: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
+      seller_name: "Official Example",
+      seed_url: "https://official.example/"
+    }]);
     expect(db.runs[0].active_unit_slot).toBe(1);
+  });
+
+  it("links a verified website crawl to an existing seller and preserves one bounded page budget", async () => {
+    const db = new OperatorD1();
+    const launches: URLSearchParams[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      const body = new URLSearchParams(String(init?.body ?? ""));
+      launches.push(body);
+      return Response.json({ status: "ok", jobid: "871778/1/601" });
+    }));
+    const service = new OperatorCrawlService(operatorEnv(db, new LinkedSellerD1()));
+
+    await service.create({
+      mode: "known_websites",
+      seedUrls: ["https://www.official.example/contact"],
+      targetSellerId: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
+      contactTypes: ["email", "phone"],
+      targetSellerCount: 1,
+      maxResultPages: 1,
+      maxOfficialPages: 4,
+      crawlDepth: 1,
+      stopAfterTarget: true,
+      idempotencyKey: "linked-known-site"
+    }, "operator@example.test");
+
+    expect(launches).toHaveLength(1);
+    expect(launches[0].get("seed_urls")).toBe("https://official.example/contact");
+    expect(launches[0].get("page_budget")).toBe("4");
+    expect(launches[0].get("contact_types")).toBe("email,phone");
+    expect(JSON.parse(String(launches[0].get("seller_targets")))[0].seller_id).toBe(
+      "018f2d5e-7b3c-7a1d-8f2e-123456789abc"
+    );
+    const settings = JSON.parse(String(launches[0].get("job_settings"))) as Record<string, unknown>;
+    expect(settings.CLOSESPIDER_PAGECOUNT).toBe(6);
+  });
+
+  it("rejects linked-seller domain conflicts and oversized official page plans", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const base = {
+      mode: "known_websites",
+      seedUrls: ["https://new-domain.example/contact"],
+      targetSellerId: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
+      contactTypes: ["email"],
+      targetSellerCount: 1,
+      maxResultPages: 1,
+      maxOfficialPages: 4,
+      crawlDepth: 1,
+      stopAfterTarget: true,
+      idempotencyKey: "domain-conflict"
+    };
+
+    await expect(
+      new OperatorCrawlService(operatorEnv(new OperatorD1(), new ConflictingSellerD1()))
+        .create(base, "operator@example.test")
+    ).rejects.toMatchObject({ status: 409, code: "official_domain_conflict" });
+
+    await expect(
+      new OperatorCrawlService(operatorEnv(new OperatorD1())).create({
+        ...findRequest("oversized-plan"),
+        targetSellerCount: 20,
+        maxOfficialPages: 6
+      }, "operator@example.test")
+    ).rejects.toMatchObject({ status: 400, code: "invalid_crawl_request" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("counts crawl contacts idempotently across repeated ingestion bookkeeping", async () => {
+    const db = new OperatorD1();
+    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ status: "ok", jobid: "871778/1/701" })));
+    const service = new OperatorCrawlService(operatorEnv(db));
+    const created = await service.create(findRequest("contact-idempotency"), "operator@example.test");
+    const contact = {
+      id: "018f2d5e-7b3c-7a1d-8f2e-123456789abd",
+      sellerId: "018f2d5e-7b3c-7a1d-8f2e-123456789abc"
+    };
+
+    await service.recordIngestion(created.run.id, [contact.sellerId], ["official_site"], [contact]);
+    await service.recordIngestion(created.run.id, [contact.sellerId], ["official_site"], [contact]);
+
+    expect(db.runContacts).toHaveLength(1);
+    expect(db.runs[0].contacts_found).toBe(1);
+  });
+
+  it("surfaces a crawler policy stop as blocked instead of completed", async () => {
+    const db = new OperatorD1();
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
+      if (String(input).includes("jobs/list.json")) {
+        return Response.json({ jobs: [{ state: "finished", close_reason: "finished" }] });
+      }
+      return Response.json({ status: "ok", jobid: "871778/1/801" });
+    }));
+    const service = new OperatorCrawlService(operatorEnv(db));
+    const created = await service.create({
+      mode: "known_websites",
+      seedUrls: ["https://official.example/"],
+      contactTypes: ["email"],
+      targetSellerCount: 1,
+      maxResultPages: 1,
+      maxOfficialPages: 4,
+      crawlDepth: 1,
+      stopAfterTarget: true,
+      idempotencyKey: "blocked-known-site"
+    }, "operator@example.test");
+    db.crawlerRuns.push({
+      id: created.run.id,
+      status: "paused_by_policy",
+      contacts_verified: 0,
+      blocked_count: 1,
+      error_count: 0
+    });
+
+    await service.pump();
+
+    expect(db.runs[0].status).toBe("blocked");
+    expect(db.runs[0].active_unit_slot).toBeNull();
+    expect(db.runs[0].error_code).toBe("source_blocked");
   });
 });
 
@@ -306,7 +441,48 @@ class OfficialDomainD1 implements D1Database {
     return {
       bind: () => this.prepare(),
       first: async <T>() => null as T | null,
-      all: async <T>() => ({ success: true, results: [{ official_domain: "official.example" }] as T[] }),
+      all: async <T>() => ({
+        success: true,
+        results: [{
+          id: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
+          canonical_name: "Official Example",
+          official_domain: "official.example",
+          identity_confidence: 90,
+          last_seen_at: "2026-08-01T00:00:00Z"
+        }] as T[]
+      }),
+      run: async () => ({ success: true })
+    };
+  }
+}
+
+class LinkedSellerD1 implements D1Database {
+  prepare(): D1PreparedStatement {
+    return {
+      bind: () => this.prepare(),
+      first: async <T>() => ({
+        id: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
+        canonical_name: "Official Example",
+        official_domain: null,
+        status: "active"
+      }) as T,
+      all: async <T>() => ({ success: true, results: [] as T[] }),
+      run: async () => ({ success: true })
+    };
+  }
+}
+
+class ConflictingSellerD1 implements D1Database {
+  prepare(): D1PreparedStatement {
+    return {
+      bind: () => this.prepare(),
+      first: async <T>() => ({
+        id: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
+        canonical_name: "Official Example",
+        official_domain: "existing.example",
+        status: "active"
+      }) as T,
+      all: async <T>() => ({ success: true, results: [] as T[] }),
       run: async () => ({ success: true })
     };
   }

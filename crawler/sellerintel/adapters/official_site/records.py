@@ -38,13 +38,13 @@ def seller_record_for_domain(
     *,
     company_name: str,
     observed_at: str,
+    seller_id: str | None = None,
 ) -> SellerRecord:
     normalized = normalize_company_name(company_name)
     canonical_name = normalized.nfkc or domain
     normalized_name = normalized.normalized or domain.replace(".", " ")
-    seller_id = deterministic_uuidv7("seller-domain", domain)
     return SellerRecord(
-        id=seller_id,
+        id=seller_id or deterministic_uuidv7("seller-domain", domain),
         canonical_name=canonical_name,
         normalized_name=normalized_name,
         official_domain=domain,
@@ -96,9 +96,15 @@ def contact_records_for_page(
     seller_id: str,
     source_id: str,
     contact_cipher: ContactCipher,
+    allowed_contact_types: set[str] | None = None,
 ) -> list[ContactRecord]:
     records: list[ContactRecord] = []
     for candidate in enrichment.contacts:
+        if (
+            allowed_contact_types is not None
+            and candidate.contact_type not in allowed_contact_types
+        ):
+            continue
         normalized_hash = deterministic_hash(
             candidate.normalized_value,
             namespace=f"contact:{candidate.contact_type}",
