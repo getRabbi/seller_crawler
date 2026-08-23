@@ -68,9 +68,11 @@ def backup_databases(
     exported_at = timestamp or datetime.now(UTC)
     backup_dir = output / f"{environment}-{exported_at.strftime('%Y%m%dT%H%M%SZ')}"
     backup_dir.mkdir(parents=True, exist_ok=False)
+    target_databases = database_names(env)
+    validate_environment_database_names(environment, target_databases)
     entries: list[BackupEntry] = []
 
-    for binding, database_name in database_names(env).items():
+    for binding, database_name in target_databases.items():
         file_path = backup_dir / f"{binding.removesuffix('_D1_DATABASE_NAME').lower()}.sql"
         table_arguments = (
             [argument for table in CORE_EXPORT_TABLES for argument in ("--table", table)]
@@ -138,6 +140,7 @@ def restore_databases(
         raise ValueError("Backup environment does not match the requested restore environment.")
 
     current_names = database_names(env)
+    validate_environment_database_names(environment, current_names)
     command_runner = runner or run_command
     for entry in manifest.databases:
         expected_name = current_names.get(entry.binding)
@@ -171,6 +174,22 @@ def database_names(env: Mapping[str, str]) -> dict[str, str]:
             raise ValueError(f"{key} contains an invalid database name.")
         names[key] = value
     return names
+
+
+def validate_environment_database_names(
+    environment: str, database_mapping: Mapping[str, str]
+) -> None:
+    environment_token = re.compile(rf"(?:^|[-_]){re.escape(environment)}(?:$|[-_])")
+    mismatches = sorted(
+        binding
+        for binding, database_name in database_mapping.items()
+        if environment_token.search(database_name.lower()) is None
+    )
+    if mismatches:
+        joined = ", ".join(mismatches)
+        raise ValueError(
+            f"Database names do not match the {environment} environment: {joined}."
+        )
 
 
 def load_manifest(path: Path) -> BackupManifest:

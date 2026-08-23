@@ -2,6 +2,8 @@
 
 ## Unreleased - Solo Mode v1 Implementation
 
+- Hardened four-D1 backup and restore so an environment label cannot target
+  database names from a different environment.
 - Updated the locked development `pip` dependency to `26.2.1`, clearing
   `PYSEC-2026-3721` while leaving the production crawler dependency set
   unchanged.

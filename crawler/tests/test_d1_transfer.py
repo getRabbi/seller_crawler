@@ -139,3 +139,41 @@ def test_restore_stops_on_checksum_mismatch(tmp_path: Path) -> None:
             confirm_production=False,
             runner=FakeWrangler(),
         )
+
+
+def test_backup_stops_when_database_names_do_not_match_environment(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="do not match the production environment"):
+        backup_databases(
+            environment="production",
+            workspace_root=tmp_path,
+            output_root=tmp_path / "backups",
+            env=DATABASE_ENV,
+            runner=FakeWrangler(),
+            timestamp=datetime(2026, 8, 4, tzinfo=UTC),
+        )
+
+
+def test_restore_stops_when_database_names_do_not_match_environment(tmp_path: Path) -> None:
+    manifest_path = backup_databases(
+        environment="staging",
+        workspace_root=tmp_path,
+        output_root=tmp_path / "backups",
+        env=DATABASE_ENV,
+        runner=FakeWrangler(),
+        timestamp=datetime(2026, 8, 4, tzinfo=UTC),
+    )
+
+    production_env = {
+        key: value.replace("staging", "production")
+        for key, value in DATABASE_ENV.items()
+    }
+    with pytest.raises(ValueError, match="do not match the staging environment"):
+        restore_databases(
+            manifest_path=manifest_path,
+            workspace_root=tmp_path,
+            environment="staging",
+            env=production_env,
+            confirm_restore=True,
+            confirm_production=False,
+            runner=FakeWrangler(),
+        )
