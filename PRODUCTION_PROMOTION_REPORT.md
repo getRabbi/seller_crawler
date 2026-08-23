@@ -34,12 +34,16 @@ Checksummed backups were created before migration:
 - staging: `.sellerintel/backups/staging-20260823T165550Z/manifest.json`
 - production: `.sellerintel/backups/production-20260823T170715Z/manifest.json`
 
-The production Access login requires an interactive operator email session.
-Neither the in-app browser connection nor the local Access CLI had an active
-session during this promotion, so no credential, cookie, OTP, or CAPTCHA
-workaround was attempted. The exact-email policies, application audience,
-redirect boundary, machine-path isolation, CORS preflight, local desktop/mobile
-UI, and previously working operator flow were verified independently.
+The production Access login required an interactive operator email session.
+The operator completed that login without sharing an OTP, cookie, or password.
+An authenticated Worker health request then returned `status=ok` with zero
+startup violations; authenticated dashboard data requests returned six sellers,
+zero current production contacts, and one crawl run. The private crawl-run CSV
+download returned one data row with all 23 expected columns. The in-app browser
+connection remained unavailable, so no visual session or credential workaround
+was attempted; the deployed UI had already passed local desktop/mobile checks.
+The exact-email policies, application audience, redirect boundary, machine-path
+isolation, and CORS preflight were also verified independently.
 
 Rollback keeps migration `0006` and its audit links in place. Redeploy Worker
 version `d86c6c69-8deb-47ca-872e-7466f85f0201`, Pages deployment
