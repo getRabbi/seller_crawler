@@ -8,7 +8,8 @@ import type {
 
 import { DashboardShell } from "../../../components/dashboard-shell";
 import { StateBlock } from "../../../components/status";
-import { postWorkerApi } from "../../../lib/api";
+import { postWorkerApi, WorkerApiError, workerApiUrl } from "../../../lib/api";
+import { lines, validateCrawlForm } from "../../../lib/crawl-form";
 
 const marketplaces = [
   ["amazon.com", "Amazon.com"], ["amazon.co.uk", "Amazon.co.uk"],
@@ -23,6 +24,8 @@ const countries = [
   ["GB", "United Kingdom"], ["CA", "Canada"], ["AU", "Australia"],
   ["DE", "Germany"], ["FR", "France"], ["IT", "Italy"], ["ES", "Spain"]
 ] as const;
+
+const contactTypes = ["email", "phone", "whatsapp", "wechat"] as const;
 
 export default function NewCrawlPage() {
   const [mode, setMode] = useState<"find_sellers" | "known_websites">("find_sellers");
@@ -41,20 +44,40 @@ export default function NewCrawlPage() {
   const [requireWebsite, setRequireWebsite] = useState(false);
   const [manufacturer, setManufacturer] = useState<"any" | "likely">("any");
   const [trader, setTrader] = useState<"any" | "likely">("any");
-  const [contacts, setContacts] = useState(["email", "phone", "whatsapp", "wechat"]);
+  const [contacts, setContacts] = useState<string[]>([...contactTypes]);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<CrawlRunActionResponse | null>(null);
   const [error, setError] = useState("");
+  const [showApiSignIn, setShowApiSignIn] = useState(false);
 
   function toggleContact(value: string) {
-    setContacts((current) => current.includes(value) ? current.filter((item) => item !== value) : [...current, value]);
+    setContacts((current) => current.includes(value)
+      ? current.filter((item) => item !== value)
+      : [...current, value]);
   }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    setSubmitting(true);
     setError("");
     setResult(null);
+    setShowApiSignIn(false);
+
+    const validationError = validateCrawlForm({
+      mode,
+      keywords,
+      seedUrls,
+      contacts,
+      target,
+      maxResultPages,
+      maxOfficialPages,
+      depth
+    });
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    setSubmitting(true);
     const idempotencyKey = `dashboard-${crypto.randomUUID()}`;
     const payload: CreateCrawlRunRequest = {
       mode,
@@ -67,7 +90,8 @@ export default function NewCrawlPage() {
       idempotencyKey,
       ...(mode === "find_sellers"
         ? {
-            keywords: lines(keywords), marketplace,
+            keywords: lines(keywords),
+            marketplace,
             countryCodes: country ? [country] : [],
             filters: {
               category: category || undefined,
@@ -81,10 +105,15 @@ export default function NewCrawlPage() {
           }
         : { seedUrls: lines(seedUrls) })
     };
+
     try {
       setResult(await postWorkerApi<CrawlRunActionResponse>("/v1/crawl-runs", payload));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The crawl could not be created.");
+      setShowApiSignIn(
+        caught instanceof WorkerApiError &&
+        (caught.locked || ["worker_unreachable", "worker_login_required"].includes(caught.code))
+      );
     } finally {
       setSubmitting(false);
     }
@@ -93,6 +122,10 @@ export default function NewCrawlPage() {
   return (
     <DashboardShell active="new-crawl" eyebrow="Operator Control" title="New Crawl">
       <form className="crawl-form" onSubmit={submit}>
+        <p className="required-note">
+          <span aria-hidden="true">*</span> Required fields must be completed before a crawl can start.
+        </p>
+
         <div className="mode-switch" role="group" aria-label="Crawl mode">
           <button className={mode === "find_sellers" ? "selected" : ""} onClick={() => setMode("find_sellers")} type="button">Find Sellers</button>
           <button className={mode === "known_websites" ? "selected" : ""} onClick={() => setMode("known_websites")} type="button">Crawl Known Websites</button>
@@ -102,8 +135,8 @@ export default function NewCrawlPage() {
           <h2>{mode === "find_sellers" ? "Amazon identity discovery" : "Official website enrichment"}</h2>
           {mode === "find_sellers" ? (
             <div className="form-grid">
-              <label className="wide">Keywords / product queries<textarea maxLength={600} onChange={(event) => setKeywords(event.target.value)} rows={4} value={keywords} /><small>One query per line, maximum five.</small></label>
-              <label>Marketplace<select onChange={(event) => setMarketplace(event.target.value)} value={marketplace}>{marketplaces.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
+              <label className="wide"><FieldLabel text="Keywords / product queries" /><textarea maxLength={600} onChange={(event) => setKeywords(event.target.value)} required rows={4} value={keywords} /><small>One query per line, maximum five.</small></label>
+              <label><FieldLabel text="Marketplace" /><select onChange={(event) => setMarketplace(event.target.value)} required value={marketplace}>{marketplaces.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
               <label>Seller / business country<select onChange={(event) => setCountry(event.target.value)} value={country}>{countries.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select><small>Uses displayed business evidence, not marketplace.</small></label>
               <label>Category / industry<input onChange={(event) => setCategory(event.target.value)} value={category} /></label>
               <label>Brand keyword<input onChange={(event) => setBrand(event.target.value)} value={brand} /></label>
@@ -114,29 +147,40 @@ export default function NewCrawlPage() {
               <label className="check"><input checked={requireWebsite} onChange={(event) => setRequireWebsite(event.target.checked)} type="checkbox" /> Has official website</label>
             </div>
           ) : (
-            <label>Approved HTTPS website URLs<textarea onChange={(event) => setSeedUrls(event.target.value)} placeholder="https://example.com/" rows={7} value={seedUrls} /><small>One public HTTPS URL per line, maximum twenty. Private/local targets are rejected.</small></label>
+            <label><FieldLabel text="Approved HTTPS website URLs" /><textarea onChange={(event) => setSeedUrls(event.target.value)} placeholder="https://example.com/" required rows={7} value={seedUrls} /><small>One public HTTPS URL per line, maximum twenty. Private/local targets are rejected.</small></label>
           )}
         </section>
 
         <section className="form-card">
           <h2>Targets and enrichment</h2>
           <div className="form-grid">
-            <label>Target sellers<input list="target-seller-counts" max="100" min="1" onChange={(event) => setTarget(event.target.value)} type="number" value={target} /><datalist id="target-seller-counts">{[10, 25, 50, 100].map((value) => <option key={value} value={value} />)}</datalist><small>Choose a preset or enter a bounded value from 1 to 100.</small></label>
-            <label>Amazon result pages<input max="3" min="1" onChange={(event) => setMaxResultPages(event.target.value)} type="number" value={maxResultPages} /></label>
-            <label>Official pages / seller<input max="25" min="1" onChange={(event) => setMaxOfficialPages(event.target.value)} type="number" value={maxOfficialPages} /></label>
-            <label>Crawl depth<input max="3" min="0" onChange={(event) => setDepth(event.target.value)} type="number" value={depth} /></label>
+            <label><FieldLabel text="Target sellers" /><input list="target-seller-counts" max="100" min="1" onChange={(event) => setTarget(event.target.value)} required type="number" value={target} /><datalist id="target-seller-counts">{[10, 25, 50, 100].map((value) => <option key={value} value={value} />)}</datalist><small>Choose a preset or enter a bounded value from 1 to 100.</small></label>
+            {mode === "find_sellers" ? <label><FieldLabel text="Amazon result pages" /><input max="3" min="1" onChange={(event) => setMaxResultPages(event.target.value)} required type="number" value={maxResultPages} /></label> : null}
+            <label><FieldLabel text="Official pages / seller" /><input max="25" min="1" onChange={(event) => setMaxOfficialPages(event.target.value)} required type="number" value={maxOfficialPages} /></label>
+            <label><FieldLabel text="Crawl depth" /><input max="3" min="0" onChange={(event) => setDepth(event.target.value)} required type="number" value={depth} /></label>
           </div>
-          <fieldset><legend>Contact priorities</legend><div className="checkbox-row">{["email", "phone", "whatsapp", "wechat"].map((value) => <label className="check" key={value}><input checked={contacts.includes(value)} onChange={() => toggleContact(value)} type="checkbox" /> {value}</label>)}</div></fieldset>
+          <fieldset aria-describedby="contact-priority-help">
+            <legend>Contact priorities <span className="required-badge">Required</span></legend>
+            <div className="checkbox-row">{contactTypes.map((value) => <label className="check" key={value}><input checked={contacts.includes(value)} onChange={() => toggleContact(value)} type="checkbox" /> {value}</label>)}</div>
+            <small id="contact-priority-help">Select at least one contact type.</small>
+          </fieldset>
         </section>
 
-        <div className="form-actions"><button className="primary-action" disabled={submitting || contacts.length === 0} type="submit">{submitting ? "STARTING…" : "START CRAWL"}</button><span>One active Student unit. Additional requests queue automatically.</span></div>
+        <div className="form-actions"><button className="primary-action" disabled={submitting} type="submit">{submitting ? "STARTING..." : "START CRAWL"}</button><span>One active Student unit. Additional requests queue automatically.</span></div>
       </form>
-      {error ? <StateBlock detail={error} title="Crawl not created" tone="danger" /> : null}
+      {error ? (
+        <StateBlock
+          action={showApiSignIn ? <a className="button-link" href={workerApiUrl("/v1/health")} rel="noreferrer" target="_blank">OPEN API SIGN-IN CHECK</a> : undefined}
+          detail={error}
+          title="Crawl not created"
+          tone="danger"
+        />
+      ) : null}
       {result ? <StateBlock detail={`Run ${result.run.id} is ${result.run.status}. ${result.queued ? "It will start when the one-unit slot is free." : "Scrapy Cloud control accepted it."}`} title="Crawl created" /> : null}
     </DashboardShell>
   );
 }
 
-function lines(value: string): string[] {
-  return value.split(/\r?\n|,/).map((item) => item.trim()).filter(Boolean);
+function FieldLabel({ text }: { text: string }) {
+  return <span className="field-label">{text} <span className="required-badge">Required</span></span>;
 }

@@ -509,6 +509,31 @@ tbody tr:last-child td {
   margin-bottom: 14px;
 }
 
+.required-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.required-note span,
+.required-badge {
+  color: #ff9b8f;
+}
+
+.field-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.required-badge {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -555,6 +580,12 @@ tbody tr:last-child td {
   border: 1px solid var(--line);
   border-radius: 7px;
   padding: 12px;
+}
+
+.form-card fieldset small {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
 }
 
 .form-card legend {

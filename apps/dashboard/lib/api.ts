@@ -38,7 +38,7 @@ export function workerApiUrl(path: string): string {
 }
 
 export async function fetchWorkerApi<T>(path: string, signal?: AbortSignal): Promise<T> {
-  const response = await fetch(workerApiUrl(path), {
+  const response = await workerFetch(workerApiUrl(path), {
     method: "GET",
     credentials: "include",
     headers: { accept: "application/json" },
@@ -49,11 +49,11 @@ export async function fetchWorkerApi<T>(path: string, signal?: AbortSignal): Pro
     const payload = await readError(response);
     throw new WorkerApiError(payload.message, response.status, payload.code);
   }
-  return (await response.json()) as T;
+  return readSuccess<T>(response);
 }
 
 export async function postWorkerApi<T>(path: string, body: unknown): Promise<T> {
-  const response = await fetch(workerApiUrl(path), {
+  const response = await workerFetch(workerApiUrl(path), {
     method: "POST",
     credentials: "include",
     headers: { accept: "application/json", "content-type": "application/json" },
@@ -64,7 +64,34 @@ export async function postWorkerApi<T>(path: string, body: unknown): Promise<T> 
     const payload = await readError(response);
     throw new WorkerApiError(payload.message, response.status, payload.code);
   }
-  return (await response.json()) as T;
+  return readSuccess<T>(response);
+}
+
+const API_SESSION_MESSAGE =
+  "Could not reach the Worker API. Your API Access session may be missing or expired. Open the API sign-in check, finish signing in, then return here and retry.";
+
+async function workerFetch(url: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") throw error;
+    throw new WorkerApiError(API_SESSION_MESSAGE, 0, "worker_unreachable");
+  }
+}
+
+async function readSuccess<T>(response: Response): Promise<T> {
+  if (!response.headers.get("content-type")?.toLowerCase().includes("application/json")) {
+    throw new WorkerApiError(API_SESSION_MESSAGE, response.status, "worker_login_required");
+  }
+  try {
+    return (await response.json()) as T;
+  } catch {
+    throw new WorkerApiError(
+      "The Worker API returned an unreadable response. Retry once; if it continues, check Crawl Health.",
+      response.status,
+      "worker_response_invalid"
+    );
+  }
 }
 
 async function readError(response: Response): Promise<{ code: string; message: string }> {

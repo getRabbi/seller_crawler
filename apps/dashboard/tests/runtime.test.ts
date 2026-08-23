@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 
-import { fetchWorkerApi, WorkerApiError, workerApiBaseUrl, workerApiUrl } from "../lib/api";
+import { fetchWorkerApi, postWorkerApi, WorkerApiError, workerApiBaseUrl, workerApiUrl } from "../lib/api";
+import { validateCrawlForm } from "../lib/crawl-form";
 import { dashboardNav, workerApiPaths } from "../lib/dashboard-data";
 import { runtimePanels } from "../lib/runtime";
 
@@ -50,7 +51,30 @@ describe("dashboard runtime configuration", () => {
     expect(source).toContain('list="target-seller-counts"');
     expect(source).toContain('max="100"');
     expect(source).toContain('min="1"');
+    expect(source).toContain('<FieldLabel text="Keywords / product queries" />');
+    expect(source).toContain('className="required-badge"');
+    expect(source).toContain('required type="number"');
+    expect(source).toContain("OPEN API SIGN-IN CHECK");
     expect(source).toContain("START CRAWL");
+  });
+
+  it("validates mode-specific required crawl fields before submission", () => {
+    const base = {
+      mode: "find_sellers" as const,
+      keywords: "",
+      seedUrls: "",
+      contacts: ["email"],
+      target: "10",
+      maxResultPages: "1",
+      maxOfficialPages: "6",
+      depth: "2"
+    };
+
+    expect(validateCrawlForm(base)).toContain("keyword or product query");
+    expect(validateCrawlForm({ ...base, mode: "known_websites", keywords: "" })).toContain("HTTPS website URL");
+    expect(validateCrawlForm({ ...base, keywords: "bottle", contacts: [] })).toContain("contact priority");
+    expect(validateCrawlForm({ ...base, keywords: "bottle", target: "101" })).toContain("1 to 100");
+    expect(validateCrawlForm({ ...base, keywords: "bottle" })).toBeNull();
   });
 
   it("uses the configured public Worker origin without exposing secrets", () => {
@@ -111,5 +135,31 @@ describe("dashboard runtime configuration", () => {
     expect(error).toBeInstanceOf(WorkerApiError);
     expect((error as WorkerApiError).locked).toBe(true);
     expect((error as WorkerApiError).code).toBe("access_required");
+  });
+
+  it("turns a browser fetch failure into an actionable API session error", async () => {
+    vi.stubEnv("NEXT_PUBLIC_WORKER_API_BASE_URL", "https://api.example.invalid");
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+
+    const error = await postWorkerApi("/v1/crawl-runs", {}).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(WorkerApiError);
+    expect((error as WorkerApiError).code).toBe("worker_unreachable");
+    expect((error as WorkerApiError).message).toContain("Open the API sign-in check");
+  });
+
+  it("treats a successful HTML Access page as a missing API login", async () => {
+    vi.stubEnv("NEXT_PUBLIC_WORKER_API_BASE_URL", "https://api.example.invalid");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+      new Response("<html>Access login</html>", {
+        status: 200,
+        headers: { "content-type": "text/html" }
+      })
+    ));
+
+    const error = await postWorkerApi("/v1/crawl-runs", {}).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(WorkerApiError);
+    expect((error as WorkerApiError).code).toBe("worker_login_required");
   });
 });
