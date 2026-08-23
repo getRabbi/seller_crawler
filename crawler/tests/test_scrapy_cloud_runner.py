@@ -246,6 +246,7 @@ def test_cli_amazon_job_enforces_one_unit_and_locked_paid_paths(tmp_path: Path) 
     assert settings["SCRAPY_CLOUD_MAX_UNITS"] == 1
     assert settings["ZYTE_API_ENABLED"] is False
     assert settings["PAID_SERVICES_ALLOWED"] is False
+    assert settings["RETRY_TIMES"] == 1
 
 
 def test_job_arguments_cannot_override_unit_limit(tmp_path: Path) -> None:

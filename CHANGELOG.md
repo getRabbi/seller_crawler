@@ -10,6 +10,9 @@
   counts toward the bounded seller target, non-HTML seller responses create no
   false seller-page evidence, and a one-seller run no longer fans out while
   waiting for profile enrichment.
+- Enforced the Amazon adapter's single safe retry in per-job Scrapy Cloud
+  settings so project-level defaults cannot expand a 503 response into extra
+  attempts.
 - Fixed operator-launched official-site crawl timestamps so every request uses
   a real ISO-8601 observation time even when a caller omits the optional
   override; the Worker now supplies a per-job timestamp and the spider retains

@@ -217,7 +217,7 @@ class ScrapyCloudRunner:
             "LOG_LEVEL": "WARNING",
             "MAX_EXTERNAL_MONTHLY_SPEND_AUD": 0,
             "PAID_SERVICES_ALLOWED": False,
-            "RETRY_TIMES": 2,
+            "RETRY_TIMES": 1 if job.spider_name == AMAZON_DISCOVERY_SPIDER else 2,
             "ROBOTSTXT_OBEY": True,
             "RUNNER_MODE": "zyte_student_active",
             "SCRAPY_CLOUD_DEPLOY_ENABLED": True,
