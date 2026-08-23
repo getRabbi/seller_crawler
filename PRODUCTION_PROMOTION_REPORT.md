@@ -1,5 +1,54 @@
 # Production Promotion Report
 
+## Contact enrichment hardening promotion — 2026-08-23
+
+Release code commit: `51feb4f99e934addc184b01bb172e589eb998874`
+
+The Amazon-to-official-website contact workflow is promoted. An operator can
+take an existing canonical seller, verify one public HTTPS website, and launch a
+bounded official-site crawl whose seller, source, and contact records remain
+linked to that existing seller ID. Contact selections are enforced by the
+crawler, crawl-run contact counts are idempotent, explicit source challenges
+stop the adapter, and a completed crawl with no supported public contacts is
+reported with a warning rather than a false success.
+
+### Promotion evidence
+
+| Gate | Verified result |
+|---|---|
+| Local/CI | 137 Python tests and 64 web tests passed; Ruff, mypy, ESLint, TypeScript, Bandit, pip-audit, npm audit, staging build, and production build passed; GitHub CI Python and CI Web passed |
+| Scrapy Cloud | Project `871778`, immutable artifact `51feb4f99e934addc184b01bb172e589eb998874`, three spiders, one-unit ceiling |
+| Staging acceptance | Job `871778/1/17`, crawl run `01a02f92-a986-79a9-a5ec-6f2932b44f83`, 9/9 successful responses, four verified contact types, zero blocks/errors, and zero active jobs afterward |
+| Contact privacy | All four staging contacts remained attached to seller `f85c6ff9-e98e-7ef3-88dd-bef50311f516`; every row had ciphertext, a masked display value, schema version 1, and parser `contact-extractor-v1` |
+| Operations migration | `0006_crawl_run_contacts.sql` applied and read back in staging and production; production reports no pending migrations |
+| Staging Worker | Version `d5d26d95-9c3a-4540-aec0-51a1faa2166f` at 100% |
+| Staging Pages | Deployment `291a0ab6-e0c8-4d2f-a282-f4d18a1d5ce6` on production branch `main` |
+| Production Worker | Version `b524684d-815b-4287-8fa9-bb91e96d1182` at 100% |
+| Production Pages | Deployment `b80a8bd0-6a54-43ef-b054-a223908c8a2f` on production branch `main` |
+| Access boundary | Health/dashboard/private export redirect unauthenticated requests; dashboard-origin preflight returns 204; unauthenticated API POST redirects; unsigned ingest/cooldown calls are rejected by the Worker |
+| Access policies | API, dashboard, Pages root, and Pages preview each have one exact-email Allow policy; only the exact ingest and cooldown machine paths have Bypass policies; API audience matches the Worker configuration |
+| Free-tier locks | Eight D1 databases, no active/queued operator run, no active Scrapy Cloud job, `SCRAPY_CLOUD_MAX_UNITS=1`, paid services and Zyte API disabled |
+
+Checksummed backups were created before migration:
+
+- staging: `.sellerintel/backups/staging-20260823T165550Z/manifest.json`
+- production: `.sellerintel/backups/production-20260823T170715Z/manifest.json`
+
+The production Access login requires an interactive operator email session.
+Neither the in-app browser connection nor the local Access CLI had an active
+session during this promotion, so no credential, cookie, OTP, or CAPTCHA
+workaround was attempted. The exact-email policies, application audience,
+redirect boundary, machine-path isolation, CORS preflight, local desktop/mobile
+UI, and previously working operator flow were verified independently.
+
+Rollback keeps migration `0006` and its audit links in place. Redeploy Worker
+version `d86c6c69-8deb-47ca-872e-7466f85f0201`, Pages deployment
+`e7b3475c-1369-40b5-ac8e-c527cebde64b`, and crawler artifact
+`6bc8b45b05f5561adec15fefbf87ff435b931f0c` if application rollback is needed.
+Restore the checksummed production backup only for a documented data-recovery
+event; normal rollback uses a forward migration and never deletes canonical or
+historical data.
+
 Date: 2026-08-23  
 Release commit: `6bc8b45b05f5561adec15fefbf87ff435b931f0c`  
 Branch: `main`
