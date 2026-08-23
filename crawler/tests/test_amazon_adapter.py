@@ -111,6 +111,22 @@ def test_search_url_and_marketplace_page_limits_are_validated() -> None:
     )
 
 
+def test_single_seller_target_schedules_only_one_product_candidate() -> None:
+    spider = configured_spider(target_sellers="1")
+    response = html_response(
+        "https://www.amazon.com/s?k=stainless+steel+bottle",
+        fixture("search.html").replace(
+            "</body>",
+            '<div data-asin="B012345679"><h2><a href="/dp/B012345679">'
+            "Second product</a></h2></div></body>",
+        ),
+        meta={"query": "stainless steel bottle", "result_page": 1},
+    )
+
+    requests = [item for item in spider.parse_search(response) if isinstance(item, Request)]
+    assert len(requests) == 1
+
+
 def test_spider_emits_persistable_marketplace_product_and_seller_batches() -> None:
     spider = configured_spider(country_codes="BD")
     search_response = html_response(

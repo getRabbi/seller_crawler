@@ -214,7 +214,8 @@ class AmazonDiscoverySpider(scrapy.Spider):
         products = parse_search_page(response.text, response.url, self.marketplace.code)
         if not products:
             self._inc_stat("sellerintel/parser_empty_count")
-        for product in products[:MAX_PRODUCTS_PER_SEARCH_PAGE]:
+        remaining_target = max(0, self.target_sellers - len(self._accepted_merchants))
+        for product in products[: min(MAX_PRODUCTS_PER_SEARCH_PAGE, remaining_target)]:
             if product.asin in self._seen_products or self._target_reached():
                 continue
             self._seen_products.add(product.asin)
