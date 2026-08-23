@@ -250,6 +250,8 @@ class AmazonDiscoverySpider(scrapy.Spider):
         observed_at = self._observed_at(response)
         if not self._requires_seller_evidence():
             yield self._product_batch(product, response, observed_at)
+            self._accepted_merchants.add(merchant_key)
+            self._inc_stat("sellerintel/sellers_found")
         yield Request(
             product.seller_profile_url,
             callback=self.parse_seller,
@@ -274,6 +276,17 @@ class AmazonDiscoverySpider(scrapy.Spider):
         product = _product_from_payload(cast(Mapping[str, object], response.meta["product"]))
         seller = parse_seller_page(response.text, response.url, self.marketplace.code)
         if not self._seller_filters_match(seller):
+            return
+        if not any(
+            (
+                seller.display_name,
+                seller.business_name,
+                seller.storefront_url,
+                seller.public_location,
+                seller.official_website_url,
+            )
+        ):
+            self._inc_stat("sellerintel/parser_empty_count")
             return
         observed_at = self._observed_at(response)
         if self._requires_seller_evidence():
@@ -326,8 +339,10 @@ class AmazonDiscoverySpider(scrapy.Spider):
             sources=[source],
             crawl_runs=[self._running_record(observed_at)],
         )
-        self._accepted_merchants.add(seller.merchant_token or seller.profile_url)
-        self._inc_stat("sellerintel/sellers_found")
+        merchant_key = seller.merchant_token or seller.profile_url
+        if merchant_key not in self._accepted_merchants:
+            self._accepted_merchants.add(merchant_key)
+            self._inc_stat("sellerintel/sellers_found")
         if seller.official_website_url:
             self._inc_stat("sellerintel/official_domains_found")
         yield dict(batch.as_payload())

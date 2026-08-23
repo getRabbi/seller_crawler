@@ -73,6 +73,27 @@ def test_seller_parser_uses_public_business_evidence_without_marketplace_country
     assert seller.trader_score == 0
 
 
+def test_amazon_parsers_fail_safe_for_json_shaped_success_bodies() -> None:
+    assert (
+        parse_search_page(
+            '{"status":"unavailable"}',
+            "https://www.amazon.com/s?k=fixture",
+            "amazon.com",
+        )
+        == ()
+    )
+
+    seller = parse_seller_page(
+        '{"status":"unavailable"}',
+        "https://www.amazon.com/sp?seller=A1FIXTURE123",
+        "amazon.com",
+    )
+    assert seller.merchant_token == "A1FIXTURE123"
+    assert seller.display_name is None
+    assert seller.business_name is None
+    assert seller.official_website_url is None
+
+
 def test_adapter_restricts_hosts_and_never_parses_contacts() -> None:
     adapter = AmazonSourceAdapter()
     assert adapter.is_allowed("https://www.amazon.co.uk/sp?seller=A1FIXTURE123") is True
@@ -124,6 +145,35 @@ def test_spider_emits_persistable_marketplace_product_and_seller_batches() -> No
     assert seller_batch["sellers"][0]["country_code"] == "BD"  # type: ignore[index]
     assert seller_batch["sellers"][0]["official_domain"] == "fixture-manufacturing.example"  # type: ignore[index]
     assert seller_batch["sources"][0]["source_type"] == "amazon_seller"  # type: ignore[index]
+
+
+def test_product_identity_counts_toward_target_and_json_seller_body_is_not_evidence() -> None:
+    spider = configured_spider(target_sellers="1")
+    product = parse_product_page(
+        fixture("product.html"),
+        "https://www.amazon.com/dp/B012345678",
+        "amazon.com",
+    )
+    product_response = html_response(
+        product.product_url,
+        fixture("product.html"),
+        meta={"query": "stainless steel bottle"},
+    )
+
+    product_outputs = list(spider.parse_product(product_response))
+    assert len(product_outputs) == 2
+    assert spider._target_reached() is True
+
+    seller_request = next(item for item in product_outputs if isinstance(item, Request))
+    seller_response = html_response(
+        seller_request.url,
+        '{"status":"unavailable"}',
+        meta=seller_request.meta,
+    )
+
+    assert list(spider.parse_seller(seller_response)) == []
+    assert spider.crawler.stats is not None
+    assert spider.crawler.stats.get_value("sellerintel/parser_empty_count") == 1
 
 
 def test_country_filter_uses_public_seller_evidence_and_rejects_non_matching_seller() -> None:

@@ -160,7 +160,7 @@ def parse_search_page(
     marketplace: str,
 ) -> tuple[AmazonProductIdentity, ...]:
     selected = marketplace_for(marketplace)
-    selector = Selector(text=html)
+    selector = _html_selector(html)
     products: list[AmazonProductIdentity] = []
     seen: set[str] = set()
     for result in selector.css("div[data-asin]"):
@@ -192,7 +192,7 @@ def parse_search_page(
 
 def parse_product_page(html: str, page_url: str, marketplace: str) -> AmazonProductIdentity:
     selected = marketplace_for(marketplace)
-    selector = Selector(text=html)
+    selector = _html_selector(html)
     asin = _asin_from_page(selector, page_url)
     if asin is None:
         raise ValueError("Amazon product page does not expose a valid ASIN")
@@ -236,7 +236,7 @@ def parse_product_page(html: str, page_url: str, marketplace: str) -> AmazonProd
 
 def parse_seller_page(html: str, page_url: str, marketplace: str) -> AmazonSellerIdentity:
     selected = marketplace_for(marketplace)
-    selector = Selector(text=html)
+    selector = _html_selector(html)
     profile_url = canonical_seller_url(page_url, selected) or canonicalize_amazon_url(page_url)
     merchant_token = merchant_token_from_url(profile_url)
     display_name = _first_text(
@@ -324,6 +324,13 @@ def merchant_token_from_url(url: str) -> str | None:
         if MERCHANT_PATTERN.fullmatch(candidate):
             return candidate
     return None
+
+
+def _html_selector(value: str) -> Selector:
+    stripped = value.lstrip()
+    if stripped.startswith(("{", "[")):
+        return Selector(text="<html></html>", type="html")
+    return Selector(text=value, type="html")
 
 
 def _asin_from_page(selector: Selector, page_url: str) -> str | None:
