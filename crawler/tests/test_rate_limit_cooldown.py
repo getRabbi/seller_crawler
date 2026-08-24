@@ -101,17 +101,15 @@ def test_optional_missing_page_does_not_create_a_false_crawler_error() -> None:
     spider = fixture_spider()
     assert spider.crawler.stats is not None
     optional_request = Request(
-        "https://approved.example/about-us",
+        "https://www.approved.example/about-us",
         meta={
             "observed_at": "2026-08-17T00:00:00Z",
-            "sellerintel_optional_page": True,
         },
     )
     seed_request = Request(
-        "https://approved.example/",
+        "https://www.approved.example/",
         meta={
             "observed_at": "2026-08-17T00:00:00Z",
-            "sellerintel_optional_page": False,
         },
     )
 
