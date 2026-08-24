@@ -88,6 +88,7 @@ describe("Solo dashboard API", () => {
 
     expect(response.status).toBe(200);
     expect(payload.seller.id).toBe(sellerId);
+    expect(payload.seller).toMatchObject({ contactCount: 1, contactTypes: ["email"] });
     expect(payload.aliases).toEqual(["Acme Export"]);
     expect(payload.contacts[0]).toMatchObject({
       displayValueMasked: "sa***@example.invalid",
@@ -352,6 +353,9 @@ function dashboardEnv(
   });
   const contacts = new FixtureD1((query) => {
     if (query.includes("contact_value_ciphertext")) return [contactSecretRow()];
+    if (query.includes("COUNT(*) AS contact_count")) {
+      return [{ seller_id: sellerId, contact_count: 1, contact_types: "email" }];
+    }
     return query.includes("FROM contacts") ? [contactRow(options.contactDisplay)] : [];
   });
   const operations = new FixtureD1((query) => {

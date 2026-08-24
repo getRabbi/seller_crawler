@@ -2,6 +2,9 @@
 
 ## Unreleased - Solo Mode v1 Implementation
 
+- Hydrated seller-detail and crawl-run seller snapshots with the same active
+  cross-D1 contact aggregates used by the Seller Directory, eliminating a
+  misleading zero summary when masked contact rows were already present.
 - Corroborated labeled contacts on verified official support, sales, export,
   wholesale, dealer, and distributor pages. The free-mail deduction now applies
   only when that official page-and-label corroboration is absent, matching the

@@ -182,6 +182,22 @@ class OperatorStatement implements D1PreparedStatement {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("operator crawl control", () => {
+  it("hydrates run seller snapshots with active contact aggregates", async () => {
+    const service = new OperatorCrawlService(
+      operatorEnv(new OperatorD1(), new SellerSnapshotD1(), new ContactSnapshotD1())
+    );
+    const internal = service as unknown as {
+      sellersByIds(ids: string[]): Promise<Array<{ contactCount: number; contactTypes: string[] }>>;
+    };
+
+    const sellers = await internal.sellersByIds([
+      "018f2d5e-7b3c-7a1d-8f2e-123456789abc"
+    ]);
+
+    expect(sellers[0]).toMatchObject({ contactCount: 5 });
+    expect(new Set(sellers[0].contactTypes)).toEqual(new Set(["email", "phone", "contact_form"]));
+  });
+
   it("launches exactly one bounded Student job and queues the second run", async () => {
     const db = new OperatorD1();
     const requests: Array<{ url: string; body: URLSearchParams }> = [];
@@ -762,6 +778,57 @@ class LinkedSellerD1 implements D1Database {
   }
 }
 
+class SellerSnapshotD1 implements D1Database {
+  prepare(): D1PreparedStatement {
+    return {
+      bind: () => this.prepare(),
+      first: async <T>() => null as T | null,
+      all: async <T>() => ({
+        success: true,
+        results: [{
+          id: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
+          canonical_name: "Official Example",
+          legal_name: null,
+          country_code: "US",
+          province: null,
+          city: null,
+          official_domain: "example.test",
+          identity_confidence: 90,
+          quality_score: 80,
+          manufacturer_score: 70,
+          trader_score: 10,
+          status: "active",
+          first_seen_at: "2026-08-01T00:00:00Z",
+          last_seen_at: "2026-08-24T00:00:00Z",
+          updated_at: "2026-08-24T00:00:00Z",
+          marketplace: "amazon.com",
+          marketplace_display_name: "Official Example",
+          marketplace_profile_url: null
+        }] as T[]
+      }),
+      run: async () => ({ success: true })
+    };
+  }
+}
+
+class ContactSnapshotD1 implements D1Database {
+  prepare(): D1PreparedStatement {
+    return {
+      bind: () => this.prepare(),
+      first: async <T>() => null as T | null,
+      all: async <T>() => ({
+        success: true,
+        results: [{
+          seller_id: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
+          contact_count: 5,
+          contact_types: "email,phone,contact_form"
+        }] as T[]
+      }),
+      run: async () => ({ success: true })
+    };
+  }
+}
+
 class ConflictingSellerD1 implements D1Database {
   prepare(): D1PreparedStatement {
     return {
@@ -795,11 +862,12 @@ function findRequest(idempotencyKey: string): Record<string, unknown> {
   };
 }
 
-function operatorEnv(db: D1Database, core?: D1Database): RuntimeEnv {
+function operatorEnv(db: D1Database, core?: D1Database, contacts?: D1Database): RuntimeEnv {
   return {
     APP_ENV: "local",
     OPS_DB: db,
     CORE_DB: core,
+    CONTACTS_DB: contacts,
     RUNNER_MODE: "zyte_student_active",
     LIVE_CRAWL_ENABLED: "true",
     OPERATOR_CRAWL_ENABLED: "true",

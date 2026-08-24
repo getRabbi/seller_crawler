@@ -260,7 +260,7 @@ export class DashboardRepository {
       return null;
     }
 
-    const [aliasResult, contacts, evidenceResult, duplicateResult] = await Promise.all([
+    const [aliasResult, contacts, evidenceResult, duplicateResult, contactMetadata] = await Promise.all([
       core
         .prepare("SELECT alias FROM seller_aliases WHERE seller_id = ? ORDER BY alias LIMIT 100")
         .bind(sellerId)
@@ -274,11 +274,12 @@ export class DashboardRepository {
         )
         .bind(sellerId)
         .all<EvidenceRow>(),
-      this.listDuplicates({ limit: MAX_LIMIT, offset: 0, query: sellerId })
+      this.listDuplicates({ limit: MAX_LIMIT, offset: 0, query: sellerId }),
+      this.getContactMetadata([sellerId])
     ]);
 
     return {
-      seller: mapSeller(seller),
+      seller: mapSeller(seller, contactMetadata.get(sellerId)),
       aliases: (aliasResult.results ?? []).map((row) => row.alias),
       contacts: contacts.items,
       evidence: (evidenceResult.results ?? []).map(mapEvidence),

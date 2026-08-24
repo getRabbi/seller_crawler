@@ -1315,29 +1315,53 @@ export class OperatorCrawlService {
       )
       .bind(...ids)
       .all<Record<string, unknown>>();
-    return (result.results ?? []).map((row) => ({
-      id: String(row.id),
-      canonicalName: String(row.canonical_name),
-      legalName: nullableString(row.legal_name),
-      countryCode: nullableString(row.country_code),
-      province: nullableString(row.province),
-      city: nullableString(row.city),
-      officialDomain: nullableString(row.official_domain),
-      identityConfidence: Number(row.identity_confidence ?? 0),
-      qualityScore: Number(row.quality_score ?? 0),
-      manufacturerScore: Number(row.manufacturer_score ?? 0),
-      traderScore: Number(row.trader_score ?? 0),
-      status: String(row.status),
-      firstSeenAt: String(row.first_seen_at),
-      lastSeenAt: String(row.last_seen_at),
-      updatedAt: String(row.updated_at),
-      marketplace: nullableString(row.marketplace),
-      marketplaceDisplayName: nullableString(row.marketplace_display_name),
-      marketplaceProfileUrl: nullableString(row.marketplace_profile_url),
-      contactCount: 0,
-      contactTypes: [],
-      duplicateStatus: null
-    }));
+    const rows = result.results ?? [];
+    const contactMetadata = await this.contactMetadataBySellerIds(
+      rows.map((row) => String(row.id))
+    );
+    return rows.map((row) => {
+      const metadata = contactMetadata.get(String(row.id));
+      return {
+        id: String(row.id),
+        canonicalName: String(row.canonical_name),
+        legalName: nullableString(row.legal_name),
+        countryCode: nullableString(row.country_code),
+        province: nullableString(row.province),
+        city: nullableString(row.city),
+        officialDomain: nullableString(row.official_domain),
+        identityConfidence: Number(row.identity_confidence ?? 0),
+        qualityScore: Number(row.quality_score ?? 0),
+        manufacturerScore: Number(row.manufacturer_score ?? 0),
+        traderScore: Number(row.trader_score ?? 0),
+        status: String(row.status),
+        firstSeenAt: String(row.first_seen_at),
+        lastSeenAt: String(row.last_seen_at),
+        updatedAt: String(row.updated_at),
+        marketplace: nullableString(row.marketplace),
+        marketplaceDisplayName: nullableString(row.marketplace_display_name),
+        marketplaceProfileUrl: nullableString(row.marketplace_profile_url),
+        contactCount: Number(metadata?.contact_count ?? 0),
+        contactTypes: metadata?.contact_types ? metadata.contact_types.split(",") : [],
+        duplicateStatus: null
+      };
+    });
+  }
+
+  private async contactMetadataBySellerIds(
+    ids: string[]
+  ): Promise<Map<string, { contact_count: number; contact_types: string }>> {
+    if (!this.env.CONTACTS_DB || ids.length === 0) return new Map();
+    const placeholders = ids.map(() => "?").join(",");
+    const result = await this.env.CONTACTS_DB
+      .prepare(
+        `SELECT seller_id, COUNT(*) AS contact_count,
+         group_concat(DISTINCT contact_type) AS contact_types
+         FROM contacts WHERE status = 'active' AND seller_id IN (${placeholders})
+         GROUP BY seller_id`
+      )
+      .bind(...ids)
+      .all<{ seller_id: string; contact_count: number; contact_types: string }>();
+    return new Map((result.results ?? []).map((row) => [row.seller_id, row]));
   }
 }
 
