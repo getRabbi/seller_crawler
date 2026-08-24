@@ -6,6 +6,9 @@
   business contact channel. Detection requires a contact/support page plus a
   reply field and message field, excludes login/search/newsletter/checkout
   forms, and never fills or submits a form.
+- Stopped treating expected 404/410 responses from optional discovered or
+  guessed official-site paths as crawler failures. A missing seed page and real
+  network/server errors still report failures.
 - Added a zero-charge, provider-neutral official-domain resolution stage after
   Amazon identity discovery. It derives at most two deterministic identity
   candidates per seller and 25 per run, respects robots/cooldowns, rejects

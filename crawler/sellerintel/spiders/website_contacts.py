@@ -204,7 +204,7 @@ class OfficialWebsiteSpider(scrapy.Spider):
                     continue
             self._seen[domain].add(seed_url)
             self._pages_scheduled[domain] = 1
-            yield self._page_request(seed_url, depth=0)
+            yield self._page_request(seed_url, depth=0, optional=False)
 
     def parse_page(self, response: Response) -> Iterable[dict[str, object] | Request]:
         domain = _domain(response.url)
@@ -220,7 +220,11 @@ class OfficialWebsiteSpider(scrapy.Spider):
             or response.status >= 400
             or not isinstance(response, TextResponse)
         ):
-            self._inc_stat("sellerintel/error_count")
+            if not (
+                response.status in {404, 410}
+                and response.meta.get("sellerintel_optional_page") is True
+            ):
+                self._inc_stat("sellerintel/error_count")
             yield from self._schedule_next(domain)
             return
 
@@ -321,10 +325,10 @@ class OfficialWebsiteSpider(scrapy.Spider):
         while self._queues[domain] and self._pages_scheduled[domain] < self.page_budget:
             url, depth = self._queues[domain].pop(0)
             self._pages_scheduled[domain] += 1
-            yield self._page_request(url, depth=depth)
+            yield self._page_request(url, depth=depth, optional=True)
             return
 
-    def _page_request(self, url: str, *, depth: int) -> Request:
+    def _page_request(self, url: str, *, depth: int, optional: bool) -> Request:
         return Request(
             url,
             callback=self.parse_page,
@@ -332,6 +336,7 @@ class OfficialWebsiteSpider(scrapy.Spider):
             meta={
                 "crawl_depth": depth,
                 "observed_at": self._observed_at,
+                "sellerintel_optional_page": optional,
                 "sellerintel_allowed_domain": _domain(url),
             },
         )

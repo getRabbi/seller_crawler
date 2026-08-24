@@ -9,6 +9,7 @@ from typing import cast
 from scrapy.crawler import Crawler
 from scrapy.http import HtmlResponse, Request
 from scrapy.settings import Settings
+from scrapy.statscollectors import MemoryStatsCollector
 from sellerintel.adapters.base import retry_after_seconds
 from sellerintel.clients.cooldown import CooldownClient, CooldownDecision, CooldownHttpResponse
 from sellerintel.spiders.website_contacts import OfficialWebsiteSpider
@@ -96,11 +97,57 @@ def test_preflight_prevents_request_while_domain_cooldown_is_active() -> None:
     assert list(spider._initial_requests()) == []
 
 
+def test_optional_missing_page_does_not_create_a_false_crawler_error() -> None:
+    spider = fixture_spider()
+    assert spider.crawler.stats is not None
+    optional_request = Request(
+        "https://approved.example/about-us",
+        meta={
+            "observed_at": "2026-08-17T00:00:00Z",
+            "sellerintel_optional_page": True,
+        },
+    )
+    seed_request = Request(
+        "https://approved.example/",
+        meta={
+            "observed_at": "2026-08-17T00:00:00Z",
+            "sellerintel_optional_page": False,
+        },
+    )
+
+    list(
+        spider.parse_page(
+            HtmlResponse(
+                url=optional_request.url,
+                request=optional_request,
+                status=404,
+                body=b"Not found",
+                encoding="utf-8",
+            )
+        )
+    )
+    assert spider.crawler.stats.get_value("sellerintel/error_count", 0) == 0
+
+    list(
+        spider.parse_page(
+            HtmlResponse(
+                url=seed_request.url,
+                request=seed_request,
+                status=404,
+                body=b"Not found",
+                encoding="utf-8",
+            )
+        )
+    )
+    assert spider.crawler.stats.get_value("sellerintel/error_count") == 1
+
+
 def fixture_spider() -> OfficialWebsiteSpider:
     crawler = Crawler(
         OfficialWebsiteSpider,
         Settings({"SELLERINTEL_OBSERVED_AT": "2026-08-17T00:00:00Z"}),
     )
+    crawler.stats = MemoryStatsCollector(crawler)
     return OfficialWebsiteSpider.from_crawler(
         crawler,
         seed_urls="https://approved.example/",
