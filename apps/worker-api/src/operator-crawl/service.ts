@@ -713,6 +713,13 @@ export class OperatorCrawlService {
       );
       return;
     }
+    let launchCandidates = candidateTargets;
+    if (run.stage === "resolving") {
+      launchCandidates = launchCandidates ?? (
+        await this.domainCandidateTargetsForRun(run.id, run.marketplace)
+      );
+      await this.authorizeCandidateTargets(run, launchCandidates);
+    }
     const launchStartedAt = new Date().toISOString();
     const claim = await this.db
       .prepare(
@@ -725,7 +732,7 @@ export class OperatorCrawlService {
     if (!statementChanged(claim)) return;
     const launchingRun = { ...run, status: "launching", updated_at: launchStartedAt };
     try {
-      const jobId = await this.launch(launchingRun, officialTargets, candidateTargets);
+      const jobId = await this.launch(launchingRun, officialTargets, launchCandidates);
       await this.db
         .prepare("UPDATE operator_crawl_runs SET zyte_job_id = ?, status = 'running', updated_at = ? WHERE id = ?")
         .bind(jobId, new Date().toISOString(), run.id)
@@ -792,6 +799,22 @@ export class OperatorCrawlService {
     if (next.stage !== stage || next.zyte_job_id) return;
     await this.event(run.id, `${stage}_handoff`, null, run.status, stage, message);
     await this.startActiveStage(next, officialTargets, candidateTargets);
+  }
+
+  private async authorizeCandidateTargets(
+    run: OperatorRunRow,
+    candidates: DomainCandidateTarget[]
+  ): Promise<void> {
+    const domains = candidates.map((candidate) => normalizeDomain(new URL(candidate.seedUrl).hostname));
+    const approved = [
+      ...new Set([...parseStringArray(run.approved_domains_json), ...domains].filter(Boolean))
+    ];
+    await this.db
+      .prepare(
+        "UPDATE operator_crawl_runs SET approved_domains_json = ? WHERE id = ? AND stage = 'resolving'"
+      )
+      .bind(JSON.stringify(approved), run.id)
+      .run();
   }
 
   private async launch(

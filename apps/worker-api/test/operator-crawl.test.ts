@@ -117,6 +117,8 @@ class OperatorStatement implements D1PreparedStatement {
         stage: this.values[0], status: this.values[1], approved_domains_json: this.values[2],
         warnings_json: this.values[3], zyte_job_id: null, updated_at: this.values[4]
       });
+    } else if (query.startsWith("UPDATE operator_crawl_runs SET approved_domains_json = ?")) {
+      Object.assign(this.requireRun(this.values[1]), { approved_domains_json: this.values[0] });
     } else if (query.startsWith("UPDATE operator_crawl_runs SET status = ?, stage = ?, active_unit_slot = ?")) {
       const run = this.requireRun(this.values[9]);
       Object.assign(run, {
@@ -453,6 +455,7 @@ describe("operator crawl control", () => {
     expect(launches).toHaveLength(1);
     expect(launches[0].get("spider")).toBe("official_domain_discovery");
     expect(launches[0].get("keywords")).toBeNull();
+    expect(JSON.parse(String(db.runs[0].approved_domains_json))).toContain("watersybottle.com");
 
     core.verified = true;
     await service.pump();

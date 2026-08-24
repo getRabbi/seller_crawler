@@ -20,6 +20,9 @@
   exact-name candidates, verifies identity, and enriches contacts sequentially.
   The API mode is stored backward-compatibly in the existing operations schema
   with an audited automatic-resolution marker, so no migration is required.
+- Fixed direct existing-seller resolution so its exact candidate domains enter
+  the per-run ingestion allowlist before the external stage launches, including
+  reconstructed launches after a Worker restart.
 
 - Hardened official-site production enrichment: substantive public pages no
   longer stop merely because a theme script contains a challenge token, while
