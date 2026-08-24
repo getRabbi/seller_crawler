@@ -147,6 +147,10 @@ message field, and submit control; login, newsletter, search, account, and
 checkout forms are rejected. The platform records the page URL but never fills
 or submits the form. Phone and WhatsApp normalization uses `phonenumbers`; no
 SMTP, mailbox probing, QR decoding, live crawling, or provider access is performed.
+On a verified official domain, labeled contacts on contact, support, sales,
+export, wholesale, dealer, or distributor pages count as corroborated business
+evidence. A free-mail address still receives the documented deduction unless
+that page-and-label corroboration exists.
 
 ## Normalization
 
@@ -179,6 +183,9 @@ identity candidates per seller and 25 per operator run. It requires exact domain
 and prominent-page identity signals before updating the same canonical seller,
 then hands accepted domains to `official_website` on the same one-unit slot.
 Generic search discovery and every paid provider remain disabled.
+Amazon discovery, official-domain verification, and official-site enrichment
+use distinct reserved completion batch numbers, so every stage has its own
+idempotency key even when the stages share one operator crawl-run ID.
 
 For a seller already in the directory, **Resolve website automatically** starts
 the same verification and contact flow directly from that canonical seller ID.

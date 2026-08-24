@@ -39,6 +39,11 @@ cookies, or unmasked personal contact data.
 Contact extractor evidence contexts must remain masked. Extractor code must not
 perform SMTP mailbox enumeration, QR decoding of unlabeled images, CAPTCHA
 bypass, or live source fetching during local fixture phases.
+Free-mail addresses are not trusted merely because they appear on a verified
+domain. Waiving the free-mail deduction requires both a labeled public contact
+and a contact-intent page path such as support, sales, export, wholesale,
+dealer, or distributor; otherwise the normal manual-review/rejection thresholds
+remain in force.
 
 Public contact-form channels must store the canonical official page URL as an
 encrypted `contact_form` value, remain separately labelled from direct email or

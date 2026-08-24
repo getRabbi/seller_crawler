@@ -107,7 +107,10 @@ def extract_emails(markup: str, *, source_url: str) -> list[ContactCandidate]:
                     reason="Mailbox local part is commonly used for public business contact.",
                 )
             )
-        if domain in FREE_MAIL_DOMAINS:
+        corroborated_business_page = labeled and any(
+            component.code == "official_contact_page" for component in components
+        )
+        if domain in FREE_MAIL_DOMAINS and not corroborated_business_page:
             components.append(
                 ConfidenceComponent(
                     code="free_mail_domain",

@@ -33,9 +33,17 @@ CONTACT_PAGE_TERMS = (
     "contact",
     "contact-us",
     "contactus",
+    "customer-care",
+    "customer-service",
+    "dealer",
+    "distributor",
+    "export",
     "kontakt",
     "contato",
     "contacto",
+    "sales",
+    "support",
+    "wholesale",
     "\u8054\u7cfb",
 )
 

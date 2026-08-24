@@ -2,6 +2,16 @@
 
 ## Unreleased - Solo Mode v1 Implementation
 
+- Corroborated labeled contacts on verified official support, sales, export,
+  wholesale, dealer, and distributor pages. The free-mail deduction now applies
+  only when that official page-and-label corroboration is absent, matching the
+  frozen confidence specification while retaining review thresholds.
+- Assigned unique reserved completion batch numbers to Amazon discovery,
+  official-domain verification, and official-site enrichment. Multi-stage runs
+  no longer reuse an ingestion idempotency key or reject the final completion
+  with HTTP 409. Updated the ingestion pipeline to Scrapy's crawler-owned spider
+  API so current cloud runtimes no longer emit deprecated pipeline-signature
+  warnings.
 - Added `contact_form` as a separately labelled, encrypted, versioned public
   business contact channel. Detection requires a contact/support page plus a
   reply field and message field, excludes login/search/newsletter/checkout

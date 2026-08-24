@@ -68,6 +68,29 @@ def test_extracts_multilingual_contact_labels_and_e164_numbers() -> None:
     )
 
 
+def test_verified_wholesale_page_corroborates_labeled_free_mail_and_phone() -> None:
+    markup = """
+    <main>
+      <h1>Dealer and wholesale inquiries</h1>
+      <p>Email: fixture-supplier@outlook.com</p>
+      <p>Phone: +86 138 0013 8000</p>
+    </main>
+    """
+    source_url = "https://supplier.example.testmail/pages/dealer-wholesale"
+
+    candidates = extract_contacts(markup, source_url=source_url)
+    by_type = {candidate.contact_type: candidate for candidate in candidates}
+
+    assert set(by_type) == {"email", "phone"}
+    assert by_type["email"].review_status == "accepted"
+    assert by_type["email"].confidence >= 80
+    assert all(
+        component.code != "free_mail_domain"
+        for component in by_type["email"].confidence_components
+    )
+    assert by_type["phone"].review_status == "accepted"
+
+
 def test_rejects_false_positive_directory_and_qr_only_fixture() -> None:
     markup = fixture("false_positive_directory.html")
     source_url = "https://directory.example.invalid/profile/jane-doe"

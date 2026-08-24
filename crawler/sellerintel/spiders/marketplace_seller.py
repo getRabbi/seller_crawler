@@ -78,7 +78,7 @@ class AmazonDiscoverySpider(scrapy.Spider):
     name = "amazon_discovery"
     job_type = "amazon_discovery"
     parser_version = AMAZON_PARSER_VERSION
-    completion_batch_number = 2_147_483_646
+    completion_batch_number = 2_147_483_645
     custom_settings = {
         "ROBOTSTXT_OBEY": True,
         "COOKIES_ENABLED": False,

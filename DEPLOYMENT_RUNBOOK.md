@@ -324,6 +324,12 @@ login, search, account, and checkout forms create none. The crawler must not
 submit the form. This extraction uses pages already inside the official-site
 page budget, so it adds no Scrapy Cloud unit, provider, or paid-request quota.
 
+For a multi-stage acceptance run, verify the reserved completion batch numbers
+are distinct: Amazon discovery `2147483645`, official-domain verification
+`2147483646`, and official-site enrichment `2147483647`. The Scrapy Cloud log
+must not contain a completion-ingestion `409`, and repeated delivery of any one
+stage completion must remain idempotent.
+
 Migration `operations/0006_crawl_run_contacts.sql` must be applied before the
 new Worker is deployed. Verify `crawl_run_contacts` exists, repeated ingestion
 does not increase the run's unique contact count, and no raw contact value is
@@ -364,3 +370,7 @@ Rolling back `contact_form` support also requires no schema rollback: remove the
 operator selection in a forward code release and preserve existing encrypted
 contact/audit rows. Suppress a bad channel through the documented suppression
 workflow instead of deleting canonical or historical data.
+Rolling back the stage-specific completion keys requires restoring the prior
+crawler artifact and Worker artifact pin together. Preserve every already
+accepted idempotency row and crawl event; do not rewrite or delete historical
+completion batches.

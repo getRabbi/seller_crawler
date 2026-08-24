@@ -20,6 +20,7 @@ from scrapy.settings import BaseSettings
 
 from sellerintel.adapters.base import is_blocked_response, retry_after_seconds
 from sellerintel.adapters.official_site import (
+    OFFICIAL_SITE_PARSER_VERSION,
     build_official_site_crawl_plan,
     canonicalize_official_url,
     contact_records_for_page,
@@ -81,6 +82,9 @@ class OfficialSellerTarget:
 
 class OfficialWebsiteSpider(scrapy.Spider):
     name = "official_website"
+    parser_version = OFFICIAL_SITE_PARSER_VERSION
+    job_type = "official_website"
+    completion_batch_number = 2_147_483_647
 
     custom_settings = {
         "DOWNLOADER_MIDDLEWARES": {

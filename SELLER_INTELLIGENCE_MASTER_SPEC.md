@@ -1351,6 +1351,11 @@ label it separately from those direct channels.
 
 ## 10.6 Confidence score
 
+On a verified official domain, contact-intent paths include contact, support,
+customer-service, sales, export, wholesale, dealer, and distributor pages. A
+labeled address on one of these pages is corroborated business evidence; the
+free-mail deduction applies only when that corroboration is absent.
+
 ```text
 +45 official contact page
 +35 official domain footer

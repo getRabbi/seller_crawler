@@ -32,9 +32,11 @@ class SignedIngestionPipeline:
         submitter: BatchSubmitter,
         *,
         started_at: str | None = None,
+        crawler: Crawler | None = None,
     ) -> None:
         self._submitter = submitter
         self._started_at = started_at or _utc_now()
+        self._crawler = crawler
         self._sources_found = 0
         self._contacts_found = 0
         self._spooled = 0
@@ -57,14 +59,15 @@ class SignedIngestionPipeline:
                     hmac_secret=secret,
                     spool_dir=spool_dir,
                 )
-            )
+            ),
+            crawler=crawler,
         )
 
     def process_item(
         self,
         item: Mapping[str, object],
-        spider: Spider,
     ) -> dict[str, object]:
+        spider = self._required_spider()
         batch = IngestionBatch.model_validate(item)
         try:
             result = self._submitter.submit_batch(batch)
@@ -101,7 +104,8 @@ class SignedIngestionPipeline:
             "spooled": result.spool_path is not None,
         }
 
-    def close_spider(self, spider: Spider) -> None:
+    def close_spider(self) -> None:
+        spider = self._required_spider()
         crawl_run_id = getattr(spider, "crawl_run_id", None)
         if not isinstance(crawl_run_id, str) or not crawl_run_id:
             return
@@ -159,6 +163,12 @@ class SignedIngestionPipeline:
             return
         if result.spool_path is not None:
             _inc_stat(spider, "sellerintel/completion_spooled")
+
+    def _required_spider(self) -> Spider:
+        spider = self._crawler.spider if self._crawler is not None else None
+        if not isinstance(spider, Spider):
+            raise RuntimeError("Signed ingestion pipeline requires an active crawler spider")
+        return spider
 
 
 def _request_count(spider: Spider) -> int:

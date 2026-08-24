@@ -83,6 +83,7 @@ class OfficialDomainDiscoverySpider(scrapy.Spider):
     name = "official_domain_discovery"
     parser_version = DISCOVERY_PARSER_VERSION
     job_type = "official_domain_discovery"
+    completion_batch_number = 2_147_483_646
 
     custom_settings = {
         "DOWNLOADER_MIDDLEWARES": {
