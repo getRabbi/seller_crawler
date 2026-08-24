@@ -32,6 +32,11 @@ matches a collected public identity and the same identity appears prominently on
 the page. Candidate decisions are stored as compact, versioned source evidence;
 only accepted domains continue to contact-page crawling.
 
+When Amazon is temporarily unavailable, the operator may select an unresolved
+seller already present in the canonical directory and choose **Resolve website
+automatically**. This is not a provider fallback: it performs no marketplace or
+search request and applies the same exact-name candidate policy.
+
 Accepted official-site evidence stays compact in D1: source URL, canonical URL,
 masked evidence snippet or extraction context, content hash, first seen, last
 fetched, last success, parser version, and schema version. Full raw HTML,

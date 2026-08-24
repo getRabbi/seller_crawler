@@ -60,12 +60,19 @@ function SellerDetail({ detail }: { detail: SellerDetailResponse }) {
             <div><dt>Aliases</dt><dd>{detail.aliases.join(", ") || "--"}</dd></div>
           </dl>
           {!seller.officialDomain ? (
-            <Link
-              className="button-link"
-              href={`/crawls/new?${new URLSearchParams({ mode: "known_websites", sellerId: seller.id, sellerName: seller.canonicalName }).toString()}`}
-            >
-              Crawl verified website
-            </Link>
+            <div className="row-actions">
+              <Link
+                className="button-link"
+                href={`/crawls/new?${new URLSearchParams({ mode: "resolve_seller", sellerId: seller.id, sellerName: seller.canonicalName }).toString()}`}
+              >
+                Resolve website automatically
+              </Link>
+              <Link
+                href={`/crawls/new?${new URLSearchParams({ mode: "known_websites", sellerId: seller.id, sellerName: seller.canonicalName }).toString()}`}
+              >
+                Crawl manually verified website
+              </Link>
+            </div>
           ) : null}
         </div>
         <div className="detail-panel">

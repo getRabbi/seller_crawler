@@ -152,13 +152,16 @@ export class OperatorCrawlService {
     }
 
     const knownSellerTarget = await this.resolveKnownSellerTarget(input);
+    const resolutionSeller = await this.resolveAutomaticSellerTarget(input);
 
     const id = newUuidV7();
     const now = new Date();
     const approvedDomains =
       input.mode === "find_sellers"
         ? [input.marketplace as string]
-        : (input.seedUrls ?? []).map((value) => new URL(value).hostname.toLowerCase());
+        : input.mode === "known_websites"
+          ? (input.seedUrls ?? []).map((value) => new URL(value).hostname.toLowerCase())
+          : [];
     const artifactVersion = this.env.SCRAPY_CLOUD_ARTIFACT_VERSION?.trim() || "main";
     await this.db
       .prepare(
@@ -171,7 +174,7 @@ export class OperatorCrawlService {
       )
       .bind(
         id,
-        input.mode,
+        input.mode === "resolve_seller" ? "known_websites" : input.mode,
         JSON.stringify(input.keywords ?? []),
         input.marketplace ?? null,
         JSON.stringify(input.countryCodes ?? []),
@@ -183,7 +186,13 @@ export class OperatorCrawlService {
                   targetSellerId: knownSellerTarget.sellerId,
                   targetSellerName: knownSellerTarget.sellerName
                 }
-              : {}
+              : resolutionSeller
+                ? {
+                    targetSellerId: resolutionSeller.sellerId,
+                    targetSellerName: resolutionSeller.sellerName,
+                    automaticResolution: true
+                  }
+                : {}
         ),
         JSON.stringify(input.seedUrls ?? []),
         JSON.stringify(input.contactTypes),
@@ -199,6 +208,9 @@ export class OperatorCrawlService {
         artifactVersion
       )
       .run();
+    if (resolutionSeller) {
+      await this.linkRunSeller(id, resolutionSeller.sellerId, "discovered", now.toISOString());
+    }
     await this.db
       .prepare(
         "INSERT INTO operator_crawl_idempotency (idempotency_key, request_hash, crawl_run_id, created_at, expires_at) VALUES (?, ?, ?, ?, ?)"
@@ -219,6 +231,8 @@ export class OperatorCrawlService {
       "queued",
       knownSellerTarget
         ? "Operator created a bounded crawl run linked to an existing canonical seller."
+        : resolutionSeller
+          ? "Operator created bounded automatic domain resolution for an existing canonical seller."
         : "Operator created a bounded crawl run."
     );
     await this.pump();
@@ -360,6 +374,13 @@ export class OperatorCrawlService {
         source.artifact_version
       )
       .run();
+    if (isAutomaticResolutionRun(source)) {
+      const filters = parseObject(source.filters_json);
+      const sellerId = stringValue(filters.targetSellerId);
+      if (UUID_V7_PATTERN.test(sellerId)) {
+        await this.linkRunSeller(retryId, sellerId, "discovered", now);
+      }
+    }
     await this.event(retryId, "retried", actorId, source.status, "queued", `Retry of ${source.id}.`);
     await this.pump();
     const retry = await this.requireRun(retryId);
@@ -395,7 +416,16 @@ export class OperatorCrawlService {
          WHERE id = ? AND status = 'queued'
            AND NOT EXISTS (SELECT 1 FROM operator_crawl_runs WHERE active_unit_slot = 1)`
       )
-      .bind(queued.mode === "find_sellers" ? "discovering" : "enriching", now, now, queued.id)
+      .bind(
+        queued.mode === "find_sellers"
+          ? "discovering"
+          : isAutomaticResolutionRun(queued)
+            ? "resolving"
+            : "enriching",
+        now,
+        now,
+        queued.id
+      )
       .run();
     const claimed = await this.getRun(queued.id);
     if (claimed?.active_unit_slot !== 1) return;
@@ -571,7 +601,7 @@ export class OperatorCrawlService {
       );
       return;
     }
-    if (run.mode === "find_sellers" && run.stage === "resolving") {
+    if (run.stage === "resolving") {
       const targets = await this.officialTargetsForRun(run.id);
       if (targets.length > 0) {
         await this.handoff(
@@ -842,7 +872,7 @@ export class OperatorCrawlService {
         250,
         run.max_result_pages + run.target_seller_count * 2
       );
-    } else if (run.mode === "find_sellers" && run.stage === "resolving") {
+    } else if (run.stage === "resolving") {
       const candidates =
         overrideCandidates ?? (await this.domainCandidateTargetsForRun(run.id, run.marketplace));
       if (candidates.length === 0) {
@@ -862,7 +892,13 @@ export class OperatorCrawlService {
       commonSettings.ENABLE_AMAZON = false;
     } else {
       const storedTarget = this.storedKnownSellerTarget(run);
-      const targets = overrideTargets ?? (storedTarget ? [storedTarget] : []);
+      const targets = overrideTargets ?? (
+        run.stage === "enriching" && (run.mode === "find_sellers" || isAutomaticResolutionRun(run))
+          ? await this.officialTargetsForRun(run.id)
+          : storedTarget
+            ? [storedTarget]
+            : []
+      );
       const seeds = targets.length > 0
         ? targets.map((target) => target.seedUrl)
         : parseStringArray(run.seed_urls_json);
@@ -1052,6 +1088,20 @@ export class OperatorCrawlService {
     return (result.results ?? []).map((row) => row.seller_id);
   }
 
+  private async linkRunSeller(
+    crawlRunId: string,
+    sellerId: string,
+    stage: "discovered" | "enriched",
+    firstSeenAt: string
+  ): Promise<void> {
+    await this.db
+      .prepare(
+        "INSERT INTO crawl_run_sellers (crawl_run_id, seller_id, stage, first_seen_at) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING"
+      )
+      .bind(crawlRunId, sellerId, stage, firstSeenAt)
+      .run();
+  }
+
   private async officialTargetsForRun(id: string): Promise<OfficialSellerTarget[]> {
     const ids = await this.runSellerIds(id);
     if (!this.env.CORE_DB || ids.length === 0) return [];
@@ -1176,6 +1226,32 @@ export class OperatorCrawlService {
     return { sellerId: row.id, sellerName: row.canonical_name, seedUrl };
   }
 
+  private async resolveAutomaticSellerTarget(
+    input: CreateCrawlRunRequest
+  ): Promise<{ sellerId: string; sellerName: string } | null> {
+    if (input.mode !== "resolve_seller" || !input.targetSellerId) return null;
+    if (!this.env.CORE_DB) {
+      throw new OperatorCrawlError(503, "core_db_missing", "CORE_DB is required to resolve an existing seller.");
+    }
+    const row = await this.env.CORE_DB
+      .prepare(
+        "SELECT id, canonical_name, official_domain, status FROM sellers WHERE id = ? LIMIT 1"
+      )
+      .bind(input.targetSellerId)
+      .first<{ id: string; canonical_name: string; official_domain: string | null; status: string }>();
+    if (!row || row.status !== "active") {
+      throw new OperatorCrawlError(404, "target_seller_not_found", "The target canonical seller is unavailable.");
+    }
+    if (row.official_domain) {
+      throw new OperatorCrawlError(
+        409,
+        "official_domain_already_resolved",
+        "The seller already has an official domain; use the verified website crawl instead."
+      );
+    }
+    return { sellerId: row.id, sellerName: row.canonical_name };
+  }
+
   private storedKnownSellerTarget(run: OperatorRunRow): OfficialSellerTarget | null {
     if (run.mode !== "known_websites") return null;
     const filters = parseObject(run.filters_json);
@@ -1241,7 +1317,9 @@ function validateCreateRequest(raw: unknown): CreateCrawlRunRequest {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw invalid("Request body must be an object.");
   const value = raw as Record<string, unknown>;
   const mode = value.mode;
-  if (mode !== "find_sellers" && mode !== "known_websites") throw invalid("mode must be find_sellers or known_websites.");
+  if (mode !== "find_sellers" && mode !== "resolve_seller" && mode !== "known_websites") {
+    throw invalid("mode must be find_sellers, resolve_seller, or known_websites.");
+  }
   const contactTypes = stringArray(value.contactTypes, 4, 16).map((item) => item.toLowerCase());
   if (contactTypes.length === 0 || contactTypes.some((item) => !CONTACT_TYPES.has(item))) throw invalid("At least one supported contact type is required.");
   const request: CreateCrawlRunRequest = {
@@ -1263,7 +1341,7 @@ function validateCreateRequest(raw: unknown): CreateCrawlRunRequest {
     request.marketplace = marketplace;
     request.countryCodes = stringArray(value.countryCodes, 20, 2).map((code) => code.toUpperCase());
     request.filters = validateFilters(value.filters);
-  } else {
+  } else if (mode === "known_websites") {
     request.seedUrls = stringArray(value.seedUrls, 20, 2048).map(validatePublicHttpsUrl);
     if (request.seedUrls.length === 0) throw invalid("At least one approved HTTPS website URL is required.");
     const targetSellerId = optionalText(value.targetSellerId, 36);
@@ -1272,6 +1350,15 @@ function validateCreateRequest(raw: unknown): CreateCrawlRunRequest {
       if (request.seedUrls.length !== 1) throw invalid("A linked seller crawl requires exactly one website URL.");
       request.targetSellerId = targetSellerId;
     }
+  } else {
+    const targetSellerId = optionalText(value.targetSellerId, 36);
+    if (!targetSellerId || !UUID_V7_PATTERN.test(targetSellerId)) {
+      throw invalid("resolve_seller requires a UUIDv7 targetSellerId.");
+    }
+    if (request.targetSellerCount !== 1) {
+      throw invalid("resolve_seller requires targetSellerCount=1.");
+    }
+    request.targetSellerId = targetSellerId;
   }
   const plannedOfficialPages =
     request.maxOfficialPages *
@@ -1327,7 +1414,11 @@ function isPrivateHost(host: string): boolean {
 function mapRun(row: OperatorRunRow): CrawlRunItem {
   return {
     id: row.id,
-    jobType: row.mode === "find_sellers" ? "amazon_identity_discovery" : "official_website",
+    jobType: row.mode === "find_sellers"
+      ? "amazon_identity_discovery"
+      : isAutomaticResolutionRun(row)
+        ? "official_domain_discovery"
+        : "official_website",
     zyteJobId: row.zyte_job_id,
     startedAt: row.started_at ?? row.requested_at,
     finishedAt: row.finished_at,
@@ -1341,7 +1432,7 @@ function mapRun(row: OperatorRunRow): CrawlRunItem {
     blockedCount: Number(row.blocked_count ?? (row.status === "blocked" ? 1 : 0)),
     errorCount: Number(row.error_count ?? (row.error_code ? 1 : 0)),
     notes: row.error_message,
-    mode: row.mode,
+    mode: isAutomaticResolutionRun(row) ? "resolve_seller" : row.mode,
     query: parseStringArray(row.query_json),
     marketplace: row.marketplace,
     countryCodes: parseStringArray(row.country_codes_json),
@@ -1478,6 +1569,16 @@ function validCandidateLabel(value: string): boolean {
 
 function mergedWarnings(run: Pick<OperatorRunRow, "warnings_json">, ...values: string[]): string[] {
   return [...new Set([...parseStringArray(run.warnings_json), ...values.filter(Boolean)])];
+}
+
+function isAutomaticResolutionRun(
+  run: Pick<OperatorRunRow, "mode" | "filters_json" | "seed_urls_json">
+): boolean {
+  return (
+    run.mode === "known_websites" &&
+    parseStringArray(run.seed_urls_json).length === 0 &&
+    parseObject(run.filters_json).automaticResolution === true
+  );
 }
 
 function statementChanged(result: D1Result): boolean {

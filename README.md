@@ -177,6 +177,11 @@ and prominent-page identity signals before updating the same canonical seller,
 then hands accepted domains to `official_website` on the same one-unit slot.
 Generic search discovery and every paid provider remain disabled.
 
+For a seller already in the directory, **Resolve website automatically** starts
+the same verification and contact flow directly from that canonical seller ID.
+This avoids repeating Amazon discovery during a source outage and never falls
+back to fuzzy brand matching or a different provider.
+
 The no-network fixture transport exercises the same spider and produces
 deterministic seller, contact, source/evidence, and crawl-run batches. Compact
 D1 evidence includes source URL, page title, masked evidence snippet, content

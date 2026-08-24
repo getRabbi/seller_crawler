@@ -115,6 +115,11 @@ Every external job uses a unique `operator:<run-id>:<stage>` tag. If a Worker
 execution ends after Scrapy Cloud accepts a job but before D1 stores its ID, the
 next queue pump recovers that exact tagged stage. Missing, duplicate, or
 unverifiable tag results never cause an automatic relaunch.
+Existing sellers with no official domain can be re-entered through
+`resolve_seller`; the run starts at `resolving`, remains one-seller/one-unit, and
+continues to enrichment only after acceptance. This uses the existing tables and
+requires no D1 migration. If disabled, deploy the prior application code and
+preserve all run, source, review, seller, and contact records.
 
 Phase 10A local runner readiness is complete and fixture-only by default. The
 real spider, signed/spooled ingestion path, and offline Docker smoke work

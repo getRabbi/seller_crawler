@@ -91,6 +91,9 @@ database partition is involved. A downloader guard rejects non-public response
 addresses and cross-domain redirect pivots for both domain verification and
 contact enrichment, while the installed resolver rejects private addresses
 before the downloader can connect.
+The `resolve_seller` API/UI path re-enters at `resolving` for one existing
+canonical seller. Its authoritative name comes from core D1, not from browser
+input, and it uses the existing operations schema with an audited marker.
 
 Phase 8 is complete and verified ahead of order. Exact identifiers,
 canonical domains, normalized company names, public contact hashes, country/city

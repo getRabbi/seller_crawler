@@ -28,7 +28,7 @@ const countries = [
 const contactTypes = ["email", "phone", "whatsapp", "wechat"] as const;
 
 export default function NewCrawlPage() {
-  const [mode, setMode] = useState<"find_sellers" | "known_websites">("find_sellers");
+  const [mode, setMode] = useState<"find_sellers" | "resolve_seller" | "known_websites">("find_sellers");
   const [keywords, setKeywords] = useState("stainless steel bottle");
   const [seedUrls, setSeedUrls] = useState("");
   const [marketplace, setMarketplace] = useState("amazon.com");
@@ -54,7 +54,9 @@ export default function NewCrawlPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("mode") === "known_websites" || params.get("sellerId")) {
+    if (params.get("mode") === "resolve_seller") {
+      setMode("resolve_seller");
+    } else if (params.get("mode") === "known_websites" || params.get("sellerId")) {
       setMode("known_websites");
     }
     const sellerId = params.get("sellerId") ?? "";
@@ -98,7 +100,7 @@ export default function NewCrawlPage() {
     const payload: CreateCrawlRunRequest = {
       mode,
       contactTypes: contacts as CreateCrawlRunRequest["contactTypes"],
-      targetSellerCount: Number(target),
+      targetSellerCount: mode === "resolve_seller" ? 1 : Number(target),
       maxResultPages: Number(maxResultPages),
       maxOfficialPages: Number(maxOfficialPages),
       crawlDepth: Number(depth),
@@ -119,10 +121,12 @@ export default function NewCrawlPage() {
               traderLikelihood: trader
             }
           }
-        : {
+        : mode === "known_websites"
+          ? {
             seedUrls: lines(seedUrls),
             targetSellerId: targetSellerId || undefined
-          })
+          }
+          : { targetSellerId })
     };
 
     try {
@@ -147,11 +151,12 @@ export default function NewCrawlPage() {
 
         <div className="mode-switch" role="group" aria-label="Crawl mode">
           <button className={mode === "find_sellers" ? "selected" : ""} onClick={() => setMode("find_sellers")} type="button">Find Sellers</button>
+          <button className={mode === "resolve_seller" ? "selected" : ""} onClick={() => { setMode("resolve_seller"); setTarget("1"); }} type="button">Resolve Existing Seller</button>
           <button className={mode === "known_websites" ? "selected" : ""} onClick={() => setMode("known_websites")} type="button">Crawl Known Websites</button>
         </div>
 
         <section className="form-card">
-          <h2>{mode === "find_sellers" ? "Amazon identity discovery" : "Official website enrichment"}</h2>
+          <h2>{mode === "find_sellers" ? "Amazon identity discovery" : mode === "resolve_seller" ? "Existing seller domain resolution" : "Official website enrichment"}</h2>
           {mode === "find_sellers" ? (
             <>
             <p className="wide-help">After Amazon identifies sellers, the run checks a small, deterministic set of matching official-domain candidates. Only domains with both an exact identity/domain match and prominent on-page identity evidence continue to contact crawling; uncertain matches are not auto-linked.</p>
@@ -168,10 +173,15 @@ export default function NewCrawlPage() {
               <label className="check"><input checked={requireWebsite} onChange={(event) => setRequireWebsite(event.target.checked)} type="checkbox" /> Amazon already shows an official website</label>
             </div>
             </>
-          ) : (
+          ) : mode === "known_websites" ? (
             <div className="form-grid">
               <label className="wide"><FieldLabel text="Approved HTTPS website URLs" /><textarea onChange={(event) => setSeedUrls(event.target.value)} placeholder="https://example.com/" required rows={7} value={seedUrls} /><small>One public HTTPS URL per line, maximum twenty. Private/local targets are rejected.</small></label>
               <label className="wide">Existing seller ID (optional)<input onChange={(event) => setTargetSellerId(event.target.value.trim())} placeholder="UUIDv7 seller ID" value={targetSellerId} /><small>{targetSellerName ? `Contacts will be linked to ${targetSellerName}. ` : ""}Linking requires exactly one verified website URL. The API rejects missing sellers and domain conflicts.</small></label>
+            </div>
+          ) : (
+            <div className="form-grid">
+              <p className="wide-help">Use a seller already stored in the canonical directory. The run derives only exact-name domain candidates, verifies domain and prominent page identity, then crawls contacts only for an accepted match. It does not call Amazon or scrape a search engine.</p>
+              <label className="wide"><FieldLabel text="Existing seller ID" /><input onChange={(event) => setTargetSellerId(event.target.value.trim())} placeholder="UUIDv7 seller ID" required value={targetSellerId} /><small>{targetSellerName ? `Resolving ${targetSellerName}. ` : ""}Start from the Seller Directory to prefill this audited identifier.</small></label>
             </div>
           )}
         </section>
@@ -179,7 +189,7 @@ export default function NewCrawlPage() {
         <section className="form-card">
           <h2>Targets and enrichment</h2>
           <div className="form-grid">
-            <label><FieldLabel text="Target sellers" /><input list="target-seller-counts" max="100" min="1" onChange={(event) => setTarget(event.target.value)} required type="number" value={target} /><datalist id="target-seller-counts">{[10, 25, 50, 100].map((value) => <option key={value} value={value} />)}</datalist><small>Choose a preset or enter a bounded value from 1 to 100.</small></label>
+            <label><FieldLabel text="Target sellers" /><input disabled={mode === "resolve_seller"} list="target-seller-counts" max="100" min="1" onChange={(event) => setTarget(event.target.value)} required type="number" value={mode === "resolve_seller" ? "1" : target} /><datalist id="target-seller-counts">{[10, 25, 50, 100].map((value) => <option key={value} value={value} />)}</datalist><small>{mode === "resolve_seller" ? "Exactly one existing seller is resolved per audited run." : "Choose a preset or enter a bounded value from 1 to 100."}</small></label>
             {mode === "find_sellers" ? <label><FieldLabel text="Amazon result pages" /><input max="3" min="1" onChange={(event) => setMaxResultPages(event.target.value)} required type="number" value={maxResultPages} /></label> : null}
             <label><FieldLabel text="Official pages / seller" /><input max="25" min="1" onChange={(event) => setMaxOfficialPages(event.target.value)} required type="number" value={maxOfficialPages} /><small>Maximum 100 official pages across the whole run.</small></label>
             <label><FieldLabel text="Crawl depth" /><input max="3" min="0" onChange={(event) => setDepth(event.target.value)} required type="number" value={depth} /></label>
@@ -201,7 +211,7 @@ export default function NewCrawlPage() {
           tone="danger"
         />
       ) : null}
-      {result ? <StateBlock detail={`Run ${result.run.id} is ${result.run.status}. ${result.queued ? "It will start when the one-unit slot is free." : "Scrapy Cloud control accepted it. Seller discovery, conservative official-domain verification, and contact enrichment will run sequentially."}`} title="Crawl created" /> : null}
+      {result ? <StateBlock detail={`Run ${result.run.id} is ${result.run.status}. ${result.queued ? "It will start when the one-unit slot is free." : mode === "resolve_seller" ? "Scrapy Cloud accepted exact-name domain verification; accepted domains continue to contact enrichment." : "Scrapy Cloud control accepted it. Seller discovery, conservative official-domain verification, and contact enrichment will run sequentially."}`} title="Crawl created" /> : null}
     </DashboardShell>
   );
 }

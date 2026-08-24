@@ -298,6 +298,11 @@ same canonical seller ID, and contact records remain encrypted and run-linked.
 Confirm `ENABLE_SEARCH_DISCOVERY=false`, candidate count is at most 25, all jobs
 use `units=1`, and no paid API is called.
 
+Also test the Amazon-independent re-entry path: choose an unresolved seller in
+the directory, click **Resolve website automatically**, and confirm its run starts
+at `resolving` with exactly one linked seller. No Amazon job may be created for
+this mode. An accepted candidate must continue to `enriching` on the same unit.
+
 The manual recovery path remains available: open the seller directory, verify a
 credible public official domain, then choose **Crawl verified website**. The New
 Crawl form must contain exactly one HTTPS URL and the UUIDv7 seller ID. The Worker

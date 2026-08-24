@@ -91,6 +91,9 @@ export default function SellersPage() {
                     {!seller.officialDomain ? (
                       <>
                         <small>
+                          <Link href={automaticResolutionUrl(seller)}>Resolve website automatically</Link>
+                        </small>
+                        <small>
                           <a
                             href={googleOfficialWebsiteSearchUrl(seller)}
                             rel="noreferrer"
@@ -143,6 +146,15 @@ function googleOfficialWebsiteSearchUrl(seller: SellerListItem): string {
 function verifiedWebsiteCrawlUrl(seller: SellerListItem): string {
   const params = new URLSearchParams({
     mode: "known_websites",
+    sellerId: seller.id,
+    sellerName: seller.canonicalName
+  });
+  return `/crawls/new?${params.toString()}`;
+}
+
+function automaticResolutionUrl(seller: SellerListItem): string {
+  const params = new URLSearchParams({
+    mode: "resolve_seller",
     sellerId: seller.id,
     sellerName: seller.canonicalName
   });

@@ -15,6 +15,11 @@
   lookup; an absent, ambiguous, or temporarily unverifiable outcome fails closed
   without an automatic duplicate launch. The dashboard now explains and displays
   domain-resolution stages.
+- Added an explicit `resolve_seller` operator workflow for unresolved canonical
+  sellers already in the directory. It skips Amazon, derives the same bounded
+  exact-name candidates, verifies identity, and enriches contacts sequentially.
+  The API mode is stored backward-compatibly in the existing operations schema
+  with an audited automatic-resolution marker, so no migration is required.
 
 - Hardened official-site production enrichment: substantive public pages no
   longer stop merely because a theme script contains a challenge token, while

@@ -68,6 +68,9 @@ parked/for-sale and lower-confidence candidates remain unlinked. Decision eviden
 contains scores and signal names only, never raw contact values.
 The crawler DNS resolver must reject a non-public address before returning it to
 the downloader; response-address validation remains a second guard.
+Existing-seller automatic resolution requires an active canonical UUIDv7 seller
+with no stored official domain. The server loads the seller name from core D1;
+the browser cannot supply or override the identity used for candidate scoring.
 
 Seller-linked website runs accept one existing UUIDv7 seller and one verified
 public HTTPS URL. The Worker validates the canonical seller and rejects domain

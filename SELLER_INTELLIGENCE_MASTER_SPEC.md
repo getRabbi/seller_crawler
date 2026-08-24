@@ -97,6 +97,12 @@ candidates may update `sellers.official_domain` and enter the existing contact-p
 crawl. Candidate evidence uses existing versioned `sources` and `review_queue`
 records with no raw contact value, so no database migration is required.
 
+An unresolved canonical seller may also enter this same stage through an explicit
+authenticated `resolve_seller` request. The Worker loads the identity from core
+D1, links the audited run to that existing seller, and skips Amazon. The request
+mode is stored using the existing operations schema plus an
+`automaticResolution=true` marker; this refinement adds no table or enum change.
+
 The maximum discovery overhead is 25 candidate pages plus bounded robots handling.
 The existing 100-page official-enrichment cap, one active unit, zero-charge lock,
 and disabled `ENABLE_SEARCH_DISCOVERY`/Zyte API/paid-service gates remain unchanged.

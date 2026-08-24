@@ -122,7 +122,7 @@ export interface CrawlRunItem {
   errorMessage?: string | null;
 }
 
-export type CrawlMode = "find_sellers" | "known_websites";
+export type CrawlMode = "find_sellers" | "resolve_seller" | "known_websites";
 
 export interface CrawlFilters {
   category?: string;

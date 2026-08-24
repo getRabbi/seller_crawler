@@ -60,10 +60,11 @@ describe("dashboard runtime configuration", () => {
     expect(source).toContain("sellerId");
   });
 
-  it("ships an operational New Crawl form with bounded custom targets and both modes", () => {
+  it("ships an operational New Crawl form with bounded custom targets and all modes", () => {
     const source = readFileSync(new URL("../app/crawls/new/page.tsx", import.meta.url), "utf8");
 
     expect(source).toContain('mode === "find_sellers"');
+    expect(source).toContain('"resolve_seller"');
     expect(source).toContain('"known_websites"');
     expect(source).toContain('list="target-seller-counts"');
     expect(source).toContain('max="100"');
@@ -74,6 +75,7 @@ describe("dashboard runtime configuration", () => {
     expect(source).toContain("OPEN API SIGN-IN CHECK");
     expect(source).toContain("START CRAWL");
     expect(source).toContain("Existing seller ID (optional)");
+    expect(source).toContain("Resolve Existing Seller");
     expect(source).toContain("Maximum 100 official pages across the whole run.");
   });
 
@@ -91,6 +93,13 @@ describe("dashboard runtime configuration", () => {
 
     expect(validateCrawlForm(base)).toContain("keyword or product query");
     expect(validateCrawlForm({ ...base, mode: "known_websites", keywords: "" })).toContain("HTTPS website URL");
+    expect(validateCrawlForm({ ...base, mode: "resolve_seller", target: "1" })).toContain("UUIDv7 ID");
+    expect(validateCrawlForm({
+      ...base,
+      mode: "resolve_seller",
+      target: "1",
+      targetSellerId: "018f2d5e-7b3c-7a1d-8f2e-123456789abc"
+    })).toBeNull();
     expect(validateCrawlForm({ ...base, keywords: "bottle", contacts: [] })).toContain("contact priority");
     expect(validateCrawlForm({ ...base, keywords: "bottle", target: "101" })).toContain("1 to 100");
     expect(validateCrawlForm({ ...base, keywords: "bottle", target: "20", maxOfficialPages: "6" })).toContain("100 pages");

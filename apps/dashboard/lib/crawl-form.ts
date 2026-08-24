@@ -1,4 +1,4 @@
-export type CrawlFormMode = "find_sellers" | "known_websites";
+export type CrawlFormMode = "find_sellers" | "resolve_seller" | "known_websites";
 
 export interface CrawlFormValues {
   mode: CrawlFormMode;
@@ -22,7 +22,7 @@ export function validateCrawlForm(values: CrawlFormValues): string | null {
     } else if (queries.length > 5) {
       errors.push("use no more than five keyword queries");
     }
-  } else {
+  } else if (values.mode === "known_websites") {
     const urls = lines(values.seedUrls);
     if (urls.length === 0) {
       errors.push("enter at least one approved HTTPS website URL");
@@ -35,6 +35,8 @@ export function validateCrawlForm(values: CrawlFormValues): string | null {
     if (values.targetSellerId && urls.length !== 1) {
       errors.push("use exactly one website URL when linking an existing seller");
     }
+  } else if (!values.targetSellerId || !/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(values.targetSellerId)) {
+    errors.push("select an existing seller with a valid UUIDv7 ID");
   }
 
   if (!boundedInteger(values.target, 1, 100)) {
@@ -54,7 +56,9 @@ export function validateCrawlForm(values: CrawlFormValues): string | null {
   }
   const plannedSites = values.mode === "known_websites"
     ? Math.max(1, lines(values.seedUrls).length)
-    : Number(values.target);
+    : values.mode === "resolve_seller"
+      ? 1
+      : Number(values.target);
   if (
     boundedInteger(values.maxOfficialPages, 1, 25) &&
     Number.isInteger(plannedSites) &&

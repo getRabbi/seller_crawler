@@ -423,6 +423,81 @@ describe("operator crawl control", () => {
     expect(db.runs[0].active_unit_slot).toBe(1);
   });
 
+  it("resolves an existing canonical seller without calling Amazon", async () => {
+    const db = new OperatorD1();
+    const core = new ResolvingDomainD1();
+    const launches: URLSearchParams[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      if (String(input).includes("jobs/list.json")) {
+        return Response.json({ jobs: [{ state: "finished", close_reason: "finished" }] });
+      }
+      const body = new URLSearchParams(String(init?.body ?? ""));
+      launches.push(body);
+      return Response.json({ status: "ok", jobid: `871778/1/${800 + launches.length}` });
+    }));
+    const service = new OperatorCrawlService(operatorEnv(db, core));
+    const created = await service.create({
+      mode: "resolve_seller",
+      targetSellerId: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
+      contactTypes: ["email", "phone"],
+      targetSellerCount: 1,
+      maxResultPages: 1,
+      maxOfficialPages: 8,
+      crawlDepth: 2,
+      stopAfterTarget: true,
+      idempotencyKey: "resolve-existing-seller"
+    }, "operator@example.test");
+
+    expect(created.run.mode).toBe("resolve_seller");
+    expect(created.run.stage).toBe("resolving");
+    expect(launches).toHaveLength(1);
+    expect(launches[0].get("spider")).toBe("official_domain_discovery");
+    expect(launches[0].get("keywords")).toBeNull();
+
+    core.verified = true;
+    await service.pump();
+
+    expect(launches).toHaveLength(2);
+    expect(launches[1].get("spider")).toBe("official_website");
+    expect(launches[1].get("seed_urls")).toBe("https://watersybottle.com/");
+  });
+
+  it("reconstructs verified enrichment targets after a Worker restart", async () => {
+    const db = new OperatorD1();
+    const core = new ResolvingDomainD1();
+    const launches: URLSearchParams[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      const body = new URLSearchParams(String(init?.body ?? ""));
+      launches.push(body);
+      return Response.json({ status: "ok", jobid: `871778/1/${900 + launches.length}` });
+    }));
+    const service = new OperatorCrawlService(operatorEnv(db, core));
+    await service.create({
+      mode: "resolve_seller",
+      targetSellerId: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
+      contactTypes: ["phone"],
+      targetSellerCount: 1,
+      maxResultPages: 1,
+      maxOfficialPages: 8,
+      crawlDepth: 2,
+      stopAfterTarget: true,
+      idempotencyKey: "restart-enrichment-targets"
+    }, "operator@example.test");
+    core.verified = true;
+    Object.assign(db.runs[0], {
+      stage: "enriching",
+      status: "enriching",
+      zyte_job_id: null,
+      updated_at: "2026-08-24T08:00:00.000Z"
+    });
+
+    await service.pump();
+
+    expect(launches).toHaveLength(2);
+    expect(launches[1].get("spider")).toBe("official_website");
+    expect(launches[1].get("seed_urls")).toBe("https://watersybottle.com/");
+  });
+
   it("links a verified website crawl to an existing seller and preserves one bounded page budget", async () => {
     const db = new OperatorD1();
     const launches: URLSearchParams[] = [];
@@ -568,7 +643,16 @@ class ResolvingDomainD1 implements D1Database {
   prepare(query: string): D1PreparedStatement {
     return {
       bind: () => this.prepare(query),
-      first: async <T>() => null as T | null,
+      first: async <T>() => (
+        query.includes("FROM sellers WHERE id = ?")
+          ? {
+              id: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
+              canonical_name: "Watersy Bottle",
+              official_domain: this.verified ? "watersybottle.com" : null,
+              status: "active"
+            } as T
+          : null
+      ),
       all: async <T>() => {
         if (query.includes("official_domain IS NOT NULL")) {
           return {
