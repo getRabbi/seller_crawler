@@ -1207,7 +1207,12 @@ export class OperatorCrawlService {
         targets.push({
           sellerId: seller.id,
           sellerName: seller.canonical_name,
-          sellerNames,
+          sellerNames: [
+            candidate.identity,
+            ...sellerNames.filter(
+              (name) => identityLabel(name) !== identityLabel(candidate.identity)
+            )
+          ].slice(0, 6),
           seedUrl: `https://${candidate.domain}/`,
           candidateBasis: candidate.basis
         });
@@ -1536,7 +1541,7 @@ function uniqueIdentityNames(values: string[]): string[] {
 function candidateDomainsForIdentities(
   names: string[],
   marketplace: string | null
-): Array<{ domain: string; basis: string }> {
+): Array<{ domain: string; basis: string; identity: string }> {
   const localSuffix: Record<string, string> = {
     "amazon.co.uk": "co.uk",
     "amazon.ca": "ca",
@@ -1547,11 +1552,12 @@ function candidateDomainsForIdentities(
     "amazon.es": "es"
   };
   const suffixes = [...new Set([localSuffix[marketplace ?? ""], "com"].filter(Boolean))];
-  const result: Array<{ domain: string; basis: string }> = [];
+  const result: Array<{ domain: string; basis: string; identity: string }> = [];
   const seen = new Set<string>();
   for (const name of names) {
     const tokens = identityTokens(name);
     if (tokens.length === 0) continue;
+    const identity = tokens.join(" ");
     const compactLabel = tokens.join("");
     const hyphenatedLabel = tokens.join("-");
     for (const [label, basis] of [
@@ -1563,7 +1569,7 @@ function candidateDomainsForIdentities(
         const domain = `${label}.${suffix}`;
         if (seen.has(domain)) continue;
         seen.add(domain);
-        result.push({ domain, basis });
+        result.push({ domain, basis, identity });
       }
     }
   }
@@ -1587,7 +1593,16 @@ function identityLabel(value: string): string {
 }
 
 function validCandidateLabel(value: string): boolean {
-  return value.length >= 5 && value.length <= 63 && /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])$/.test(value) && /[a-z]/.test(value);
+  const genericLabels = new Set([
+    "amazon", "business", "company", "official", "online", "seller", "shop", "store", "the"
+  ]);
+  return (
+    value.length >= 5 &&
+    value.length <= 63 &&
+    !genericLabels.has(value) &&
+    /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])$/.test(value) &&
+    /[a-z]/.test(value)
+  );
 }
 
 function mergedWarnings(run: Pick<OperatorRunRow, "warnings_json">, ...values: string[]): string[] {

@@ -402,14 +402,14 @@ describe("operator crawl control", () => {
       {
         seller_id: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
         seller_name: "Watersy Bottle",
-        seller_names: ["Watersy Bottle"],
+        seller_names: ["watersy bottle"],
         seed_url: "https://watersybottle.com/",
         candidate_basis: "identity_exact_compact"
       },
       {
         seller_id: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
         seller_name: "Watersy Bottle",
-        seller_names: ["Watersy Bottle"],
+        seller_names: ["watersy bottle"],
         seed_url: "https://watersy-bottle.com/",
         candidate_basis: "identity_exact_hyphenated"
       }
@@ -463,6 +463,38 @@ describe("operator crawl control", () => {
     expect(launches).toHaveLength(2);
     expect(launches[1].get("spider")).toBe("official_website");
     expect(launches[1].get("seed_urls")).toBe("https://watersybottle.com/");
+  });
+
+  it("uses the normalized brand identity when a marketplace suffix is removed", async () => {
+    const db = new OperatorD1();
+    const launches: URLSearchParams[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      const body = new URLSearchParams(String(init?.body ?? ""));
+      launches.push(body);
+      return Response.json({ status: "ok", jobid: "871778/1/899" });
+    }));
+    const service = new OperatorCrawlService(operatorEnv(db, new GenericSuffixDomainD1()));
+
+    await service.create({
+      mode: "resolve_seller",
+      targetSellerId: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
+      contactTypes: ["email", "phone"],
+      targetSellerCount: 1,
+      maxResultPages: 1,
+      maxOfficialPages: 8,
+      crawlDepth: 2,
+      stopAfterTarget: true,
+      idempotencyKey: "resolve-generic-suffix-seller"
+    }, "operator@example.test");
+
+    expect(launches).toHaveLength(1);
+    expect(JSON.parse(String(launches[0].get("candidate_targets")))).toEqual([{
+      seller_id: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
+      seller_name: "TOURIT Official Store",
+      seller_names: ["tourit"],
+      seed_url: "https://tourit.com/",
+      candidate_basis: "identity_exact_compact"
+    }]);
   });
 
   it("reconstructs verified enrichment targets after a Worker restart", async () => {
@@ -681,6 +713,33 @@ class ResolvingDomainD1 implements D1Database {
         }
         return { success: true, results: [] as T[] };
       },
+      run: async () => ({ success: true })
+    };
+  }
+}
+
+class GenericSuffixDomainD1 implements D1Database {
+  prepare(query: string): D1PreparedStatement {
+    return {
+      bind: () => this.prepare(query),
+      first: async <T>() => (
+        query.includes("FROM sellers WHERE id = ?")
+          ? {
+              id: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
+              canonical_name: "TOURIT Official Store",
+              official_domain: null,
+              status: "active"
+            } as T
+          : null
+      ),
+      all: async <T>() => ({
+        success: true,
+        results: (query.includes("official_domain IS NULL") ? [{
+          id: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
+          canonical_name: "TOURIT Official Store",
+          legal_name: null
+        }] : []) as T[]
+      }),
       run: async () => ({ success: true })
     };
   }

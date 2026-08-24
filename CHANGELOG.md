@@ -23,6 +23,9 @@
 - Fixed direct existing-seller resolution so its exact candidate domains enter
   the per-run ingestion allowlist before the external stage launches, including
   reconstructed launches after a Worker restart.
+- Fixed marketplace suffix normalization so names such as `Official Store` are
+  removed consistently from both deterministic domain generation and identity
+  verification. Generic-only candidates remain rejected.
 
 - Hardened official-site production enrichment: substantive public pages no
   longer stop merely because a theme script contains a challenge token, while
