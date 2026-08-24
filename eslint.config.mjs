@@ -12,6 +12,7 @@ export default [
       "**/out/**",
       "coverage/**",
       "dist/**",
+      ".sellerintel/**",
       "**/.wrangler/**"
     ]
   },

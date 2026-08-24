@@ -103,6 +103,19 @@ throughput its free-tier D1 impact is proportional to verified contacts and
 stays inside the existing ingestion write envelope. Archive or retention must
 be a documented forward operation.
 
+Amazon operator runs may add a sequential official-domain verification stage.
+It checks no more than two deterministic candidates per seller and 25 candidates
+per run, one homepage page per domain plus bounded robots and same-domain redirect
+handling. Candidate outcomes
+reuse versioned source/review records, so this release requires no D1 migration.
+The candidate stage does not consume Zyte API or a second unit. A failed or
+ambiguous candidate is not linked; a parked page, private response address,
+cross-domain redirect, robots denial, or explicit block is never bypassed.
+Every external job uses a unique `operator:<run-id>:<stage>` tag. If a Worker
+execution ends after Scrapy Cloud accepts a job but before D1 stores its ID, the
+next queue pump recovers that exact tagged stage. Missing, duplicate, or
+unverifiable tag results never cause an automatic relaunch.
+
 Phase 10A local runner readiness is complete and fixture-only by default. The
 real spider, signed/spooled ingestion path, and offline Docker smoke work
 locally. Runbook details are in `docs/local-runner.md`. The local smoke command validates startup gates,

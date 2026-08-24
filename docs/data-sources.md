@@ -1,42 +1,45 @@
 # Data Sources
 
-The current local phases have no live source adapters. Amazon, Alibaba, 1688,
-search discovery, Zyte API, and live crawling remain disabled.
-
-Solo Mode v1 narrows the first launch source scope to official company websites
-only. The allowed contact types are public business email, phone, WhatsApp, and
-WeChat. Marketplace crawling, Amazon, Alibaba, 1688, supplier directories,
-registry crawling, broad search discovery, paid search APIs, paid proxies, and
-Zyte API are deferred.
-
-Phase 7, the Solo v1 Phase 9 dashboard/API surface, and Phase 10A are complete
-and verified locally. No live source is activated.
+Production uses two approved public-source adapters in one sequential operator
+run: bounded Amazon seller-identity discovery, then official company website
+verification and contact enrichment. The allowed contact types are public
+business email, phone, WhatsApp, and WeChat. Alibaba, 1688, supplier directories,
+registry crawling, generic search discovery, paid search APIs, paid proxies, and
+Zyte API remain disabled.
 
 Phase 4 contact extractor tests use sanitized local HTML fixtures only. These
 fixtures cover an official contact page, a multilingual contact page, and a
 misleading directory-style false positive. No fixture test connects to an
 external source.
 
-Phase 6 adapter policies are local metadata only. `official_site` and
-`business_registry` are enabled by default for later approved local work;
-Amazon, Alibaba, 1688, and search discovery remain disabled until explicit
-phase work and source review allow them.
+Phase 6 policy metadata remains authoritative. Amazon and official-site adapters
+are enabled only by the accepted operator runtime; Alibaba, 1688, business
+registry, and search discovery stay disabled.
 
-Phase 7 implements a real Scrapy official-site engine. In its default fixture
-mode, a downloader middleware serves sanitized pages and robots.txt without a
-network connection. In gated local-live or Zyte modes, the same spider fetches
-only explicit approved domains and bounded business pages. It stops on explicit
-blocks and never switches providers. R2 uploads remain deferred.
+Phase 7 implements real Scrapy official-site engines. In fixture mode, a
+downloader middleware serves sanitized pages and robots.txt without a network
+connection. In gated local-live or Zyte Student modes, the contact spider fetches
+only authorized domains and bounded business pages. It stops on explicit blocks
+and never switches providers. R2 uploads remain deferred.
 
-For Solo v1, accepted official-site evidence should be compact in D1 first:
-source URL, canonical URL, masked evidence snippet or extraction context,
-content hash, first seen, last fetched, last success, parser version, and schema
-version. Full raw HTML, screenshot capture, and long-retention archives can move
-to R2 after launch.
+If Amazon does not expose an official link, the Worker may create a maximum of
+two deterministic exact-name candidates per seller and 25 candidates per run.
+This does not query or scrape Google, Bing, DuckDuckGo, or another search engine.
+The candidate spider requests only the HTTPS homepage after robots authorization,
+blocks private response addresses and cross-domain redirect pivots, and rejects
+parked pages. A domain is auto-linked only when its normalized label exactly
+matches a collected public identity and the same identity appears prominently on
+the page. Candidate decisions are stored as compact, versioned source evidence;
+only accepted domains continue to contact-page crawling.
+
+Accepted official-site evidence stays compact in D1: source URL, canonical URL,
+masked evidence snippet or extraction context, content hash, first seen, last
+fetched, last success, parser version, and schema version. Full raw HTML,
+screenshot capture, and long-retention archives can move to R2 after launch.
 
 Phase 8 entity resolution does not add a live source. It compares already
 collected seller identities, aliases, domains, marketplace identifiers, public
-contact hashes, and location hints in deterministic local fixtures.
+contact hashes, and location hints.
 
 Phase 9 dashboard data comes only from Worker `/v1` endpoints. The browser does
 not call D1, R2, crawlers, source adapters, or provider APIs directly, and list

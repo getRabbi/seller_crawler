@@ -86,8 +86,10 @@ class OfficialWebsiteSpider(scrapy.Spider):
     custom_settings = {
         "DOWNLOADER_MIDDLEWARES": {
             "sellerintel.middlewares.FixtureOfficialSiteMiddleware": 50,
+            "sellerintel.middlewares.PublicNetworkGuardMiddleware": 950,
         },
         "DEPTH_LIMIT": 0,
+        "DNS_RESOLVER": "sellerintel.security.dns.PublicCachingResolver",
         "ROBOTSTXT_OBEY": True,
     }
 
@@ -274,7 +276,10 @@ class OfficialWebsiteSpider(scrapy.Spider):
                     callback=self.parse_sitemap,
                     errback=self.handle_request_error,
                     dont_filter=True,
-                    meta={"source_domain": domain},
+                    meta={
+                        "source_domain": domain,
+                        "sellerintel_allowed_domain": domain,
+                    },
                 )
                 return
 
@@ -327,6 +332,7 @@ class OfficialWebsiteSpider(scrapy.Spider):
             meta={
                 "crawl_depth": depth,
                 "observed_at": self._observed_at,
+                "sellerintel_allowed_domain": _domain(url),
             },
         )
 

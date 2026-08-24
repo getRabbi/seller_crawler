@@ -290,12 +290,20 @@ signed ingestion, compact evidence, search, masked dashboard display, duplicate
 handling, crawl status, and CSV export. Stop on robots denial, CAPTCHA, explicit
 block, unexpected domain navigation, ingestion spool, or charge warning.
 
-For a seller-linked acceptance test, open the seller directory, use the
-operator-initiated search link to verify a credible public official domain, then
-choose **Crawl verified website**. The New Crawl form must contain exactly one
-HTTPS URL and the UUIDv7 seller ID. The Worker rejects unknown sellers and a
-domain that conflicts with an already stored official domain. Do not paste a
-search-result page URL; only the verified official company URL is a seed.
+For an automatic handoff acceptance test, create a bounded Amazon run for a
+seller whose official domain is initially null. Confirm the event sequence is
+`discovering -> resolving -> enriching`, candidate source records use parser
+`official-domain-discovery-v1`, only an accepted score of at least 80 updates the
+same canonical seller ID, and contact records remain encrypted and run-linked.
+Confirm `ENABLE_SEARCH_DISCOVERY=false`, candidate count is at most 25, all jobs
+use `units=1`, and no paid API is called.
+
+The manual recovery path remains available: open the seller directory, verify a
+credible public official domain, then choose **Crawl verified website**. The New
+Crawl form must contain exactly one HTTPS URL and the UUIDv7 seller ID. The Worker
+rejects unknown sellers and a domain that conflicts with an already stored
+official domain. Do not paste a search-result page URL; only the verified official
+company URL is a seed.
 
 The operator API caps each run at 100 planned official pages. The spider's page
 budget applies per domain; the Scrapy Cloud response cap adds only two bounded
@@ -336,3 +344,7 @@ Rolling back application code does not require deleting
 `crawl_run_contacts`. Leave the table and rows in place; older Workers ignore
 them. If the linkage feature must be disabled, deploy a forward code change that
 removes the seller-linked form action while preserving run/contact audit rows.
+Rolling back automatic domain verification likewise requires no schema rollback:
+restore the prior Worker/crawler/dashboard versions, keep candidate source/review
+and accepted canonical records, and use a documented forward correction if an
+accepted domain must be changed. Never delete canonical or historical records.

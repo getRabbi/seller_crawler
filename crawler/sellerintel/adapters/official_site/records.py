@@ -39,6 +39,8 @@ def seller_record_for_domain(
     company_name: str,
     observed_at: str,
     seller_id: str | None = None,
+    identity_confidence: int = 80,
+    parser_version: str = OFFICIAL_SITE_PARSER_VERSION,
 ) -> SellerRecord:
     normalized = normalize_company_name(company_name)
     canonical_name = normalized.nfkc or domain
@@ -48,10 +50,10 @@ def seller_record_for_domain(
         canonical_name=canonical_name,
         normalized_name=normalized_name,
         official_domain=domain,
-        identity_confidence=80,
+        identity_confidence=identity_confidence,
         quality_score=40,
         schema_version=1,
-        parser_version=OFFICIAL_SITE_PARSER_VERSION,
+        parser_version=parser_version,
         first_seen_at=observed_at,
         last_seen_at=observed_at,
         created_at=observed_at,

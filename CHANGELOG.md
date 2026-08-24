@@ -2,6 +2,20 @@
 
 ## Unreleased - Solo Mode v1 Implementation
 
+- Added a zero-charge, provider-neutral official-domain resolution stage after
+  Amazon identity discovery. It derives at most two deterministic identity
+  candidates per seller and 25 per run, respects robots/cooldowns, rejects
+  private response addresses, cross-domain redirects, parked pages, and weak
+  identity matches, persists versioned decision evidence, and hands only
+  conservatively verified domains to contact enrichment on the same one-unit
+  slot. Generic search scraping, Zyte API, paid services, and provider switching
+  remain disabled.
+- Added atomic external-launch claiming and unique per-run/per-stage Scrapy Cloud
+  tags. A stale uncertain launch is recovered from the authoritative tagged-job
+  lookup; an absent, ambiguous, or temporarily unverifiable outcome fails closed
+  without an automatic duplicate launch. The dashboard now explains and displays
+  domain-resolution stages.
+
 - Hardened official-site production enrichment: substantive public pages no
   longer stop merely because a theme script contains a challenge token, while
   HTTP blocks and visible or short challenge pages still stop without bypass.

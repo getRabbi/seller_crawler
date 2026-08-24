@@ -80,6 +80,18 @@ contact extraction. A no-network downloader middleware provides full fixture
 execution. Compact masked evidence is persisted through the ingestion contract;
 raw R2 evidence is deferred by the Solo amendment.
 
+The production Phase 7 handoff also includes a provider-neutral
+`official_domain_discovery` spider. The Worker deterministically derives a small
+candidate set from existing canonical seller and seller-alias identity data, authorizes those
+domains for the run, and uses the same active Student unit sequentially:
+`discovering -> resolving -> enriching`. Conservative multi-signal scoring is
+required before the canonical seller gains an official domain. Candidate source
+records provide an idempotent audit trail; no generic search adapter or new
+database partition is involved. A downloader guard rejects non-public response
+addresses and cross-domain redirect pivots for both domain verification and
+contact enrichment, while the installed resolver rejects private addresses
+before the downloader can connect.
+
 Phase 8 is complete and verified ahead of order. Exact identifiers,
 canonical domains, normalized company names, public contact hashes, country/city
 signals, and fuzzy name similarity produce transparent score components.

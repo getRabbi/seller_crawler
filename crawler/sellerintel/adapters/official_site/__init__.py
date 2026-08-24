@@ -1,3 +1,8 @@
+from sellerintel.adapters.official_site.discovery import (
+    DISCOVERY_PARSER_VERSION,
+    DomainVerification,
+    verify_official_domain,
+)
 from sellerintel.adapters.official_site.enrichment import (
     EvidenceEnvelope,
     OfficialPageEnrichment,
@@ -19,6 +24,8 @@ from sellerintel.adapters.official_site.records import (
 ENABLED_BY_DEFAULT = True
 
 __all__ = [
+    "DISCOVERY_PARSER_VERSION",
+    "DomainVerification",
     "ENABLED_BY_DEFAULT",
     "EvidenceEnvelope",
     "OfficialPageEnrichment",
@@ -33,4 +40,5 @@ __all__ = [
     "new_uuidv7",
     "seller_record_for_domain",
     "source_record_for_page",
+    "verify_official_domain",
 ]

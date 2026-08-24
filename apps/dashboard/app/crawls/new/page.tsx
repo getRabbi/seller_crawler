@@ -153,6 +153,8 @@ export default function NewCrawlPage() {
         <section className="form-card">
           <h2>{mode === "find_sellers" ? "Amazon identity discovery" : "Official website enrichment"}</h2>
           {mode === "find_sellers" ? (
+            <>
+            <p className="wide-help">After Amazon identifies sellers, the run checks a small, deterministic set of matching official-domain candidates. Only domains with both an exact identity/domain match and prominent on-page identity evidence continue to contact crawling; uncertain matches are not auto-linked.</p>
             <div className="form-grid">
               <label className="wide"><FieldLabel text="Keywords / product queries" /><textarea maxLength={600} onChange={(event) => setKeywords(event.target.value)} required rows={4} value={keywords} /><small>One query per line, maximum five.</small></label>
               <label><FieldLabel text="Marketplace" /><select onChange={(event) => setMarketplace(event.target.value)} required value={marketplace}>{marketplaces.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
@@ -163,8 +165,9 @@ export default function NewCrawlPage() {
               <label>Manufacturer likelihood<select onChange={(event) => setManufacturer(event.target.value as "any" | "likely")} value={manufacturer}><option value="any">Any</option><option value="likely">Likely</option></select></label>
               <label>Trader likelihood<select onChange={(event) => setTrader(event.target.value as "any" | "likely")} value={trader}><option value="any">Any</option><option value="likely">Likely</option></select></label>
               <label className="check"><input checked={requireLocation} onChange={(event) => setRequireLocation(event.target.checked)} type="checkbox" /> Require public location</label>
-              <label className="check"><input checked={requireWebsite} onChange={(event) => setRequireWebsite(event.target.checked)} type="checkbox" /> Has official website</label>
+              <label className="check"><input checked={requireWebsite} onChange={(event) => setRequireWebsite(event.target.checked)} type="checkbox" /> Amazon already shows an official website</label>
             </div>
+            </>
           ) : (
             <div className="form-grid">
               <label className="wide"><FieldLabel text="Approved HTTPS website URLs" /><textarea onChange={(event) => setSeedUrls(event.target.value)} placeholder="https://example.com/" required rows={7} value={seedUrls} /><small>One public HTTPS URL per line, maximum twenty. Private/local targets are rejected.</small></label>
@@ -198,7 +201,7 @@ export default function NewCrawlPage() {
           tone="danger"
         />
       ) : null}
-      {result ? <StateBlock detail={`Run ${result.run.id} is ${result.run.status}. ${result.queued ? "It will start when the one-unit slot is free." : "Scrapy Cloud control accepted it."}`} title="Crawl created" /> : null}
+      {result ? <StateBlock detail={`Run ${result.run.id} is ${result.run.status}. ${result.queued ? "It will start when the one-unit slot is free." : "Scrapy Cloud control accepted it. Seller discovery, conservative official-domain verification, and contact enrichment will run sequentially."}`} title="Crawl created" /> : null}
     </DashboardShell>
   );
 }

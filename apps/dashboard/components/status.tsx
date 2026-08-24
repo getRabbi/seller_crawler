@@ -72,7 +72,7 @@ function statusTone(value: string): string {
   if (["active", "ready", "accepted", "enabled", "running", "completed"].includes(value)) {
     return "good";
   }
-  if (["review", "pending", "idle", "queued", "starting", "enriching", "ingesting", "completed_with_warnings", "cooldown"].includes(value)) {
+  if (["review", "pending", "idle", "queued", "starting", "launching", "resolving", "enriching", "ingesting", "completed_with_warnings", "cooldown"].includes(value)) {
     return "warn";
   }
   if (["paused", "disabled", "locked", "failed", "blocked", "cancelled"].includes(value)) {

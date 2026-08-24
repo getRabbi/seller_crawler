@@ -6,7 +6,7 @@ import type {
   SellerListItem
 } from "@seller-intelligence/shared-types/dashboard";
 
-import type { D1Database, D1Value } from "../repositories/d1";
+import type { D1Database, D1Result, D1Value } from "../repositories/d1";
 import { newUuidV7 } from "../repositories/ids";
 import { readRuntimeState, startupGateViolations, type RuntimeEnv } from "../validation/startup";
 
@@ -33,11 +33,17 @@ const TERMINAL_STATUSES = new Set([
 const API_BASE = "https://app.zyte.com/api";
 const UUID_V7_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_OFFICIAL_PAGES_PER_RUN = 100;
+const MAX_DOMAIN_CANDIDATES_PER_RUN = 25;
 
 interface OfficialSellerTarget {
   sellerId: string;
   sellerName: string;
   seedUrl: string;
+}
+
+interface DomainCandidateTarget extends OfficialSellerTarget {
+  sellerNames: string[];
+  candidateBasis: string;
 }
 
 interface CrawlerOutcome {
@@ -101,8 +107,10 @@ interface ExistingIdempotency {
 }
 
 interface CloudJob {
+  id?: unknown;
   state?: unknown;
   close_reason?: unknown;
+  tags?: unknown;
 }
 
 export class OperatorCrawlError extends Error {
@@ -281,10 +289,30 @@ export class OperatorCrawlService {
     if (TERMINAL_STATUSES.has(run.status)) {
       return { run: mapRun(run), queued: false };
     }
-    if (run.zyte_job_id && run.active_unit_slot === 1) {
+    let jobId = run.zyte_job_id;
+    if (!jobId && run.status === "launching" && run.active_unit_slot === 1) {
+      try {
+        jobId = await this.taggedStageJob(run);
+      } catch {
+        throw new OperatorCrawlError(
+          503,
+          "launch_recovery_unavailable",
+          "The launch outcome cannot be verified yet; cancellation was not applied."
+        );
+      }
+      const leaseAge = Date.now() - Date.parse(run.updated_at);
+      if (!jobId && (!Number.isFinite(leaseAge) || leaseAge < 120_000)) {
+        throw new OperatorCrawlError(
+          409,
+          "launch_confirmation_pending",
+          "Launch confirmation is still pending; retry cancellation after the recovery window."
+        );
+      }
+    }
+    if (jobId && run.active_unit_slot === 1) {
       await this.cloudRequest("POST", "/jobs/stop.json", {
         project: this.projectId(),
-        job: run.zyte_job_id
+        job: jobId
       });
     }
     await this.transition(run, "cancelled", "cancelled", actorId, "Operator cancelled the crawl run.", true);
@@ -344,7 +372,11 @@ export class OperatorCrawlService {
       .prepare("SELECT * FROM operator_crawl_runs WHERE active_unit_slot = 1 LIMIT 1")
       .first<OperatorRunRow>();
     if (active) {
-      await this.syncActive(active);
+      if (active.zyte_job_id) {
+        await this.syncActive(active);
+      } else {
+        await this.startActiveStage(active);
+      }
       const stillActive = await this.db
         .prepare("SELECT id FROM operator_crawl_runs WHERE active_unit_slot = 1 LIMIT 1")
         .first<{ id: string }>();
@@ -368,25 +400,7 @@ export class OperatorCrawlService {
     const claimed = await this.getRun(queued.id);
     if (claimed?.active_unit_slot !== 1) return;
     await this.event(claimed.id, "starting", null, "queued", "starting", "One-unit slot acquired.");
-    try {
-      const jobId = await this.launch(claimed);
-      await this.db
-        .prepare("UPDATE operator_crawl_runs SET zyte_job_id = ?, status = 'running', updated_at = ? WHERE id = ?")
-        .bind(jobId, new Date().toISOString(), claimed.id)
-        .run();
-      await this.event(claimed.id, "started", null, "starting", "running", "Scrapy Cloud accepted the one-unit job.");
-    } catch (error) {
-      await this.transition(
-        claimed,
-        "failed",
-        claimed.stage,
-        null,
-        "Scrapy Cloud job launch failed.",
-        true,
-        "zyte_launch_failed",
-        safeError(error)
-      );
-    }
+    await this.startActiveStage(claimed);
   }
 
   async authorizedDomains(crawlRunId: string): Promise<Set<string>> {
@@ -406,14 +420,20 @@ export class OperatorCrawlService {
     const run = await this.getRun(crawlRunId);
     if (!run) return;
     const now = new Date().toISOString();
-    const stage = sourceTypes.some((value) => value.startsWith("amazon")) ? "discovered" : "enriched";
+    const stages: string[] = [];
+    if (sourceTypes.some((value) => value.startsWith("amazon"))) stages.push("discovered");
+    if (sourceTypes.some((value) => value === "official_site") || contacts.length > 0) {
+      stages.push("enriched");
+    }
     for (const sellerId of new Set(sellerIds)) {
-      await this.db
-        .prepare(
-          "INSERT INTO crawl_run_sellers (crawl_run_id, seller_id, stage, first_seen_at) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING"
-        )
-        .bind(crawlRunId, sellerId, stage, now)
-        .run();
+      for (const stage of stages) {
+        await this.db
+          .prepare(
+            "INSERT INTO crawl_run_sellers (crawl_run_id, seller_id, stage, first_seen_at) VALUES (?, ?, ?, ?) ON CONFLICT DO NOTHING"
+          )
+          .bind(crawlRunId, sellerId, stage, now)
+          .run();
+      }
     }
     for (const contact of contacts) {
       await this.db
@@ -508,42 +528,34 @@ export class OperatorCrawlService {
       );
       return;
     }
-    if (outcome?.status === "completed_with_errors" || Number(outcome?.error_count ?? 0) > 0) {
-      await this.transition(
-        run,
-        "completed_with_warnings",
-        "completed",
-        null,
-        "Crawl finished with one or more bounded crawler errors.",
-        true,
-        "crawler_errors",
-        "Review crawl evidence and source health before retrying.",
-        ["crawler_errors"]
-      );
-      return;
-    }
+    const crawlerWarnings =
+      outcome?.status === "completed_with_errors" || Number(outcome?.error_count ?? 0) > 0
+        ? ["crawler_errors"]
+        : [];
     if (run.mode === "find_sellers" && run.stage === "discovering") {
+      const candidates = await this.domainCandidateTargetsForRun(run.id, run.marketplace);
+      if (candidates.length > 0) {
+        await this.handoff(
+          run,
+          "resolving",
+          candidates.map((target) => target.seedUrl),
+          crawlerWarnings,
+          "Official-domain verification started on the same one-unit slot.",
+          undefined,
+          candidates
+        );
+        return;
+      }
       const targets = await this.officialTargetsForRun(run.id);
       if (targets.length > 0) {
-        const domains = targets.map((target) => new URL(target.seedUrl).hostname.toLowerCase());
-        const approved = [...new Set([...parseStringArray(run.approved_domains_json), ...domains])];
-        await this.db
-          .prepare(
-            "UPDATE operator_crawl_runs SET stage = 'enriching', status = 'enriching', approved_domains_json = ?, zyte_job_id = NULL, updated_at = ? WHERE id = ?"
-          )
-          .bind(JSON.stringify(approved), new Date().toISOString(), run.id)
-          .run();
-        const enriching = await this.requireRun(run.id);
-        try {
-          const jobId = await this.launch(enriching, targets);
-          await this.db
-            .prepare("UPDATE operator_crawl_runs SET zyte_job_id = ?, status = 'running', updated_at = ? WHERE id = ?")
-            .bind(jobId, new Date().toISOString(), run.id)
-            .run();
-          await this.event(run.id, "enrichment_started", null, run.status, "running", "Official-site enrichment started on the same one-unit slot.");
-        } catch (error) {
-          await this.transition(enriching, "failed", "enriching", null, "Official-site enrichment launch failed.", true, "enrichment_launch_failed", safeError(error));
-        }
+        await this.handoff(
+          run,
+          "enriching",
+          targets.map((target) => target.seedUrl),
+          crawlerWarnings,
+          "Official-site enrichment started on the same one-unit slot.",
+          targets
+        );
         return;
       }
       await this.transition(
@@ -555,7 +567,47 @@ export class OperatorCrawlService {
         true,
         null,
         null,
-        ["official_website_unavailable"]
+        mergedWarnings(run, ...crawlerWarnings, "official_website_unavailable")
+      );
+      return;
+    }
+    if (run.mode === "find_sellers" && run.stage === "resolving") {
+      const targets = await this.officialTargetsForRun(run.id);
+      if (targets.length > 0) {
+        await this.handoff(
+          run,
+          "enriching",
+          targets.map((target) => target.seedUrl),
+          crawlerWarnings,
+          "Verified official domains were handed to contact enrichment on the same one-unit slot.",
+          targets
+        );
+        return;
+      }
+      await this.transition(
+        run,
+        "completed_with_warnings",
+        "completed",
+        null,
+        "Official-domain candidates were checked, but none passed the conservative identity threshold.",
+        true,
+        null,
+        null,
+        mergedWarnings(run, ...crawlerWarnings, "official_domain_not_verified")
+      );
+      return;
+    }
+    if (crawlerWarnings.length > 0) {
+      await this.transition(
+        run,
+        "completed_with_warnings",
+        "completed",
+        null,
+        "Crawl finished with one or more bounded crawler errors.",
+        true,
+        "crawler_errors",
+        "Review crawl evidence and source health before retrying.",
+        mergedWarnings(run, ...crawlerWarnings)
       );
       return;
     }
@@ -569,7 +621,7 @@ export class OperatorCrawlService {
         true,
         null,
         null,
-        ["no_public_contacts_found"]
+        mergedWarnings(run, "no_public_contacts_found")
       );
       return;
     }
@@ -578,10 +630,145 @@ export class OperatorCrawlService {
 
   private async refreshById(id: string): Promise<void> {
     const run = await this.getRun(id);
-    if (run?.active_unit_slot === 1) await this.syncActive(run);
+    if (run?.active_unit_slot === 1) {
+      if (run.zyte_job_id) await this.syncActive(run);
+      else await this.startActiveStage(run);
+    }
   }
 
-  private async launch(run: OperatorRunRow, overrideTargets?: OfficialSellerTarget[]): Promise<string> {
+  private async startActiveStage(
+    run: OperatorRunRow,
+    officialTargets?: OfficialSellerTarget[],
+    candidateTargets?: DomainCandidateTarget[]
+  ): Promise<void> {
+    if (run.status === "launching") {
+      const leaseAge = Date.now() - Date.parse(run.updated_at);
+      if (Number.isFinite(leaseAge) && leaseAge < 120_000) return;
+      let recoveredJobId: string | null;
+      try {
+        recoveredJobId = await this.taggedStageJob(run);
+      } catch {
+        return;
+      }
+      if (recoveredJobId) {
+        const recoveredAt = new Date().toISOString();
+        const recovery = await this.db
+          .prepare(
+            `UPDATE operator_crawl_runs SET zyte_job_id = ?, status = 'running', updated_at = ?
+             WHERE id = ? AND status = 'launching' AND zyte_job_id IS NULL`
+          )
+          .bind(recoveredJobId, recoveredAt, run.id)
+          .run();
+        if (statementChanged(recovery)) {
+          await this.event(
+            run.id,
+            "launch_recovered",
+            null,
+            "launching",
+            "running",
+            "Recovered the accepted Scrapy Cloud job by its unique stage tag."
+          );
+        }
+        return;
+      }
+      await this.transition(
+        run,
+        "failed",
+        run.stage,
+        null,
+        "The external launch outcome could not be proven; automatic relaunch was suppressed.",
+        true,
+        "launch_outcome_unknown",
+        "Retry as a new audited crawl after confirming no Scrapy Cloud job remains active."
+      );
+      return;
+    }
+    const launchStartedAt = new Date().toISOString();
+    const claim = await this.db
+      .prepare(
+        `UPDATE operator_crawl_runs SET status = 'launching', updated_at = ?
+         WHERE id = ? AND active_unit_slot = 1 AND zyte_job_id IS NULL
+           AND status = ? AND updated_at = ?`
+      )
+      .bind(launchStartedAt, run.id, run.status, run.updated_at)
+      .run();
+    if (!statementChanged(claim)) return;
+    const launchingRun = { ...run, status: "launching", updated_at: launchStartedAt };
+    try {
+      const jobId = await this.launch(launchingRun, officialTargets, candidateTargets);
+      await this.db
+        .prepare("UPDATE operator_crawl_runs SET zyte_job_id = ?, status = 'running', updated_at = ? WHERE id = ?")
+        .bind(jobId, new Date().toISOString(), run.id)
+        .run();
+      await this.event(
+        launchingRun.id,
+        launchingRun.stage === "resolving" ? "domain_verification_started" : "started",
+        null,
+        "launching",
+        "running",
+        "Scrapy Cloud accepted the bounded one-unit stage job."
+      );
+    } catch (error) {
+      const code = launchingRun.stage === "resolving"
+        ? "domain_verification_launch_failed"
+        : launchingRun.stage === "enriching"
+          ? "enrichment_launch_failed"
+          : "zyte_launch_failed";
+      await this.transition(
+        launchingRun,
+        "failed",
+        launchingRun.stage,
+        null,
+        "Scrapy Cloud stage launch failed.",
+        true,
+        code,
+        safeError(error)
+      );
+    }
+  }
+
+  private async handoff(
+    run: OperatorRunRow,
+    stage: "resolving" | "enriching",
+    seedUrls: string[],
+    warnings: string[],
+    message: string,
+    officialTargets?: OfficialSellerTarget[],
+    candidateTargets?: DomainCandidateTarget[]
+  ): Promise<void> {
+    const domains = seedUrls.map((value) => normalizeDomain(new URL(value).hostname));
+    const approved = [
+      ...new Set([...parseStringArray(run.approved_domains_json), ...domains].filter(Boolean))
+    ];
+    const now = new Date().toISOString();
+    const result = await this.db
+      .prepare(
+        `UPDATE operator_crawl_runs SET stage = ?, status = ?, approved_domains_json = ?,
+         warnings_json = ?, zyte_job_id = NULL, updated_at = ?
+         WHERE id = ? AND stage = ?`
+      )
+      .bind(
+        stage,
+        stage,
+        JSON.stringify(approved),
+        JSON.stringify(mergedWarnings(run, ...warnings)),
+        now,
+        run.id,
+        run.stage
+      )
+      .run();
+    if (!statementChanged(result)) return;
+    const next = await this.requireRun(run.id);
+    if (next.stage !== stage || next.zyte_job_id) return;
+    await this.event(run.id, `${stage}_handoff`, null, run.status, stage, message);
+    await this.startActiveStage(next, officialTargets, candidateTargets);
+  }
+
+  private async launch(
+    run: OperatorRunRow,
+    overrideTargets?: OfficialSellerTarget[],
+    overrideCandidates?: DomainCandidateTarget[]
+  ): Promise<string> {
     const commonSettings: Record<string, unknown> = {
       RUNNER_MODE: "zyte_student_active",
       LIVE_CRAWL_ENABLED: true,
@@ -631,7 +818,7 @@ export class OperatorCrawlService {
       project: this.projectId(),
       units: "1",
       priority: "1",
-      add_tag: `operator:${run.id}`,
+      add_tag: this.stageTag(run),
       job_settings: JSON.stringify(commonSettings),
       crawl_run_id: run.id
     };
@@ -655,6 +842,24 @@ export class OperatorCrawlService {
         250,
         run.max_result_pages + run.target_seller_count * 2
       );
+    } else if (run.mode === "find_sellers" && run.stage === "resolving") {
+      const candidates =
+        overrideCandidates ?? (await this.domainCandidateTargetsForRun(run.id, run.marketplace));
+      if (candidates.length === 0) {
+        throw new Error("No bounded official-domain candidates remain for verification.");
+      }
+      form.spider = "official_domain_discovery";
+      form.candidate_targets = JSON.stringify(
+        candidates.map((target) => ({
+          seller_id: target.sellerId,
+          seller_name: target.sellerName,
+          seller_names: target.sellerNames,
+          seed_url: target.seedUrl,
+          candidate_basis: target.candidateBasis
+        }))
+      );
+      commonSettings.CLOSESPIDER_PAGECOUNT = candidates.length * 3 + 2;
+      commonSettings.ENABLE_AMAZON = false;
     } else {
       const storedTarget = this.storedKnownSellerTarget(run);
       const targets = overrideTargets ?? (storedTarget ? [storedTarget] : []);
@@ -688,6 +893,47 @@ export class OperatorCrawlService {
     }
     if (!jobId.startsWith(`${this.projectId()}/`)) throw new Error("Scrapy Cloud returned a job from another project.");
     return jobId;
+  }
+
+  private async taggedStageJob(run: OperatorRunRow): Promise<string | null> {
+    const tag = this.stageTag(run);
+    const payload = await this.cloudRequest(
+      "GET",
+      `/jobs/list.json?project=${encodeURIComponent(this.projectId())}` +
+        `&has_tag=${encodeURIComponent(tag)}&count=2`
+    );
+    if (payload.status !== "ok" || !Array.isArray(payload.jobs)) {
+      throw new Error("Scrapy Cloud returned an invalid tagged-job response.");
+    }
+    const jobs: CloudJob[] = [];
+    for (const value of payload.jobs) {
+      if (!value || typeof value !== "object" || Array.isArray(value)) {
+        throw new Error("Scrapy Cloud returned an invalid tagged job.");
+      }
+      const job = value as CloudJob;
+      const tags = Array.isArray(job.tags)
+        ? job.tags.filter((entry): entry is string => typeof entry === "string")
+        : [];
+      if (
+        typeof job.id !== "string" ||
+        !/^\d+\/\d+\/\d+$/.test(job.id) ||
+        !job.id.startsWith(`${this.projectId()}/`) ||
+        !Array.isArray(job.tags) ||
+        tags.length !== job.tags.length ||
+        !tags.includes(tag)
+      ) {
+        throw new Error("Scrapy Cloud returned a tagged job outside the expected schema.");
+      }
+      jobs.push(job);
+    }
+    if (jobs.length > 1) {
+      throw new Error("More than one Scrapy Cloud job has the unique stage tag.");
+    }
+    return typeof jobs[0]?.id === "string" ? jobs[0].id : null;
+  }
+
+  private stageTag(run: Pick<OperatorRunRow, "id" | "stage">): string {
+    return `operator:${run.id}:${run.stage}`;
   }
 
   private async cloudRequest(method: "GET" | "POST", path: string, form?: Record<string, string>): Promise<Record<string, unknown>> {
@@ -835,6 +1081,69 @@ export class OperatorCrawlService {
       });
     }
     return [...targets.values()];
+  }
+
+  private async domainCandidateTargetsForRun(
+    id: string,
+    marketplace: string | null
+  ): Promise<DomainCandidateTarget[]> {
+    const ids = await this.runSellerIds(id);
+    if (!this.env.CORE_DB || ids.length === 0) return [];
+    const placeholders = ids.map(() => "?").join(",");
+    const [sellerResult, aliasResult] = await Promise.all([
+      this.env.CORE_DB
+        .prepare(
+          `SELECT id, canonical_name, legal_name
+           FROM sellers
+           WHERE id IN (${placeholders}) AND status = 'active' AND official_domain IS NULL
+           ORDER BY last_seen_at DESC, id ASC`
+        )
+        .bind(...ids)
+        .all<{ id: string; canonical_name: string; legal_name: string | null }>(),
+      this.env.CORE_DB
+        .prepare(
+          `SELECT seller_id, alias AS identity_value
+           FROM seller_aliases WHERE seller_id IN (${placeholders})
+           ORDER BY last_seen_at DESC, id ASC`
+        )
+        .bind(...ids)
+        .all<{ seller_id: string; identity_value: string }>(),
+    ]);
+    const extraNames = new Map<string, string[]>();
+    for (const row of aliasResult.results ?? []) {
+      if (!row.identity_value?.trim()) continue;
+      const names = extraNames.get(row.seller_id) ?? [];
+      if (!names.some((value) => value.toLowerCase() === row.identity_value.toLowerCase())) {
+        names.push(row.identity_value.trim());
+      }
+      extraNames.set(row.seller_id, names);
+    }
+
+    const targets: DomainCandidateTarget[] = [];
+    const claimedDomains = new Set<string>();
+    for (const seller of sellerResult.results ?? []) {
+      const sellerNames = uniqueIdentityNames([
+        seller.canonical_name,
+        seller.legal_name ?? "",
+        ...(extraNames.get(seller.id) ?? [])
+      ]).slice(0, 6);
+      let sellerCandidateCount = 0;
+      for (const candidate of candidateDomainsForIdentities(sellerNames, marketplace)) {
+        if (claimedDomains.has(candidate.domain)) continue;
+        claimedDomains.add(candidate.domain);
+        targets.push({
+          sellerId: seller.id,
+          sellerName: seller.canonical_name,
+          sellerNames,
+          seedUrl: `https://${candidate.domain}/`,
+          candidateBasis: candidate.basis
+        });
+        sellerCandidateCount += 1;
+        if (sellerCandidateCount >= 2 || targets.length >= MAX_DOMAIN_CANDIDATES_PER_RUN) break;
+      }
+      if (targets.length >= MAX_DOMAIN_CANDIDATES_PER_RUN) break;
+    }
+    return targets;
   }
 
   private async resolveKnownSellerTarget(
@@ -1096,6 +1405,86 @@ function safeError(error: unknown): string { return error instanceof Error ? err
 function normalizeDomain(value: string): string {
   return value.trim().toLowerCase().replace(/\.$/, "").replace(/^www\./, "");
 }
+
+function uniqueIdentityNames(values: string[]): string[] {
+  const names: string[] = [];
+  const keys = new Set<string>();
+  for (const value of values) {
+    const name = value.trim().slice(0, 200);
+    const key = identityLabel(name);
+    if (key.length < 5 || keys.has(key)) continue;
+    keys.add(key);
+    names.push(name);
+  }
+  return names;
+}
+
+function candidateDomainsForIdentities(
+  names: string[],
+  marketplace: string | null
+): Array<{ domain: string; basis: string }> {
+  const localSuffix: Record<string, string> = {
+    "amazon.co.uk": "co.uk",
+    "amazon.ca": "ca",
+    "amazon.com.au": "com.au",
+    "amazon.de": "de",
+    "amazon.fr": "fr",
+    "amazon.it": "it",
+    "amazon.es": "es"
+  };
+  const suffixes = [...new Set([localSuffix[marketplace ?? ""], "com"].filter(Boolean))];
+  const result: Array<{ domain: string; basis: string }> = [];
+  const seen = new Set<string>();
+  for (const name of names) {
+    const tokens = identityTokens(name);
+    if (tokens.length === 0) continue;
+    const compactLabel = tokens.join("");
+    const hyphenatedLabel = tokens.join("-");
+    for (const [label, basis] of [
+      [compactLabel, "identity_exact_compact"],
+      [hyphenatedLabel, "identity_exact_hyphenated"]
+    ] as const) {
+      if (!validCandidateLabel(label)) continue;
+      for (const suffix of suffixes) {
+        const domain = `${label}.${suffix}`;
+        if (seen.has(domain)) continue;
+        seen.add(domain);
+        result.push({ domain, basis });
+      }
+    }
+  }
+  return result;
+}
+
+function identityTokens(value: string): string[] {
+  const genericSuffixes = new Set([
+    "amazon", "seller", "store", "shop", "official", "storefront",
+    "ltd", "limited", "inc", "llc", "corp", "corporation", "company", "co"
+  ]);
+  const ascii = value.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const tokens = ascii.match(/[a-z0-9]+/g) ?? [];
+  while (tokens.length > 1 && genericSuffixes.has(tokens.at(-1) ?? "")) tokens.pop();
+  while (tokens.length > 1 && genericSuffixes.has(tokens[0] ?? "")) tokens.shift();
+  return tokens;
+}
+
+function identityLabel(value: string): string {
+  return identityTokens(value).join("");
+}
+
+function validCandidateLabel(value: string): boolean {
+  return value.length >= 5 && value.length <= 63 && /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])$/.test(value) && /[a-z]/.test(value);
+}
+
+function mergedWarnings(run: Pick<OperatorRunRow, "warnings_json">, ...values: string[]): string[] {
+  return [...new Set([...parseStringArray(run.warnings_json), ...values.filter(Boolean)])];
+}
+
+function statementChanged(result: D1Result): boolean {
+  const changes = (result.meta as { changes?: unknown } | undefined)?.changes;
+  return typeof changes === "number" ? changes > 0 : result.success;
+}
+
 function stableJson(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
   if (value && typeof value === "object") {

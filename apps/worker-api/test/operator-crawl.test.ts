@@ -40,6 +40,7 @@ class OperatorStatement implements D1PreparedStatement {
 
   async run(): Promise<D1Result> {
     const query = compact(this.query);
+    let changes = 1;
     if (query.startsWith("INSERT INTO operator_crawl_runs") && query.includes("retry_of_run_id")) {
       const [
         id, mode, queryJson, marketplace, countries, filters, seeds, contacts, target,
@@ -93,7 +94,16 @@ class OperatorStatement implements D1PreparedStatement {
       const run = this.state.runs.find((item) => item.id === this.values[3] && item.status === "queued");
       if (run && !this.state.runs.some((item) => item.active_unit_slot === 1)) {
         Object.assign(run, { status: "starting", stage: this.values[0], active_unit_slot: 1, started_at: this.values[1], updated_at: this.values[2] });
+      } else {
+        changes = 0;
       }
+    } else if (query.startsWith("UPDATE operator_crawl_runs SET status = 'launching'")) {
+      const run = this.state.runs.find((item) =>
+        item.id === this.values[1] && item.active_unit_slot === 1 && item.zyte_job_id === null &&
+        item.status === this.values[2] && item.updated_at === this.values[3]
+      );
+      if (run) Object.assign(run, { status: "launching", updated_at: this.values[0] });
+      else changes = 0;
     } else if (query.startsWith("UPDATE operator_crawl_runs SET zyte_job_id = ?")) {
       Object.assign(this.requireRun(this.values[2]), { zyte_job_id: this.values[0], status: "running", updated_at: this.values[1] });
     } else if (query.startsWith("UPDATE operator_crawl_runs SET discovered_sellers = ?")) {
@@ -102,10 +112,10 @@ class OperatorStatement implements D1PreparedStatement {
         contacts_found: Number(this.values[2]),
         updated_at: this.values[3]
       });
-    } else if (query.startsWith("UPDATE operator_crawl_runs SET stage = 'enriching'")) {
-      Object.assign(this.requireRun(this.values[2]), {
-        stage: "enriching", status: "enriching", approved_domains_json: this.values[0],
-        zyte_job_id: null, updated_at: this.values[1]
+    } else if (query.startsWith("UPDATE operator_crawl_runs SET stage = ?, status = ?")) {
+      Object.assign(this.requireRun(this.values[5]), {
+        stage: this.values[0], status: this.values[1], approved_domains_json: this.values[2],
+        warnings_json: this.values[3], zyte_job_id: null, updated_at: this.values[4]
       });
     } else if (query.startsWith("UPDATE operator_crawl_runs SET status = ?, stage = ?, active_unit_slot = ?")) {
       const run = this.requireRun(this.values[9]);
@@ -116,7 +126,7 @@ class OperatorStatement implements D1PreparedStatement {
         warnings_json: this.values[8] ?? run.warnings_json
       });
     }
-    return { success: true };
+    return { success: true, meta: { changes } };
   }
 
   private resolve(): Row[] {
@@ -303,6 +313,13 @@ describe("operator crawl control", () => {
       ["amazon_seller"],
       []
     );
+    await service.recordIngestion(
+      created.run.id,
+      ["018f2d5e-7b3c-7a1d-8f2e-123456789abc"],
+      ["official_domain_discovery"],
+      []
+    );
+    expect(db.runs[0].enriched_sellers).toBe(0);
 
     await service.pump();
 
@@ -315,6 +332,94 @@ describe("operator crawl control", () => {
       seller_name: "Official Example",
       seed_url: "https://official.example/"
     }]);
+    expect(db.runs[0].active_unit_slot).toBe(1);
+  });
+
+  it("recovers an accepted stage launch by its unique tag without launching twice", async () => {
+    const db = new OperatorD1();
+    let launchRequests = 0;
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes("jobs/list.json") && url.includes("has_tag=")) {
+        const tag = new URL(url).searchParams.get("has_tag");
+        return Response.json({
+          status: "ok",
+          jobs: [{ id: "871778/1/777", state: "running", tags: [tag] }]
+        });
+      }
+      launchRequests += 1;
+      return Response.json({ status: "ok", jobid: "871778/1/700" });
+    }));
+    const service = new OperatorCrawlService(operatorEnv(db));
+    const created = await service.create(findRequest("recover-launch-run"), "operator@example.test");
+    const run = db.runs[0];
+    Object.assign(run, {
+      status: "launching",
+      zyte_job_id: null,
+      active_unit_slot: 1,
+      updated_at: "2026-01-01T00:00:00.000Z"
+    });
+
+    await service.pump();
+
+    expect(launchRequests).toBe(1);
+    expect(run.zyte_job_id).toBe("871778/1/777");
+    expect(run.status).toBe("running");
+    expect(db.events.some((event) =>
+      event.crawl_run_id === created.run.id && event.event_type === "launch_recovered"
+    )).toBe(true);
+  });
+
+  it("verifies a deterministic domain candidate before linked contact enrichment", async () => {
+    const db = new OperatorD1();
+    const core = new ResolvingDomainD1();
+    const launches: URLSearchParams[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("jobs/list.json")) {
+        return Response.json({ jobs: [{ state: "finished", close_reason: "finished" }] });
+      }
+      const body = new URLSearchParams(String(init?.body ?? ""));
+      launches.push(body);
+      return Response.json({ status: "ok", jobid: `871778/1/${550 + launches.length}` });
+    }));
+    const service = new OperatorCrawlService(operatorEnv(db, core));
+    const created = await service.create(findRequest("domain-resolution-run"), "operator@example.test");
+    await service.recordIngestion(
+      created.run.id,
+      ["018f2d5e-7b3c-7a1d-8f2e-123456789abc"],
+      ["amazon_seller"],
+      []
+    );
+
+    await service.pump();
+
+    expect(launches).toHaveLength(2);
+    expect(launches[1].get("spider")).toBe("official_domain_discovery");
+    expect(JSON.parse(String(launches[1].get("candidate_targets")))).toEqual([
+      {
+        seller_id: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
+        seller_name: "Watersy Bottle",
+        seller_names: ["Watersy Bottle"],
+        seed_url: "https://watersybottle.com/",
+        candidate_basis: "identity_exact_compact"
+      },
+      {
+        seller_id: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
+        seller_name: "Watersy Bottle",
+        seller_names: ["Watersy Bottle"],
+        seed_url: "https://watersy-bottle.com/",
+        candidate_basis: "identity_exact_hyphenated"
+      }
+    ]);
+    expect(JSON.parse(String(db.runs[0].approved_domains_json))).toContain("watersybottle.com");
+
+    core.verified = true;
+    await service.pump();
+
+    expect(launches).toHaveLength(3);
+    expect(launches[2].get("spider")).toBe("official_website");
+    expect(launches[2].get("seed_urls")).toBe("https://watersybottle.com/");
     expect(db.runs[0].active_unit_slot).toBe(1);
   });
 
@@ -437,20 +542,58 @@ describe("operator crawl control", () => {
 });
 
 class OfficialDomainD1 implements D1Database {
-  prepare(): D1PreparedStatement {
+  prepare(query: string): D1PreparedStatement {
+    const hasOfficialDomain = query.includes("official_domain IS NOT NULL");
     return {
-      bind: () => this.prepare(),
+      bind: () => this.prepare(query),
       first: async <T>() => null as T | null,
       all: async <T>() => ({
         success: true,
-        results: [{
+        results: (hasOfficialDomain ? [{
           id: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
           canonical_name: "Official Example",
           official_domain: "official.example",
           identity_confidence: 90,
           last_seen_at: "2026-08-01T00:00:00Z"
-        }] as T[]
+        }] : []) as T[]
       }),
+      run: async () => ({ success: true })
+    };
+  }
+}
+
+class ResolvingDomainD1 implements D1Database {
+  verified = false;
+
+  prepare(query: string): D1PreparedStatement {
+    return {
+      bind: () => this.prepare(query),
+      first: async <T>() => null as T | null,
+      all: async <T>() => {
+        if (query.includes("official_domain IS NOT NULL")) {
+          return {
+            success: true,
+            results: (this.verified ? [{
+              id: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
+              canonical_name: "Watersy Bottle",
+              official_domain: "watersybottle.com",
+              identity_confidence: 90,
+              last_seen_at: "2026-08-24T00:00:00Z"
+            }] : []) as T[]
+          };
+        }
+        if (query.includes("official_domain IS NULL")) {
+          return {
+            success: true,
+            results: (this.verified ? [] : [{
+              id: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
+              canonical_name: "Watersy Bottle",
+              legal_name: null
+            }]) as T[]
+          };
+        }
+        return { success: true, results: [] as T[] };
+      },
       run: async () => ({ success: true })
     };
   }

@@ -50,13 +50,13 @@ export default function CrawlHealthPage() {
                   <td><Link href={`/crawl-health?run=${run.id}`}>{run.id.slice(0, 12)}</Link></td>
                   <td>{run.query?.join(", ") || run.jobType}</td>
                   <td>{[run.marketplace, run.countryCodes?.join(", ")].filter(Boolean).join(" / ") || "Direct"}</td>
-                  <td><StatusPill value={run.status} /></td>
+                  <td><StatusPill value={run.status} />{run.stage && run.stage !== run.status ? <small>{run.stage}</small> : null}</td>
                   <td>{run.requestedSellerCount ?? "--"}</td>
                   <td>{run.discoveredSellers ?? 0} / {run.enrichedSellers ?? 0}</td>
                   <td>{run.contactsFound ?? run.contactsVerified}</td>
                   <td>{new Date(run.startedAt).toLocaleString()}</td>
                   <td>{duration(run)}</td>
-                  <td><div className="row-actions">{["queued","starting","running","enriching","ingesting"].includes(run.status) ? <button onClick={() => void action(run, "cancel")} type="button">Cancel</button> : null}{["failed","blocked","cooldown","cancelled"].includes(run.status) ? <button onClick={() => void action(run, "retry")} type="button">Retry</button> : null}<Link href={`/sellers?source_run=${run.id}`}>View results</Link></div>{run.errorMessage ? <small>{run.errorMessage}</small> : null}{run.warnings?.map((warning) => <small key={warning}>{warning}</small>)}</td>
+                  <td><div className="row-actions">{["queued","starting","launching","running","resolving","enriching","ingesting"].includes(run.status) ? <button onClick={() => void action(run, "cancel")} type="button">Cancel</button> : null}{["failed","blocked","cooldown","cancelled"].includes(run.status) ? <button onClick={() => void action(run, "retry")} type="button">Retry</button> : null}<Link href={`/sellers?source_run=${run.id}`}>View results</Link></div>{run.errorMessage ? <small>{run.errorMessage}</small> : null}{run.warnings?.map((warning) => <small key={warning}>{warning}</small>)}</td>
                 </tr>
               ))}
             </tbody>

@@ -1,7 +1,7 @@
 # Seller Intelligence Platform — Zero-Cost Hybrid Runner Master Specification v2.0
 
 **Document status:** FROZEN FOR IMPLEMENTATION WITH SOLO MODE V1 AMENDMENT
-**Specification version:** 2.1.0
+**Specification version:** 2.1.1
 **Target builder:** OpenAI Codex  
 **Primary use:** Internal B2B product and supplier research  
 **Target throughput:** Up to 500 useful new or materially updated intelligence events per day  
@@ -12,6 +12,7 @@
 **Current activation state:** `ZYTE_STUDENT_CONFIRMED`; deploy and live-crawl gates disabled
 **Freeze date:** 28 July 2026  
 **Solo Mode amendment date:** 4 August 2026
+**Official-domain resolution refinement:** 24 August 2026
 **Change authority:** Architecture changes require an explicit specification amendment before code changes  
 
 ---
@@ -69,6 +70,41 @@ The older entitlement-pending statements below are retained as historical contex
 from the 28 July freeze. Zyte Support confirmed the Student entitlement on 4 August
 2026: exactly one Scrapy Cloud unit is free, no paid Scrapy Cloud subscription is
 enabled, and charges are possible only if another unit is added or Zyte API is used.
+
+### Phase 7 production refinement: deterministic official-domain resolution
+
+This refinement stays inside the frozen provider-neutral Phase 7 architecture. It
+does not activate the separately deferred search-discovery adapter and does not
+add a crawler provider, paid API, browser automation, CAPTCHA handling, or an
+additional Scrapy Cloud unit.
+
+After bounded Amazon identity discovery, unresolved canonical sellers may enter a
+sequential `resolving` stage on the same one-unit slot. The Worker derives at most
+two HTTPS candidates per seller and at most 25 candidates per run from already
+collected public seller names and seller aliases. Product brands alone are not
+official-domain identity evidence because a reseller may carry unrelated brands.
+Candidate construction is deterministic, limited to compact or hyphenated exact identity labels and the
+marketplace country suffix plus `.com`; it is not a DNS wildcard scan or search
+engine query.
+
+Each candidate is subject to robots.txt, cooldown, same-domain redirect, public
+response-address, one-request-per-domain, response-size, timeout, and explicit-block
+controls. Automatic acceptance requires a score of at least 80 and both independent
+identity conditions: exact normalized domain-label match and exact normalized
+prominent-page identity match. Parked or for-sale pages are rejected. Scores from
+55 to 79 may be recorded for review; lower scores are rejected. Only accepted
+candidates may update `sellers.official_domain` and enter the existing contact-page
+crawl. Candidate evidence uses existing versioned `sources` and `review_queue`
+records with no raw contact value, so no database migration is required.
+
+The maximum discovery overhead is 25 candidate pages plus bounded robots handling.
+The existing 100-page official-enrichment cap, one active unit, zero-charge lock,
+and disabled `ENABLE_SEARCH_DISCOVERY`/Zyte API/paid-service gates remain unchanged.
+Each external stage has a unique run/stage tag so a stale uncertain launch can be
+recovered authoritatively without starting a duplicate job; an unprovable outcome
+fails closed.
+Rollback is an application-code rollback or forward feature disable; accepted
+canonical, source, review, contact, and historical records are preserved.
 
 ---
 

@@ -7,8 +7,9 @@ runner architecture in `SELLER_INTELLIGENCE_MASTER_SPEC.md`.
 
 - Active milestone: controlled Solo Mode v1 production operation
 - Solo foundations: complete, encrypted, restore-verified, and deployed
-- Operator extension: Amazon public identity discovery, official-site handoff,
-  one-unit queue/control APIs, filters, and dashboard UI deployed to production
+- Operator extension: Amazon public identity discovery, deterministic official-
+  domain verification, official-site contact handoff, one-unit queue/control
+  APIs, filters, and dashboard UI
 - Accepted staging/production runner mode: `zyte_student_active`
 - Accepted live crawling state: authenticated and operator controlled
 - Emergency pause: available but not triggered in an accepted environment
@@ -45,7 +46,10 @@ retention are deferred until after launch.
 The sole operator has explicitly approved the compatible Amazon/public-source
 identity-discovery extension and dashboard-driven bounded crawl workflow.
 Amazon supplies identity evidence; email, phone, WhatsApp, and WeChat normally
-come from a credibly resolved public official website.
+come from a credibly resolved public official website. When Amazon has no link,
+the same run may verify a bounded exact-name candidate set without scraping a
+search engine; weak, parked, private-network, or cross-domain candidates are not
+auto-linked.
 
 Still deferred: Zyte API, extra Scrapy Cloud units, GitHub Actions
 crawler fallback, credit-backed fallback, automatic provider orchestration, AI
@@ -167,12 +171,18 @@ domain, discovers bounded business/contact pages and sitemaps, canonicalizes
 and deduplicates URLs, stops a domain after explicit blocks, and applies strict
 page, depth, concurrency, retry, timeout, response-size, and cookie limits.
 
+The companion `official_domain_discovery` spider checks at most two deterministic
+identity candidates per seller and 25 per operator run. It requires exact domain
+and prominent-page identity signals before updating the same canonical seller,
+then hands accepted domains to `official_website` on the same one-unit slot.
+Generic search discovery and every paid provider remain disabled.
+
 The no-network fixture transport exercises the same spider and produces
 deterministic seller, contact, source/evidence, and crawl-run batches. Compact
 D1 evidence includes source URL, page title, masked evidence snippet, content
 hash, `detected_at`, and `last_seen_at`. Full raw-evidence R2 storage remains
-deferred by the Solo v1 amendment. Live crawling and provider activation remain
-disabled.
+deferred by the Solo v1 amendment. Live work remains restricted to authenticated,
+bounded operator requests in the accepted runtime.
 
 ## Entity Resolution
 

@@ -38,7 +38,7 @@ export function DashboardShell({ active, title, eyebrow, children }: DashboardSh
         { label: "Runner", value: runtime.runnerMode === "zyte_student_active" ? "Zyte Student — Active" : runtime.runnerMode, detail: "Configured crawler runner." },
         { label: "Live crawl", value: runtime.globalCrawlKillSwitch ? "Emergency Paused" : runtime.operatorCrawlEnabled && runtime.liveCrawlEnabled ? "Operator Controlled" : "Unavailable", detail: "Authenticated bounded crawl gate." },
         { label: "Amazon", value: runtime.amazonEnabled ? "Active" : "Unavailable", detail: "Public identity discovery." },
-        { label: "Discovery", value: runtime.discoveryEnabled ? "Active" : "Unavailable", detail: "Amazon keyword/product discovery." },
+        { label: "Discovery", value: runtime.discoveryEnabled ? "Active" : "Unavailable", detail: "Amazon discovery and conservative official-domain verification." },
         { label: "Official enrichment", value: runtime.officialWebsiteEnabled ? "Active" : "Unavailable", detail: "Public official-site extraction." },
         { label: "Zyte unit", value: `1 / ${runtime.scrapyCloudMaxUnits}`, detail: "Single-unit queue enforcement." },
         { label: "Paid services", value: runtime.paidServicesAllowed ? "Enabled" : "Locked", detail: "Zero-charge billing protection." }

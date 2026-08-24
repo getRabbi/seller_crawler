@@ -59,6 +59,16 @@ the configured page budget. Do not fetch live pages, retrieve sitemaps, upload
 R2 evidence, follow account/cart/login paths, bypass access controls, or expand
 to another provider during the local enrichment phase.
 
+Automatic official-domain verification may use only bounded deterministic
+identity candidates authorized for the current operator run. It must not scrape
+search-result pages, enumerate subdomains, probe private/reserved response
+addresses, or follow a redirect to a different canonical domain. Auto-linking
+requires both an exact normalized domain identity and prominent on-page identity;
+parked/for-sale and lower-confidence candidates remain unlinked. Decision evidence
+contains scores and signal names only, never raw contact values.
+The crawler DNS resolver must reject a non-public address before returning it to
+the downloader; response-address validation remains a second guard.
+
 Seller-linked website runs accept one existing UUIDv7 seller and one verified
 public HTTPS URL. The Worker validates the canonical seller and rejects domain
 conflicts; the crawler may update missing official-domain evidence but

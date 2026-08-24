@@ -23,7 +23,7 @@ export const runtimePanels: RuntimePanel[] = [
   {
     label: "Discovery",
     value: "Active",
-    detail: "Amazon keyword/product discovery is active; paid generic search remains off."
+    detail: "Amazon identity discovery and conservative official-domain verification are active; paid generic search remains off."
   },
   {
     label: "Official enrichment",
