@@ -441,7 +441,7 @@ describe("operator crawl control", () => {
     const created = await service.create({
       mode: "resolve_seller",
       targetSellerId: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
-      contactTypes: ["email", "phone"],
+      contactTypes: ["email", "phone", "contact_form"],
       targetSellerCount: 1,
       maxResultPages: 1,
       maxOfficialPages: 8,
@@ -463,6 +463,7 @@ describe("operator crawl control", () => {
     expect(launches).toHaveLength(2);
     expect(launches[1].get("spider")).toBe("official_website");
     expect(launches[1].get("seed_urls")).toBe("https://watersybottle.com/");
+    expect(launches[1].get("contact_types")).toBe("email,phone,contact_form");
   });
 
   it("uses the normalized brand identity when a marketplace suffix is removed", async () => {
@@ -478,7 +479,7 @@ describe("operator crawl control", () => {
     await service.create({
       mode: "resolve_seller",
       targetSellerId: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
-      contactTypes: ["email", "phone"],
+      contactTypes: ["email", "phone", "contact_form"],
       targetSellerCount: 1,
       maxResultPages: 1,
       maxOfficialPages: 8,
@@ -547,7 +548,7 @@ describe("operator crawl control", () => {
       mode: "known_websites",
       seedUrls: ["https://www.official.example/contact"],
       targetSellerId: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
-      contactTypes: ["email", "phone"],
+      contactTypes: ["email", "phone", "contact_form"],
       targetSellerCount: 1,
       maxResultPages: 1,
       maxOfficialPages: 4,
@@ -559,7 +560,7 @@ describe("operator crawl control", () => {
     expect(launches).toHaveLength(1);
     expect(launches[0].get("seed_urls")).toBe("https://official.example/contact");
     expect(launches[0].get("page_budget")).toBe("4");
-    expect(launches[0].get("contact_types")).toBe("email,phone");
+    expect(launches[0].get("contact_types")).toBe("email,phone,contact_form");
     expect(JSON.parse(String(launches[0].get("seller_targets")))[0].seller_id).toBe(
       "018f2d5e-7b3c-7a1d-8f2e-123456789abc"
     );

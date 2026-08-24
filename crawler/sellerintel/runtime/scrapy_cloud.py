@@ -521,7 +521,7 @@ def _parser() -> argparse.ArgumentParser:
     official.add_argument(
         "--contact-type",
         action="append",
-        choices=("email", "phone", "whatsapp", "wechat"),
+        choices=("email", "phone", "whatsapp", "wechat", "contact_form"),
         default=[],
     )
 
@@ -593,7 +593,10 @@ def main(
             ("max_depth", str(args.max_depth)),
             (
                 "contact_types",
-                ",".join(args.contact_type or ("email", "phone", "whatsapp", "wechat")),
+                ",".join(
+                    args.contact_type
+                    or ("email", "phone", "whatsapp", "wechat", "contact_form")
+                ),
             ),
         ]
         if args.default_region:

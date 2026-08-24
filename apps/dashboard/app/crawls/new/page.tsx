@@ -25,7 +25,7 @@ const countries = [
   ["DE", "Germany"], ["FR", "France"], ["IT", "Italy"], ["ES", "Spain"]
 ] as const;
 
-const contactTypes = ["email", "phone", "whatsapp", "wechat"] as const;
+const contactTypes = ["email", "phone", "whatsapp", "wechat", "contact_form"] as const;
 
 export default function NewCrawlPage() {
   const [mode, setMode] = useState<"find_sellers" | "resolve_seller" | "known_websites">("find_sellers");
@@ -196,7 +196,7 @@ export default function NewCrawlPage() {
           </div>
           <fieldset aria-describedby="contact-priority-help">
             <legend>Contact priorities <span className="required-badge">Required</span></legend>
-            <div className="checkbox-row">{contactTypes.map((value) => <label className="check" key={value}><input checked={contacts.includes(value)} onChange={() => toggleContact(value)} type="checkbox" /> {value}</label>)}</div>
+            <div className="checkbox-row">{contactTypes.map((value) => <label className="check" key={value}><input checked={contacts.includes(value)} onChange={() => toggleContact(value)} type="checkbox" /> {value === "contact_form" ? "contact form" : value}</label>)}</div>
             <small id="contact-priority-help">Select at least one contact type.</small>
           </fieldset>
         </section>

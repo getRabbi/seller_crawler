@@ -27,7 +27,7 @@ larger v2.0 architecture remains the post-launch roadmap.
 Solo Mode v1 requires:
 
 - official company website crawling from explicit operator-approved seed URLs;
-- email, phone, WhatsApp, and WeChat extraction;
+- email, phone, WhatsApp, WeChat, and public contact-form extraction;
 - company/contact normalization and basic deterministic entity resolution;
 - signed, idempotent Worker ingestion into the existing core, contacts, operations,
   and history D1 databases;
@@ -360,6 +360,7 @@ The platform may collect:
 - Public business email addresses
 - Public business WhatsApp links
 - Public business WeChat IDs
+- Public official-site contact-form URLs
 - Public supplier or manufacturer profile URLs
 - Product and brand relationships needed for internal research
 - Source URL, timestamps, and evidence required to verify each field
@@ -1333,7 +1334,22 @@ A nearby QR image alone is not enough unless the QR content is extracted by a sa
 
 Use `phonenumbers` for parsing and E.164 normalization.
 
-## 10.5 Confidence score
+## 10.5 Public contact forms
+
+Treat a public official-site contact form as an actionable contact channel only when:
+
+- the canonical page path clearly identifies a contact or support page;
+- one form contains both a reply field and a message/inquiry field;
+- the form is not a login, account, checkout, search, or newsletter form; and
+- the page was fetched under the official-site adapter's existing robots, block,
+  network, domain, and page-budget controls.
+
+Store the canonical public page URL as `contact_form` with its own parser version.
+The platform must never fill in or submit the form automatically. The channel is
+not evidence that a public email address or phone number exists, and the UI must
+label it separately from those direct channels.
+
+## 10.6 Confidence score
 
 ```text
 +45 official contact page

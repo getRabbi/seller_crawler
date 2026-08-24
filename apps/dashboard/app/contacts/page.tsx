@@ -68,6 +68,7 @@ export default function ContactsPage() {
             <option value="phone">Phone</option>
             <option value="whatsapp">WhatsApp</option>
             <option value="wechat">WeChat</option>
+            <option value="contact_form">Contact form</option>
           </select>
         </label>
         <label>Source<select onChange={(event) => setSource(event.target.value)} value={source}><option value="">All</option><option value="official_site">Official website</option><option value="amazon_seller">Amazon seller</option></select></label>
@@ -114,8 +115,10 @@ export default function ContactsPage() {
                       {contact.sellerName ?? contact.sellerId}
                     </Link>
                   </td>
-                  <td>{contact.contactType}</td>
-                  <td>{revealed[contact.id] ?? contact.displayValueMasked ?? "--"}</td>
+                  <td>{contact.contactType === "contact_form" ? "Contact form" : contact.contactType}</td>
+                  <td>{contact.contactType === "contact_form" && revealed[contact.id]
+                    ? <a href={revealed[contact.id]} rel="noreferrer" target="_blank">Open public form</a>
+                    : revealed[contact.id] ?? contact.displayValueMasked ?? "--"}</td>
                   <td><StatusPill value={contact.classification} /></td>
                   <td><ScoreBar value={contact.confidence} /></td>
                   <td>
@@ -124,7 +127,7 @@ export default function ContactsPage() {
                   <td>{[contact.sellerCountryCode, contact.sourceType].filter(Boolean).join(" / ") || "--"}</td>
                   <td>
                     <button onClick={() => void reveal(contact)} type="button">
-                      Reveal (audited)
+                      {contact.contactType === "contact_form" ? "Reveal link (audited)" : "Reveal (audited)"}
                     </button>
                   </td>
                 </tr>

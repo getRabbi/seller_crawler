@@ -40,6 +40,12 @@ Contact extractor evidence contexts must remain masked. Extractor code must not
 perform SMTP mailbox enumeration, QR decoding of unlabeled images, CAPTCHA
 bypass, or live source fetching during local fixture phases.
 
+Public contact-form channels must store the canonical official page URL as an
+encrypted `contact_form` value, remain separately labelled from direct email or
+phone channels, and stay ineligible for automated outreach. Detection may read
+an already-authorized page but must never fill or submit any form. Login,
+account, checkout, search, newsletter, and password forms are not contacts.
+
 Address masking must be applied before street-level address evidence is shown in
 logs, dashboards, history rows, or review payloads. Full evidence belongs only in
 access-controlled evidence storage.

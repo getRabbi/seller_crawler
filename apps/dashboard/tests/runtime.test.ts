@@ -76,6 +76,7 @@ describe("dashboard runtime configuration", () => {
     expect(source).toContain("START CRAWL");
     expect(source).toContain("Existing seller ID (optional)");
     expect(source).toContain("Resolve Existing Seller");
+    expect(source).toContain('"contact_form"');
     expect(source).toContain("Maximum 100 official pages across the whole run.");
   });
 

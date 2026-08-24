@@ -43,7 +43,7 @@ from sellerintel.schemas.ingestion import (
 from sellerintel.security.contact_crypto import ContactCipher
 
 MAX_CONTACTS_PER_PAGE_BATCH = 17
-CONTACT_TYPES = frozenset({"email", "phone", "whatsapp", "wechat"})
+CONTACT_TYPES = frozenset({"email", "phone", "whatsapp", "wechat", "contact_form"})
 RUNTIME_SETTING_KEYS = (
     "RUNNER_MODE",
     "LIVE_CRAWL_ENABLED",

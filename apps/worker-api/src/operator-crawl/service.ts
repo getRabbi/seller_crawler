@@ -21,7 +21,7 @@ export const SUPPORTED_AMAZON_MARKETPLACES = [
   "amazon.es"
 ] as const;
 
-const CONTACT_TYPES = new Set(["email", "phone", "whatsapp", "wechat"]);
+const CONTACT_TYPES = new Set(["email", "phone", "whatsapp", "wechat", "contact_form"]);
 const TERMINAL_STATUSES = new Set([
   "completed",
   "completed_with_warnings",
@@ -1348,7 +1348,7 @@ function validateCreateRequest(raw: unknown): CreateCrawlRunRequest {
   if (mode !== "find_sellers" && mode !== "resolve_seller" && mode !== "known_websites") {
     throw invalid("mode must be find_sellers, resolve_seller, or known_websites.");
   }
-  const contactTypes = stringArray(value.contactTypes, 4, 16).map((item) => item.toLowerCase());
+  const contactTypes = stringArray(value.contactTypes, 5, 16).map((item) => item.toLowerCase());
   if (contactTypes.length === 0 || contactTypes.some((item) => !CONTACT_TYPES.has(item))) throw invalid("At least one supported contact type is required.");
   const request: CreateCrawlRunRequest = {
     mode,

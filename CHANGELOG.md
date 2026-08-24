@@ -2,6 +2,10 @@
 
 ## Unreleased - Solo Mode v1 Implementation
 
+- Added `contact_form` as a separately labelled, encrypted, versioned public
+  business contact channel. Detection requires a contact/support page plus a
+  reply field and message field, excludes login/search/newsletter/checkout
+  forms, and never fills or submits a form.
 - Added a zero-charge, provider-neutral official-domain resolution stage after
   Amazon identity discovery. It derives at most two deterministic identity
   candidates per seller and 25 per run, respects robots/cooldowns, rejects

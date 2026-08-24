@@ -89,7 +89,7 @@ function SellerDetail({ detail }: { detail: SellerDetailResponse }) {
         {detail.contacts.length ? (
           <table>
             <thead><tr><th scope="col">Type</th><th scope="col">Masked value</th><th scope="col">Class</th><th scope="col">Confidence</th></tr></thead>
-            <tbody>{detail.contacts.map((contact) => <tr key={contact.id}><td>{contact.contactType}</td><td>{contact.displayValueMasked ?? "--"}</td><td>{contact.classification}</td><td><ScoreBar value={contact.confidence} /></td></tr>)}</tbody>
+            <tbody>{detail.contacts.map((contact) => <tr key={contact.id}><td>{contact.contactType === "contact_form" ? "Contact form" : contact.contactType}</td><td>{contact.displayValueMasked ?? "--"}</td><td>{contact.classification}</td><td><ScoreBar value={contact.confidence} /></td></tr>)}</tbody>
           </table>
         ) : <StateBlock title="No Contacts" detail="No active, unsuppressed contacts are stored." />}
       </TableShell>

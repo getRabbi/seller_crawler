@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-ContactType = Literal["email", "phone", "whatsapp", "wechat"]
+ContactType = Literal["email", "phone", "whatsapp", "wechat", "contact_form"]
 ReviewStatus = Literal["accepted", "manual_review"]
 
 SCHEMA_VERSION = 1

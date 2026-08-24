@@ -51,7 +51,7 @@ export default function SellersPage() {
         <label>Source<select onChange={(event) => update("source", event.target.value)} value={filters.source ?? ""}><option value="">All</option><option value="amazon_seller">Amazon seller</option><option value="amazon_product">Amazon product</option><option value="official_site">Official website</option></select></label>
         <label>Amazon seller/store<input onChange={(event) => update("amazon_seller", event.target.value)} value={filters.amazon_seller ?? ""} /></label>
         <label>Website<select onChange={(event) => update("has_official_website", event.target.value)} value={filters.has_official_website ?? ""}><option value="">Any</option><option value="true">Has official website</option><option value="false">No official website</option></select></label>
-        <label>Contact<select onChange={(event) => update("contact_type", event.target.value)} value={filters.contact_type ?? ""}><option value="">Any</option>{["email","phone","whatsapp","wechat"].map((value) => <option key={value}>{value}</option>)}</select></label>
+        <label>Contact<select onChange={(event) => update("contact_type", event.target.value)} value={filters.contact_type ?? ""}><option value="">Any</option>{["email","phone","whatsapp","wechat","contact_form"].map((value) => <option key={value}>{value}</option>)}</select></label>
         <label>Manufacturer score<input max="100" min="0" onChange={(event) => update("manufacturer_score", event.target.value)} type="number" value={filters.manufacturer_score ?? ""} /></label>
         <label>Trader score<input max="100" min="0" onChange={(event) => update("trader_score", event.target.value)} type="number" value={filters.trader_score ?? ""} /></label>
         <label>Duplicate<select onChange={(event) => update("duplicate_status", event.target.value)} value={filters.duplicate_status ?? ""}><option value="">Any</option><option value="pending">Pending</option><option value="decided">Decided</option><option value="rolled_back">Rolled back</option></select></label>
@@ -117,7 +117,7 @@ export default function SellersPage() {
                     <StatusPill value={seller.status} />
                   </td>
                   <td>{seller.marketplaceDisplayName ?? seller.marketplace ?? "--"}</td>
-                  <td>{seller.contactCount ? `${seller.contactCount} (${seller.contactTypes.join(", ")})` : "--"}</td>
+                  <td>{seller.contactCount ? `${seller.contactCount} (${seller.contactTypes.map((value) => value === "contact_form" ? "contact form" : value).join(", ")})` : "--"}</td>
                   <td>{formatTimestamp(seller.lastSeenAt)}</td>
                 </tr>
               ))}

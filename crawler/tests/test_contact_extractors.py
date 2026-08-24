@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from sellerintel.extractors import (
+    extract_contact_forms,
     extract_contacts,
     extract_emails,
     extract_phone_numbers,
@@ -72,6 +73,69 @@ def test_rejects_false_positive_directory_and_qr_only_fixture() -> None:
     source_url = "https://directory.example.invalid/profile/jane-doe"
 
     assert extract_contacts(markup, source_url=source_url, default_region="US") == []
+
+
+def test_extracts_only_an_actionable_public_contact_form() -> None:
+    markup = """
+    <main>
+      <h1>Contact our business team</h1>
+      <form action="/apps/contact" id="business-contact">
+        <input type="email" name="contact[email]">
+        <input type="tel" name="contact[phone]">
+        <textarea name="contact[message]"></textarea>
+        <button type="submit">Send</button>
+      </form>
+    </main>
+    """
+
+    candidates = extract_contact_forms(
+        markup,
+        source_url="https://www.example.testmail/pages/contact-us?source=footer",
+    )
+
+    assert len(candidates) == 1
+    candidate = candidates[0]
+    assert candidate.contact_type == "contact_form"
+    assert candidate.normalized_value == "https://example.testmail/pages/contact-us"
+    assert candidate.display_value_masked == "example.testmail/…/contact-us"
+    assert candidate.classification == "business_public_contact_form"
+    assert candidate.confidence == 100
+    assert candidate.parser_version == "contact-form-extractor-v1"
+    assert candidate.review_status == "accepted"
+
+
+def test_rejects_newsletter_login_and_non_contact_page_forms() -> None:
+    newsletter = """
+    <form action="/newsletter/subscribe">
+      <input type="email" name="email">
+      <textarea name="message"></textarea>
+      <button>Subscribe</button>
+    </form>
+    """
+    login = """
+    <form action="/account/login">
+      <input type="email" name="email">
+      <input type="password" name="password">
+      <textarea name="message"></textarea>
+      <button>Sign in</button>
+    </form>
+    """
+    valid_shape = """
+    <form><input type="email"><textarea></textarea><button>Send</button></form>
+    """
+
+    assert extract_contact_forms(
+        newsletter,
+        source_url="https://example.testmail/contact-us",
+    ) == []
+    assert extract_contact_forms(
+        login,
+        source_url="https://example.testmail/contact-us",
+    ) == []
+    assert extract_contact_forms(
+        valid_shape,
+        source_url="https://example.testmail/products/widget",
+    ) == []
 
 
 def test_html_document_parsing_keeps_json_ld_and_skips_hidden_noise() -> None:

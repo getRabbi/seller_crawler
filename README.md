@@ -34,7 +34,7 @@ Solo Mode v1 is the single-operator minimum launch path documented in
 `SOLO_MODE_IMPLEMENTATION_PLAN.md`. It preserves the tested Phase 0-8
 foundations and narrows launch to one verified Zyte Student Scrapy Cloud unit,
 one local fallback runner, official-website crawling, public business email,
-phone, WhatsApp, and WeChat extraction, normalization, basic entity resolution,
+phone, WhatsApp, WeChat, and contact-form extraction, normalization, basic entity resolution,
 Worker ingestion, the existing four D1 databases, a simple searchable private
 dashboard, CSV export, basic backup, and single-user Cloudflare Access.
 
@@ -45,7 +45,7 @@ retention are deferred until after launch.
 
 The sole operator has explicitly approved the compatible Amazon/public-source
 identity-discovery extension and dashboard-driven bounded crawl workflow.
-Amazon supplies identity evidence; email, phone, WhatsApp, and WeChat normally
+Amazon supplies identity evidence; email, phone, WhatsApp, WeChat, and public contact forms normally
 come from a credibly resolved public official website. When Amazon has no link,
 the same run may verify a bounded exact-name candidate set without scraping a
 search engine; weak, parked, private-network, or cross-domain candidates are not
@@ -139,11 +139,14 @@ configured spool directory without storing the HMAC secret or signature.
 ## Contact Extractors
 
 Phase 4 adds local, fixture-driven extractors for public business email, phone,
-WhatsApp, and WeChat contacts under `crawler/sellerintel/extractors`. The
+WhatsApp, WeChat, and contact-form channels under `crawler/sellerintel/extractors`. The
 extractors parse sanitized HTML, normalize values, keep masked evidence context,
 assign confidence components, classify candidates, and reject low-confidence
-false positives. Phone and WhatsApp normalization uses `phonenumbers`; no SMTP,
-mailbox probing, QR decoding, live crawling, or provider access is performed.
+false positives. A contact form requires a contact/support path, reply field,
+message field, and submit control; login, newsletter, search, account, and
+checkout forms are rejected. The platform records the page URL but never fills
+or submits the form. Phone and WhatsApp normalization uses `phonenumbers`; no
+SMTP, mailbox probing, QR decoding, live crawling, or provider access is performed.
 
 ## Normalization
 

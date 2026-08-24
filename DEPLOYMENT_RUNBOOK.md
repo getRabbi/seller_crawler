@@ -317,6 +317,13 @@ are enforced by the spider. A visible CAPTCHA, short challenge page, HTTP
 401/403/407/429/451, robots denial, or explicit block must produce a blocked
 operator status and must not trigger provider rotation.
 
+If `contact_form` is selected, verify that a real contact/support page containing
+a reply field, message field, and submit control creates one encrypted,
+run-linked channel with parser `contact-form-extractor-v1`. Verify newsletter,
+login, search, account, and checkout forms create none. The crawler must not
+submit the form. This extraction uses pages already inside the official-site
+page budget, so it adds no Scrapy Cloud unit, provider, or paid-request quota.
+
 Migration `operations/0006_crawl_run_contacts.sql` must be applied before the
 new Worker is deployed. Verify `crawl_run_contacts` exists, repeated ingestion
 does not increase the run's unique contact count, and no raw contact value is
@@ -353,3 +360,7 @@ Rolling back automatic domain verification likewise requires no schema rollback:
 restore the prior Worker/crawler/dashboard versions, keep candidate source/review
 and accepted canonical records, and use a documented forward correction if an
 accepted domain must be changed. Never delete canonical or historical records.
+Rolling back `contact_form` support also requires no schema rollback: remove the
+operator selection in a forward code release and preserve existing encrypted
+contact/audit rows. Suppress a bad channel through the documented suppression
+workflow instead of deleting canonical or historical data.
