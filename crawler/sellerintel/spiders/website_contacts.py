@@ -81,7 +81,6 @@ class OfficialSellerTarget:
 
 class OfficialWebsiteSpider(scrapy.Spider):
     name = "official_website"
-    handle_httpstatus_all = True
 
     custom_settings = {
         "DOWNLOADER_MIDDLEWARES": {
@@ -90,6 +89,7 @@ class OfficialWebsiteSpider(scrapy.Spider):
         },
         "DEPTH_LIMIT": 0,
         "DNS_RESOLVER": "sellerintel.security.dns.PublicCachingResolver",
+        "HTTPERROR_ALLOW_ALL": True,
         "ROBOTSTXT_OBEY": True,
     }
 

@@ -17,6 +17,10 @@ from sellerintel.adapters.amazon import (
 )
 from sellerintel.spiders.marketplace_seller import AmazonDiscoverySpider
 
+
+def test_non_success_amazon_responses_reach_the_policy_callback() -> None:
+    assert AmazonDiscoverySpider.custom_settings["HTTPERROR_ALLOW_ALL"] is True
+
 FIXTURES = Path(__file__).parent / "fixtures" / "amazon"
 RUN_ID = "018f2d5e-7b3c-7a1d-8f2e-523456789abc"
 

@@ -81,7 +81,6 @@ class OfficialDomainDiscoverySpider(scrapy.Spider):
     """Verify bounded, deterministic official-domain candidates without search scraping."""
 
     name = "official_domain_discovery"
-    handle_httpstatus_all = True
     parser_version = DISCOVERY_PARSER_VERSION
     job_type = "official_domain_discovery"
 
@@ -92,6 +91,7 @@ class OfficialDomainDiscoverySpider(scrapy.Spider):
         },
         "DEPTH_LIMIT": 0,
         "DNS_RESOLVER": "sellerintel.security.dns.PublicCachingResolver",
+        "HTTPERROR_ALLOW_ALL": True,
         "ROBOTSTXT_OBEY": True,
         "RETRY_TIMES": 0,
     }

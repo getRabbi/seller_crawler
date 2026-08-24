@@ -9,6 +9,10 @@
 - Stopped treating expected 404/410 responses from optional discovered or
   guessed official-site paths as crawler failures. A missing seed page and real
   network/server errors still report failures.
+- Routed non-success responses through the explicit Amazon, domain-verification,
+  and official-site policy callbacks with Scrapy's supported
+  `HTTPERROR_ALLOW_ALL` setting. This keeps block/cooldown handling fail-closed
+  and prevents the generic HTTP middleware from bypassing adapter decisions.
 - Added a zero-charge, provider-neutral official-domain resolution stage after
   Amazon identity discovery. It derives at most two deterministic identity
   candidates per seller and 25 per run, respects robots/cooldowns, rejects

@@ -79,14 +79,13 @@ class AmazonDiscoverySpider(scrapy.Spider):
     job_type = "amazon_discovery"
     parser_version = AMAZON_PARSER_VERSION
     completion_batch_number = 2_147_483_646
-    handle_httpstatus_all = True
-
     custom_settings = {
         "ROBOTSTXT_OBEY": True,
         "COOKIES_ENABLED": False,
         "CONCURRENT_REQUESTS": 2,
         "CONCURRENT_REQUESTS_PER_DOMAIN": 1,
         "DOWNLOAD_DELAY": 8.0,
+        "HTTPERROR_ALLOW_ALL": True,
         "RANDOMIZE_DOWNLOAD_DELAY": True,
         "AUTOTHROTTLE_ENABLED": True,
         "AUTOTHROTTLE_START_DELAY": 8.0,

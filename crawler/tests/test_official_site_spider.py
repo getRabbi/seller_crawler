@@ -20,6 +20,7 @@ FIXTURE_SITE = CRAWLER / "tests" / "fixtures" / "official_site"
 
 def test_fixture_only_scrapy_crawl_runs_end_to_end_without_network(tmp_path: Path) -> None:
     assert OfficialWebsiteSpider.custom_settings["DEPTH_LIMIT"] == 0
+    assert OfficialWebsiteSpider.custom_settings["HTTPERROR_ALLOW_ALL"] is True
     output_path = tmp_path / "runs" / "official-site.jsonl"
     env = os.environ.copy()
     env.update(

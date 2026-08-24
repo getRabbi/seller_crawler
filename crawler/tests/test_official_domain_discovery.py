@@ -17,6 +17,11 @@ from sellerintel.security.dns import _require_public_address
 from sellerintel.spiders.website_discovery import OfficialDomainDiscoverySpider
 from twisted.internet.error import DNSLookupError
 
+
+def test_non_success_responses_reach_the_policy_callback() -> None:
+    assert OfficialDomainDiscoverySpider.custom_settings["HTTPERROR_ALLOW_ALL"] is True
+
+
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE_SITE = ROOT / "crawler" / "tests" / "fixtures" / "official_site"
 RUN_ID = "018f2d5e-7b3c-7a1d-8f2e-623456789abc"
