@@ -1,5 +1,51 @@
 # Production Promotion Report
 
+## Same-page crawl monitoring UI promotion - 2026-08-26
+
+Release code commit: `8f423f1473d143937b7dd242290752411d12b054`
+
+New Crawl now retains the created or duplicate-skipped run on the same page,
+resumes it from a validated UUIDv7 `runId` URL parameter after refresh, and
+polls the existing authenticated detail route every five seconds until a
+terminal state. The operator sees elapsed time, current workflow stage,
+discovered/enriched seller counts, masked contact count, request outcomes,
+warnings, errors, and the latest five audited events. At completion the page
+renders the unique run-linked seller snapshot directly below the form; failed,
+blocked, cooldown, and cancelled runs clearly label any stored rows as partial
+results.
+
+| Gate | Verified result |
+|---|---|
+| Git and CI | Release `8f423f1473d143937b7dd242290752411d12b054` pushed to `main`; CI Web run `32942566647` and CI Python run `32942566636` passed |
+| Local web QA | Full ESLint and TypeScript checks passed; 80/80 Vitest tests passed, including rendered active-monitor and completed-results HTML; production npm audit reported zero vulnerabilities |
+| Production build | Next.js 15.5.22 generated all 11 static pages; `/crawls/new` is 9.33 kB with 115 kB first-load JavaScript |
+| Local HTTP acceptance | Exported New Crawl HTML and its client bundle returned HTTP 200; the shipped bundle contains the live monitor, terminal results, and bounded polling code |
+| Staging Pages | Deployment `be3fffed-facb-4b6e-8b06-89df9ad5a6c2`, branch `main`, source `8f423f1`; custom and preview routes remain Access-protected |
+| Production Pages | Deployment `5326eb15-830f-4102-b87f-71d0824363ac`, branch `main`, source `8f423f1`; custom and preview routes remain Access-protected |
+| API boundary | Production monitor-route browser preflight returns HTTP 204 for the exact dashboard origin; run detail remains protected by Cloudflare Access |
+
+This is a dashboard-only promotion. It changes no Worker, D1 schema, crawler
+artifact, provider, source adapter, contact reveal rule, or unit allocation, so
+no data backup or migration was required. Polling does not create, retry, or
+cancel an operator run; the existing detail service may idempotently advance an
+already-authorized sequential stage on the same one-unit slot. Contact output
+contains only masked counts/types and links to the existing audited seller
+detail flow. Paid services, Zyte API, extra units, provider switching, and all
+paid budgets remain disabled.
+
+Every Cloudflare mutation was guarded before execution and read back afterward
+against only account ID `b63e426431b63ec9db33d7c421d01b42`; the forbidden
+account was not used. The in-app authenticated browser connector was unavailable,
+so no credential workaround or visual Access-session automation was attempted.
+Rendered-component tests, production static export, localhost HTTP acceptance,
+deployment metadata, Access redirects, and CORS acceptance passed independently.
+
+Application rollback is to redeploy production Pages deployment
+`ce06f957-be82-47b8-a6b6-ee6dca1f2542`. Worker version
+`7c022ade-4b04-4cf9-ac33-7e669317a26d`, migration `0007`, crawler artifact
+`294a37f438e82101ccf1b253cc3be9d4245b8614`, and all canonical/historical data
+remain in place.
+
 ## Operator crawl sizing and duplicate-search release - 2026-08-26
 
 Release code commit: `294a37f438e82101ccf1b253cc3be9d4245b8614`
