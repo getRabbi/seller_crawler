@@ -34,6 +34,9 @@ const API_BASE = "https://app.zyte.com/api";
 const UUID_V7_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const MAX_OFFICIAL_PAGES_PER_RUN = 100;
 const MAX_DOMAIN_CANDIDATES_PER_RUN = 25;
+const MAX_OFFICIAL_SITES_PER_RUN = 25;
+const MAX_AMAZON_RESULT_PAGES_PER_KEYWORD = 15;
+const MAX_AMAZON_RESPONSES_PER_RUN = 700;
 
 interface OfficialSellerTarget {
   sellerId: string;
@@ -85,6 +88,7 @@ interface OperatorRunRow {
   warnings_json: string;
   error_code: string | null;
   error_message: string | null;
+  search_fingerprint: string | null;
   total_count?: number;
   requests_total?: number;
   responses_success?: number;
@@ -104,6 +108,14 @@ interface EventRow {
 interface ExistingIdempotency {
   request_hash: string;
   crawl_run_id: string;
+}
+
+interface HistoricalSearchScope {
+  id: string;
+  query_json: string;
+  marketplace: string | null;
+  country_codes_json: string;
+  filters_json: string;
 }
 
 interface CloudJob {
@@ -151,6 +163,21 @@ export class OperatorCrawlService {
       return { run: mapRun(run), queued: run.status === "queued" };
     }
 
+    const searchSignature = input.mode === "find_sellers" ? normalizedSearchSignature(input) : null;
+    const searchFingerprint = searchSignature ? await sha256Hex(searchSignature) : null;
+    if (searchFingerprint && searchSignature) {
+      const duplicate = await this.equivalentSearch(searchFingerprint, searchSignature, input.marketplace as string);
+      if (duplicate) {
+        return {
+          run: mapRun(duplicate),
+          queued: duplicate.status === "queued",
+          skipped: true,
+          skipReason: "duplicate_search",
+          duplicateOfRunId: duplicate.id
+        };
+      }
+    }
+
     const knownSellerTarget = await this.resolveKnownSellerTarget(input);
     const resolutionSeller = await this.resolveAutomaticSellerTarget(input);
 
@@ -163,51 +190,73 @@ export class OperatorCrawlService {
           ? (input.seedUrls ?? []).map((value) => new URL(value).hostname.toLowerCase())
           : [];
     const artifactVersion = this.env.SCRAPY_CLOUD_ARTIFACT_VERSION?.trim() || "main";
-    await this.db
-      .prepare(
-        `INSERT INTO operator_crawl_runs (
-          id, mode, query_json, marketplace, country_codes_json, filters_json,
-          seed_urls_json, contact_types_json, target_seller_count, max_result_pages,
-          max_official_pages, crawl_depth, stop_after_target, status, stage,
-          requested_by, requested_at, updated_at, approved_domains_json, artifact_version
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', 'queued', ?, ?, ?, ?, ?)`
-      )
-      .bind(
-        id,
-        input.mode === "resolve_seller" ? "known_websites" : input.mode,
-        JSON.stringify(input.keywords ?? []),
-        input.marketplace ?? null,
-        JSON.stringify(input.countryCodes ?? []),
-        JSON.stringify(
-          input.mode === "find_sellers"
-            ? input.filters ?? {}
-            : knownSellerTarget
-              ? {
-                  targetSellerId: knownSellerTarget.sellerId,
-                  targetSellerName: knownSellerTarget.sellerName
-                }
-              : resolutionSeller
+    try {
+      await this.db
+        .prepare(
+          `INSERT INTO operator_crawl_runs (
+            id, mode, query_json, marketplace, country_codes_json, filters_json,
+            seed_urls_json, contact_types_json, target_seller_count, max_result_pages,
+            max_official_pages, crawl_depth, stop_after_target, status, stage,
+            requested_by, requested_at, updated_at, approved_domains_json, artifact_version,
+            search_fingerprint
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', 'queued', ?, ?, ?, ?, ?, ?)`
+        )
+        .bind(
+          id,
+          input.mode === "resolve_seller" ? "known_websites" : input.mode,
+          JSON.stringify(input.keywords ?? []),
+          input.marketplace ?? null,
+          JSON.stringify(input.countryCodes ?? []),
+          JSON.stringify(
+            input.mode === "find_sellers"
+              ? input.filters ?? {}
+              : knownSellerTarget
                 ? {
-                    targetSellerId: resolutionSeller.sellerId,
-                    targetSellerName: resolutionSeller.sellerName,
-                    automaticResolution: true
+                    targetSellerId: knownSellerTarget.sellerId,
+                    targetSellerName: knownSellerTarget.sellerName
                   }
-                : {}
-        ),
-        JSON.stringify(input.seedUrls ?? []),
-        JSON.stringify(input.contactTypes),
-        input.targetSellerCount,
-        input.maxResultPages,
-        input.maxOfficialPages,
-        input.crawlDepth,
-        input.stopAfterTarget ? 1 : 0,
-        actorId,
-        now.toISOString(),
-        now.toISOString(),
-        JSON.stringify([...new Set(approvedDomains)]),
-        artifactVersion
-      )
-      .run();
+                : resolutionSeller
+                  ? {
+                      targetSellerId: resolutionSeller.sellerId,
+                      targetSellerName: resolutionSeller.sellerName,
+                      automaticResolution: true
+                    }
+                  : {}
+          ),
+          JSON.stringify(input.seedUrls ?? []),
+          JSON.stringify(input.contactTypes),
+          input.targetSellerCount,
+          input.maxResultPages,
+          input.maxOfficialPages,
+          input.crawlDepth,
+          input.stopAfterTarget ? 1 : 0,
+          actorId,
+          now.toISOString(),
+          now.toISOString(),
+          JSON.stringify([...new Set(approvedDomains)]),
+          artifactVersion,
+          searchFingerprint
+        )
+        .run();
+    } catch (error) {
+      if (searchFingerprint && searchSignature) {
+        const duplicate = await this.equivalentSearch(
+          searchFingerprint,
+          searchSignature,
+          input.marketplace as string
+        );
+        if (duplicate) {
+          return {
+            run: mapRun(duplicate),
+            queued: duplicate.status === "queued",
+            skipped: true,
+            skipReason: "duplicate_search",
+            duplicateOfRunId: duplicate.id
+          };
+        }
+      }
+      throw error;
+    }
     if (resolutionSeller) {
       await this.linkRunSeller(id, resolutionSeller.sellerId, "discovered", now.toISOString());
     }
@@ -239,6 +288,34 @@ export class OperatorCrawlService {
     const run = await this.getRun(id);
     if (!run) throw new OperatorCrawlError(503, "crawl_create_failed", "Crawl run could not be loaded after creation.");
     return { run: mapRun(run), queued: run.status === "queued" };
+  }
+
+  private async equivalentSearch(
+    fingerprint: string,
+    signature: string,
+    marketplace: string
+  ): Promise<OperatorRunRow | null> {
+    const current = await this.db
+      .prepare(
+        "SELECT * FROM operator_crawl_runs WHERE search_fingerprint = ? AND retry_of_run_id IS NULL ORDER BY requested_at ASC LIMIT 1"
+      )
+      .bind(fingerprint)
+      .first<OperatorRunRow>();
+    if (current) return current;
+
+    const historical = await this.db
+      .prepare(
+        `SELECT id, query_json, marketplace, country_codes_json, filters_json
+         FROM operator_crawl_runs
+         WHERE mode = 'find_sellers' AND marketplace = ? AND search_fingerprint IS NULL`
+      )
+      .bind(marketplace)
+      .all<HistoricalSearchScope>();
+    for (const row of historical.results ?? []) {
+      if (normalizedStoredSearchSignature(row) !== signature) continue;
+      return this.getRun(row.id);
+    }
+    return null;
   }
 
   async list(limit: number, offset: number, status?: string): Promise<{ items: CrawlRunItem[]; total: number; limit: number; offset: number }> {
@@ -892,8 +969,10 @@ export class OperatorCrawlService {
       form.manufacturer_likelihood = stringValue(filters.manufacturerLikelihood) || "any";
       form.trader_likelihood = stringValue(filters.traderLikelihood) || "any";
       commonSettings.CLOSESPIDER_PAGECOUNT = Math.min(
-        250,
-        run.max_result_pages + run.target_seller_count * 2
+        MAX_AMAZON_RESPONSES_PER_RUN,
+        Math.max(1, parseStringArray(run.query_json).length) * run.max_result_pages +
+          run.target_seller_count * 2 +
+          2
       );
     } else if (run.stage === "resolving") {
       const candidates =
@@ -1153,7 +1232,7 @@ export class OperatorCrawlService {
         seedUrl: `https://${domain}/`
       });
     }
-    return [...targets.values()];
+    return [...targets.values()].slice(0, MAX_OFFICIAL_SITES_PER_RUN);
   }
 
   private async domainCandidateTargetsForRun(
@@ -1377,8 +1456,8 @@ function validateCreateRequest(raw: unknown): CreateCrawlRunRequest {
   const request: CreateCrawlRunRequest = {
     mode,
     contactTypes: [...new Set(contactTypes)] as CreateCrawlRunRequest["contactTypes"],
-    targetSellerCount: integer(value.targetSellerCount, 1, 100, "targetSellerCount"),
-    maxResultPages: integer(value.maxResultPages, 1, 3, "maxResultPages"),
+    targetSellerCount: integer(value.targetSellerCount, 1, 300, "targetSellerCount"),
+    maxResultPages: integer(value.maxResultPages, 1, MAX_AMAZON_RESULT_PAGES_PER_KEYWORD, "maxResultPages"),
     maxOfficialPages: integer(value.maxOfficialPages, 1, 25, "maxOfficialPages"),
     crawlDepth: integer(value.crawlDepth, 0, 3, "crawlDepth"),
     stopAfterTarget: value.stopAfterTarget !== false,
@@ -1386,12 +1465,12 @@ function validateCreateRequest(raw: unknown): CreateCrawlRunRequest {
   };
   if (!/^[A-Za-z0-9._:-]+$/.test(request.idempotencyKey)) throw invalid("idempotencyKey contains unsupported characters.");
   if (mode === "find_sellers") {
-    request.keywords = stringArray(value.keywords, 5, 120);
+    request.keywords = uniqueNormalizedQueries(stringArray(value.keywords, 5, 120));
     if (request.keywords.length === 0) throw invalid("At least one keyword query is required.");
     const marketplace = text(value.marketplace, 3, 32, "marketplace").toLowerCase();
     if (!(SUPPORTED_AMAZON_MARKETPLACES as readonly string[]).includes(marketplace)) throw invalid("marketplace is not supported.");
     request.marketplace = marketplace;
-    request.countryCodes = stringArray(value.countryCodes, 20, 2).map((code) => code.toUpperCase());
+    request.countryCodes = [...new Set(stringArray(value.countryCodes, 20, 2).map((code) => code.toUpperCase()))];
     request.filters = validateFilters(value.filters);
   } else if (mode === "known_websites") {
     request.seedUrls = stringArray(value.seedUrls, 20, 2048).map(validatePublicHttpsUrl);
@@ -1414,7 +1493,11 @@ function validateCreateRequest(raw: unknown): CreateCrawlRunRequest {
   }
   const plannedOfficialPages =
     request.maxOfficialPages *
-    (request.mode === "known_websites" ? request.seedUrls?.length ?? 1 : request.targetSellerCount);
+    (request.mode === "find_sellers"
+      ? Math.min(request.targetSellerCount, MAX_OFFICIAL_SITES_PER_RUN)
+      : request.mode === "known_websites"
+        ? request.seedUrls?.length ?? 1
+        : 1);
   if (plannedOfficialPages > MAX_OFFICIAL_PAGES_PER_RUN) {
     throw invalid(`Official website page budget must not exceed ${MAX_OFFICIAL_PAGES_PER_RUN} pages per run.`);
   }
@@ -1513,6 +1596,66 @@ function parseObject(raw: string): Record<string, unknown> {
     const value = JSON.parse(raw) as unknown;
     return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
   } catch { return {}; }
+}
+
+function uniqueNormalizedQueries(values: string[]): string[] {
+  const result: string[] = [];
+  const seen = new Set<string>();
+  for (const value of values) {
+    const cleaned = value.replace(/\s+/g, " ").trim();
+    const key = normalizedSearchText(cleaned);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(cleaned);
+  }
+  return result;
+}
+
+function normalizedSearchSignature(request: CreateCrawlRunRequest): string {
+  return searchSignature(
+    request.keywords ?? [],
+    request.marketplace ?? "",
+    request.countryCodes ?? [],
+    request.filters as Record<string, unknown> | undefined
+  );
+}
+
+function normalizedStoredSearchSignature(row: HistoricalSearchScope): string {
+  return searchSignature(
+    parseStringArray(row.query_json),
+    row.marketplace ?? "",
+    parseStringArray(row.country_codes_json),
+    parseObject(row.filters_json)
+  );
+}
+
+function searchSignature(
+  keywords: string[],
+  marketplace: string,
+  countryCodes: string[],
+  filters: Record<string, unknown> = {}
+): string {
+  return stableJson({
+    version: 1,
+    keywords: [...new Set(keywords.map(normalizedSearchText))].sort(),
+    marketplace: normalizedSearchText(marketplace),
+    countryCodes: [...new Set(countryCodes.map((value) => value.trim().toUpperCase()))].sort(),
+    filters: {
+      category: normalizedSearchText(filters.category),
+      brandKeyword: normalizedSearchText(filters.brandKeyword),
+      sellerNameKeyword: normalizedSearchText(filters.sellerNameKeyword),
+      requirePublicLocation: Boolean(filters.requirePublicLocation),
+      hasOfficialWebsite: Boolean(filters.hasOfficialWebsite),
+      manufacturerLikelihood: normalizedSearchText(filters.manufacturerLikelihood) || "any",
+      traderLikelihood: normalizedSearchText(filters.traderLikelihood) || "any"
+    }
+  });
+}
+
+function normalizedSearchText(value: unknown): string {
+  return typeof value === "string"
+    ? value.normalize("NFKC").replace(/\s+/g, " ").trim().toLowerCase()
+    : "";
 }
 
 function stringArray(value: unknown, maximumItems: number, maximumLength: number): string[] {

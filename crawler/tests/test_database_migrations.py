@@ -247,6 +247,17 @@ def test_operations_sources_store_solo_v1_compact_evidence() -> None:
     }.issubset(table_columns(connection, "sources"))
 
 
+def test_operator_search_fingerprints_are_unique_for_original_runs() -> None:
+    connection = apply_partition_migrations("operations")
+
+    assert "search_fingerprint" in table_columns(connection, "operator_crawl_runs")
+    indexes = {
+        row[1]: row[2]
+        for row in connection.execute("PRAGMA index_list(operator_crawl_runs)").fetchall()
+    }
+    assert indexes["ux_operator_crawl_search_fingerprint"] == 1
+
+
 def test_worker_configs_bind_exactly_four_partition_migration_directories() -> None:
     config_paths = [
         ROOT / "apps" / "worker-api" / "wrangler.toml",

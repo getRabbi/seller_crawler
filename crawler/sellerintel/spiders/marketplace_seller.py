@@ -44,8 +44,8 @@ from sellerintel.schemas.ingestion import (
 from sellerintel.spool.checksums import sha256_hex
 
 MAX_KEYWORDS = 5
-MAX_AMAZON_RESULT_PAGES = 3
-MAX_TARGET_SELLERS = 100
+MAX_AMAZON_RESULT_PAGES = 15
+MAX_TARGET_SELLERS = 300
 MAX_PRODUCTS_PER_SEARCH_PAGE = 24
 AMAZON_BLOCK_COOLDOWN_SECONDS = 604_800
 AMAZON_RUNTIME_SETTING_KEYS = (
@@ -433,7 +433,7 @@ class AmazonDiscoverySpider(scrapy.Spider):
             risk_level="high",
             robots_policy="obey",
             terms_review_status="approved",
-            daily_request_budget=self.max_result_pages,
+            daily_request_budget=self.max_result_pages * len(self.keywords),
             concurrency_per_domain=1,
             minimum_delay_seconds=8.0,
             blocked_until=blocked_until,

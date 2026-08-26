@@ -2,6 +2,13 @@
 
 ## Unreleased - Solo Mode v1 Implementation
 
+- Simplified Find Sellers sizing to one 100/200/300 seller-target field. Amazon
+  result pages and crawl limits are now derived automatically, while official
+  enrichment remains capped at 25 sites, four pages per site, and 100 pages per
+  run. Added normalized semantic search fingerprints through operations
+  migration `0007_operator_search_deduplication.sql`; equivalent keyword,
+  marketplace, country, and filter searches return the existing audited run as
+  an explicit skip instead of creating or queuing another job.
 - Hydrated seller-detail and crawl-run seller snapshots with the same active
   cross-D1 contact aggregates used by the Seller Directory, eliminating a
   misleading zero summary when masked contact rows were already present.
@@ -98,8 +105,6 @@
   a real ISO-8601 observation time even when a caller omits the optional
   override; the Worker now supplies a per-job timestamp and the spider retains
   a safe UTC fallback instead of persisting the literal string `None`.
-- Made the New Crawl seller target a server-bounded custom numeric control with
-  10/25/50/100 suggestions, preserving the hard 1-100 backend limit.
 - Added the explicitly approved single-operator Amazon identity-discovery
   extension: bounded public search/product/seller parsing, product-to-seller
   relationships, real business-country evidence, source provenance, block and

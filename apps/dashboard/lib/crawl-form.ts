@@ -6,20 +6,24 @@ export interface CrawlFormValues {
   seedUrls: string;
   contacts: string[];
   target: string;
-  maxResultPages: string;
-  maxOfficialPages: string;
-  depth: string;
   targetSellerId?: string;
 }
+
+export const SELLER_TARGET_OPTIONS = [100, 200, 300] as const;
+const PRODUCTS_PER_AMAZON_RESULT_PAGE = 24;
+const MAX_RESULT_PAGES_PER_KEYWORD = 15;
+export const OFFICIAL_PAGES_PER_SITE = 4;
+export const DEFAULT_CRAWL_DEPTH = 2;
 
 export function validateCrawlForm(values: CrawlFormValues): string | null {
   const errors: string[] = [];
 
   if (values.mode === "find_sellers") {
-    const queries = lines(values.keywords);
+    const rawQueries = lines(values.keywords);
+    const queries = searchQueries(values.keywords);
     if (queries.length === 0) {
       errors.push("enter at least one keyword or product query");
-    } else if (queries.length > 5) {
+    } else if (rawQueries.length > 5) {
       errors.push("use no more than five keyword queries");
     }
   } else if (values.mode === "known_websites") {
@@ -39,32 +43,14 @@ export function validateCrawlForm(values: CrawlFormValues): string | null {
     errors.push("select an existing seller with a valid UUIDv7 ID");
   }
 
-  if (!boundedInteger(values.target, 1, 100)) {
-    errors.push("set target sellers from 1 to 100");
-  }
-  if (values.mode === "find_sellers" && !boundedInteger(values.maxResultPages, 1, 3)) {
-    errors.push("set Amazon result pages from 1 to 3");
-  }
-  if (!boundedInteger(values.maxOfficialPages, 1, 25)) {
-    errors.push("set official pages per seller from 1 to 25");
-  }
-  if (!boundedInteger(values.depth, 0, 3)) {
-    errors.push("set crawl depth from 0 to 3");
+  if (
+    values.mode === "find_sellers" &&
+    !SELLER_TARGET_OPTIONS.includes(Number(values.target) as (typeof SELLER_TARGET_OPTIONS)[number])
+  ) {
+    errors.push("choose a seller target of 100, 200, or 300");
   }
   if (values.contacts.length === 0) {
     errors.push("select at least one contact priority");
-  }
-  const plannedSites = values.mode === "known_websites"
-    ? Math.max(1, lines(values.seedUrls).length)
-    : values.mode === "resolve_seller"
-      ? 1
-      : Number(values.target);
-  if (
-    boundedInteger(values.maxOfficialPages, 1, 25) &&
-    Number.isInteger(plannedSites) &&
-    plannedSites * Number(values.maxOfficialPages) > 100
-  ) {
-    errors.push("keep the official website budget at or below 100 pages per run");
   }
 
   return errors.length > 0
@@ -76,8 +62,24 @@ export function lines(value: string): string[] {
   return value.split(/\r?\n|,/).map((item) => item.trim()).filter(Boolean);
 }
 
-function boundedInteger(value: string, minimum: number, maximum: number): boolean {
-  if (value.trim() === "") return false;
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed >= minimum && parsed <= maximum;
+export function searchQueries(value: string): string[] {
+  const result: string[] = [];
+  const seen = new Set<string>();
+  for (const query of lines(value)) {
+    const cleaned = query.replace(/\s+/g, " ").trim();
+    const key = cleaned.normalize("NFKC").toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(cleaned);
+  }
+  return result;
+}
+
+export function resultPageLimit(targetSellerCount: number, keywordCount: number): number {
+  const safeTarget = Math.max(1, Math.floor(targetSellerCount));
+  const safeKeywordCount = Math.max(1, Math.floor(keywordCount));
+  return Math.min(
+    MAX_RESULT_PAGES_PER_KEYWORD,
+    Math.max(1, Math.ceil(safeTarget / (PRODUCTS_PER_AMAZON_RESULT_PAGE * safeKeywordCount)))
+  );
 }

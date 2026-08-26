@@ -103,11 +103,33 @@ throughput its free-tier D1 impact is proportional to verified contacts and
 stays inside the existing ingestion write envelope. Archive or retention must
 be a documented forward operation.
 
+Find Sellers exposes one sizing value: 100, 200, or 300 seller records. The
+dashboard derives Amazon result pages as `ceil(target / (24 * keyword_count))`,
+bounded to 15 pages per keyword, and uses crawl depth 2. A 300-seller run has a
+hard discovery close limit of 700 responses; the later sequential stages still
+allow no more than 25 deterministic domain-candidate pages, 25 verified official
+sites, and 100 official content pages. These are ceilings, not yield guarantees. Repeated merchants,
+filters, robots decisions, cooldowns, public-result availability, and explicit
+blocks can stop below the selected target. One Student unit remains the only
+active unit, and no paid-service or provider flag changes.
+
+Operations migration `0007_operator_search_deduplication.sql` stores one
+nullable SHA-256 search fingerprint and a unique index for each original Amazon
+search. The signature normalizes the keyword set, marketplace, country scope,
+and seller filters; it intentionally ignores target size and hidden page/depth
+budgets. The create API also compares pre-migration rows, so an equivalent
+historical search is returned with `skipped=true` and no external launch. A
+terminal run can be repeated only through the existing explicit Retry action.
+The fingerprint contains no secret or contact value, raw queries remain under
+the existing Access-protected operations policy, and application logs continue
+to exclude raw personal contacts. Free-tier impact is one 64-character value
+and one index entry per original search plus one indexed lookup per create.
+
 Amazon operator runs may add a sequential official-domain verification stage.
 It checks no more than two deterministic candidates per seller and 25 candidates
 per run, one homepage page per domain plus bounded robots and same-domain redirect
-handling. Candidate outcomes
-reuse versioned source/review records, so this release requires no D1 migration.
+handling. Candidate outcomes reuse versioned source/review records; the separate
+additive search-fingerprint migration does not alter candidate evidence.
 The candidate stage does not consume Zyte API or a second unit. A failed or
 ambiguous candidate is not linked; a parked page, private response address,
 cross-domain redirect, robots denial, or explicit block is never bypassed.

@@ -9,7 +9,15 @@ import type {
 import { DashboardShell } from "../../../components/dashboard-shell";
 import { StateBlock } from "../../../components/status";
 import { postWorkerApi, WorkerApiError, workerApiUrl } from "../../../lib/api";
-import { lines, validateCrawlForm } from "../../../lib/crawl-form";
+import {
+  DEFAULT_CRAWL_DEPTH,
+  lines,
+  OFFICIAL_PAGES_PER_SITE,
+  resultPageLimit,
+  searchQueries,
+  SELLER_TARGET_OPTIONS,
+  validateCrawlForm
+} from "../../../lib/crawl-form";
 
 const marketplaces = [
   ["amazon.com", "Amazon.com"], ["amazon.co.uk", "Amazon.co.uk"],
@@ -33,10 +41,7 @@ export default function NewCrawlPage() {
   const [seedUrls, setSeedUrls] = useState("");
   const [marketplace, setMarketplace] = useState("amazon.com");
   const [country, setCountry] = useState("");
-  const [target, setTarget] = useState("10");
-  const [maxResultPages, setMaxResultPages] = useState("1");
-  const [maxOfficialPages, setMaxOfficialPages] = useState("6");
-  const [depth, setDepth] = useState("2");
+  const [target, setTarget] = useState("100");
   const [category, setCategory] = useState("");
   const [brand, setBrand] = useState("");
   const [sellerName, setSellerName] = useState("");
@@ -63,7 +68,6 @@ export default function NewCrawlPage() {
     if (sellerId) {
       setTargetSellerId(sellerId);
       setTargetSellerName((params.get("sellerName") ?? "").slice(0, 200));
-      setTarget("1");
     }
   }, []);
 
@@ -85,9 +89,6 @@ export default function NewCrawlPage() {
       seedUrls,
       contacts,
       target,
-      maxResultPages,
-      maxOfficialPages,
-      depth,
       targetSellerId
     });
     if (validationError) {
@@ -97,18 +98,27 @@ export default function NewCrawlPage() {
 
     setSubmitting(true);
     const idempotencyKey = `dashboard-${crypto.randomUUID()}`;
+    const keywordQueries = searchQueries(keywords);
+    const websiteSeeds = lines(seedUrls);
+    const targetSellerCount = mode === "find_sellers"
+      ? Number(target)
+      : mode === "known_websites"
+        ? Math.max(1, websiteSeeds.length)
+        : 1;
     const payload: CreateCrawlRunRequest = {
       mode,
       contactTypes: contacts as CreateCrawlRunRequest["contactTypes"],
-      targetSellerCount: mode === "resolve_seller" ? 1 : Number(target),
-      maxResultPages: Number(maxResultPages),
-      maxOfficialPages: Number(maxOfficialPages),
-      crawlDepth: Number(depth),
+      targetSellerCount,
+      maxResultPages: mode === "find_sellers"
+        ? resultPageLimit(targetSellerCount, keywordQueries.length)
+        : 1,
+      maxOfficialPages: OFFICIAL_PAGES_PER_SITE,
+      crawlDepth: DEFAULT_CRAWL_DEPTH,
       stopAfterTarget: true,
       idempotencyKey,
       ...(mode === "find_sellers"
         ? {
-            keywords: lines(keywords),
+            keywords: keywordQueries,
             marketplace,
             countryCodes: country ? [country] : [],
             filters: {
@@ -123,7 +133,7 @@ export default function NewCrawlPage() {
           }
         : mode === "known_websites"
           ? {
-            seedUrls: lines(seedUrls),
+            seedUrls: websiteSeeds,
             targetSellerId: targetSellerId || undefined
           }
           : { targetSellerId })
@@ -151,7 +161,7 @@ export default function NewCrawlPage() {
 
         <div className="mode-switch" role="group" aria-label="Crawl mode">
           <button className={mode === "find_sellers" ? "selected" : ""} onClick={() => setMode("find_sellers")} type="button">Find Sellers</button>
-          <button className={mode === "resolve_seller" ? "selected" : ""} onClick={() => { setMode("resolve_seller"); setTarget("1"); }} type="button">Resolve Existing Seller</button>
+          <button className={mode === "resolve_seller" ? "selected" : ""} onClick={() => setMode("resolve_seller")} type="button">Resolve Existing Seller</button>
           <button className={mode === "known_websites" ? "selected" : ""} onClick={() => setMode("known_websites")} type="button">Crawl Known Websites</button>
         </div>
 
@@ -187,13 +197,13 @@ export default function NewCrawlPage() {
         </section>
 
         <section className="form-card">
-          <h2>Targets and enrichment</h2>
-          <div className="form-grid">
-            <label><FieldLabel text="Target sellers" /><input disabled={mode === "resolve_seller"} list="target-seller-counts" max="100" min="1" onChange={(event) => setTarget(event.target.value)} required type="number" value={mode === "resolve_seller" ? "1" : target} /><datalist id="target-seller-counts">{[10, 25, 50, 100].map((value) => <option key={value} value={value} />)}</datalist><small>{mode === "resolve_seller" ? "Exactly one existing seller is resolved per audited run." : "Choose a preset or enter a bounded value from 1 to 100."}</small></label>
-            {mode === "find_sellers" ? <label><FieldLabel text="Amazon result pages" /><input max="3" min="1" onChange={(event) => setMaxResultPages(event.target.value)} required type="number" value={maxResultPages} /></label> : null}
-            <label><FieldLabel text="Official pages / seller" /><input max="25" min="1" onChange={(event) => setMaxOfficialPages(event.target.value)} required type="number" value={maxOfficialPages} /><small>Maximum 100 official pages across the whole run.</small></label>
-            <label><FieldLabel text="Crawl depth" /><input max="3" min="0" onChange={(event) => setDepth(event.target.value)} required type="number" value={depth} /></label>
-          </div>
+          <h2>Collection size and contacts</h2>
+          {mode === "find_sellers" ? (
+            <div className="form-grid">
+              <label><FieldLabel text="Seller information target" /><select onChange={(event) => setTarget(event.target.value)} required value={target}>{SELLER_TARGET_OPTIONS.map((value) => <option key={value} value={value}>{value} sellers</option>)}</select><small>Collect up to this many unique seller records. Search-page, depth, and official-site limits are calculated automatically.</small></label>
+              <p className="wide-help">An equivalent keyword, marketplace, country, and filter search is created only once. If it already exists, no new job is launched and the previous run is shown as skipped.</p>
+            </div>
+          ) : null}
           <fieldset aria-describedby="contact-priority-help">
             <legend>Contact priorities <span className="required-badge">Required</span></legend>
             <div className="checkbox-row">{contactTypes.map((value) => <label className="check" key={value}><input checked={contacts.includes(value)} onChange={() => toggleContact(value)} type="checkbox" /> {value === "contact_form" ? "contact form" : value}</label>)}</div>
@@ -211,7 +221,13 @@ export default function NewCrawlPage() {
           tone="danger"
         />
       ) : null}
-      {result ? <StateBlock detail={`Run ${result.run.id} is ${result.run.status}. ${result.queued ? "It will start when the one-unit slot is free." : mode === "resolve_seller" ? "Scrapy Cloud accepted exact-name domain verification; accepted domains continue to contact enrichment." : "Scrapy Cloud control accepted it. Seller discovery, conservative official-domain verification, and contact enrichment will run sequentially."}`} title="Crawl created" /> : null}
+      {result ? (
+        result.skipped ? (
+          <StateBlock detail={`Run ${result.run.id} already covers this normalized search and is ${result.run.status}. No new crawl was created or queued.`} title="Search already exists — skipped" />
+        ) : (
+          <StateBlock detail={`Run ${result.run.id} is ${result.run.status}. ${result.queued ? "It will start when the one-unit slot is free." : mode === "resolve_seller" ? "Scrapy Cloud accepted exact-name domain verification; accepted domains continue to contact enrichment." : "Scrapy Cloud control accepted it. Seller discovery, conservative official-domain verification, and contact enrichment will run sequentially."}`} title="Crawl created" />
+        )
+      ) : null}
     </DashboardShell>
   );
 }

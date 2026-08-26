@@ -330,10 +330,15 @@ are distinct: Amazon discovery `2147483645`, official-domain verification
 must not contain a completion-ingestion `409`, and repeated delivery of any one
 stage completion must remain idempotent.
 
-Migration `operations/0006_crawl_run_contacts.sql` must be applied before the
+Migrations `operations/0006_crawl_run_contacts.sql` and
+`operations/0007_operator_search_deduplication.sql` must be applied before the
 new Worker is deployed. Verify `crawl_run_contacts` exists, repeated ingestion
 does not increase the run's unique contact count, and no raw contact value is
-present in the operations database.
+present in the operations database. Verify `operator_crawl_runs` contains the
+nullable `search_fingerprint` column and its partial unique index. An equivalent
+normalized Amazon search must return the existing audited run with
+`skipped=true`, must not create or queue another run, and must not launch a
+second Scrapy Cloud job.
 
 ## 8. Production Promotion
 
@@ -374,3 +379,8 @@ Rolling back the stage-specific completion keys requires restoring the prior
 crawler artifact and Worker artifact pin together. Preserve every already
 accepted idempotency row and crawl event; do not rewrite or delete historical
 completion batches.
+Rolling back normalized search deduplication leaves migration `0007` in place.
+Deploy the prior application and crawler artifacts, preserve every crawl run and
+fingerprint, and use only a documented forward migration if the index must ever
+be retired. Never delete an existing run to permit a repeated search; use the
+audited Retry action for a terminal run.

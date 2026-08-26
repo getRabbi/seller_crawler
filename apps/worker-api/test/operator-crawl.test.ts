@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { operatorCrawlResponse } from "../src/operator-crawl/routes";
 import { OperatorCrawlService } from "../src/operator-crawl/service";
 import type { D1Database, D1PreparedStatement, D1Result, D1Value } from "../src/repositories/d1";
 import type { RuntimeEnv } from "../src/validation/startup";
@@ -55,13 +56,15 @@ class OperatorStatement implements D1PreparedStatement {
         retry_of_run_id: retryOf, requested_by: actor, requested_at: requestedAt,
         started_at: null, finished_at: null, updated_at: updatedAt,
         approved_domains_json: domains, artifact_version: artifact,
+        search_fingerprint: null,
         discovered_sellers: 0, enriched_sellers: 0, contacts_found: 0,
         warnings_json: "[]", error_code: null, error_message: null
       });
     } else if (query.startsWith("INSERT INTO operator_crawl_runs") && query.includes("'queued', 'queued'")) {
       const [
         id, mode, queryJson, marketplace, countries, filters, seeds, contacts, target,
-        maxResults, maxOfficial, depth, stop, actor, requestedAt, updatedAt, domains, artifact
+        maxResults, maxOfficial, depth, stop, actor, requestedAt, updatedAt, domains, artifact,
+        searchFingerprint
       ] = this.values;
       this.state.runs.push({
         id, mode, query_json: queryJson, marketplace, country_codes_json: countries,
@@ -72,6 +75,7 @@ class OperatorStatement implements D1PreparedStatement {
         retry_of_run_id: null, requested_by: actor, requested_at: requestedAt,
         started_at: null, finished_at: null, updated_at: updatedAt,
         approved_domains_json: domains, artifact_version: artifact,
+        search_fingerprint: searchFingerprint,
         discovered_sellers: 0, enriched_sellers: 0, contacts_found: 0,
         warnings_json: "[]", error_code: null, error_message: null
       });
@@ -136,6 +140,18 @@ class OperatorStatement implements D1PreparedStatement {
     if (query.includes("FROM operator_crawl_idempotency")) {
       return this.state.idempotency.filter((item) => item.idempotency_key === this.values[0]);
     }
+    if (query.includes("FROM operator_crawl_runs WHERE search_fingerprint = ?")) {
+      return this.state.runs
+        .filter((item) => item.search_fingerprint === this.values[0] && item.retry_of_run_id === null)
+        .slice(0, 1);
+    }
+    if (query.includes("search_fingerprint IS NULL") && query.includes("mode = 'find_sellers'")) {
+      return this.state.runs.filter((item) =>
+        item.mode === "find_sellers" &&
+        item.marketplace === this.values[0] &&
+        item.search_fingerprint == null
+      );
+    }
     if (query.includes("FROM operator_crawl_runs WHERE active_unit_slot = 1")) {
       return this.state.runs.filter((item) => item.active_unit_slot === 1).slice(0, 1);
     }
@@ -198,6 +214,23 @@ describe("operator crawl control", () => {
     expect(new Set(sellers[0].contactTypes)).toEqual(new Set(["email", "phone", "contact_form"]));
   });
 
+  it("caps verified official-site enrichment at 25 sites for the 100-page budget", async () => {
+    const db = new OperatorD1();
+    const runId = "018f2d5e-7b3c-7a1d-8f2e-123456789abc";
+    for (let index = 0; index < 30; index += 1) {
+      db.runSellers.push({ crawl_run_id: runId, seller_id: `seller-${index}`, stage: "discovered" });
+    }
+    const service = new OperatorCrawlService(operatorEnv(db, new ManyOfficialDomainsD1()));
+    const internal = service as unknown as {
+      officialTargetsForRun(id: string): Promise<Array<{ seedUrl: string }>>;
+    };
+
+    const targets = await internal.officialTargetsForRun(runId);
+
+    expect(targets).toHaveLength(25);
+    expect(new Set(targets.map((target) => target.seedUrl)).size).toBe(25);
+  });
+
   it("launches exactly one bounded Student job and queues the second run", async () => {
     const db = new OperatorD1();
     const requests: Array<{ url: string; body: URLSearchParams }> = [];
@@ -211,7 +244,10 @@ describe("operator crawl control", () => {
     const service = new OperatorCrawlService(operatorEnv(db));
 
     const first = await service.create(findRequest("crawl-one"), "operator@example.test");
-    const second = await service.create(findRequest("crawl-two"), "operator@example.test");
+    const second = await service.create({
+      ...findRequest("crawl-two"),
+      keywords: ["insulated lunch box"]
+    }, "operator@example.test");
 
     expect(first.run.status).toBe("running");
     expect(second.run.status).toBe("queued");
@@ -233,6 +269,29 @@ describe("operator crawl control", () => {
     expect(Number.isNaN(Date.parse(String(settings.SELLERINTEL_OBSERVED_AT)))).toBe(false);
   });
 
+  it("launches the 300-seller preset with a bounded derived discovery budget", async () => {
+    const db = new OperatorD1();
+    const launches: URLSearchParams[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
+      launches.push(new URLSearchParams(String(init?.body ?? "")));
+      return Response.json({ status: "ok", jobid: "871778/1/102" });
+    }));
+    const service = new OperatorCrawlService(operatorEnv(db));
+
+    await service.create({
+      ...findRequest("largest-preset"),
+      keywords: ["commercial food container"],
+      targetSellerCount: 300,
+      maxResultPages: 13
+    }, "operator@example.test");
+
+    expect(launches[0].get("target_sellers")).toBe("300");
+    expect(launches[0].get("max_result_pages")).toBe("13");
+    const settings = JSON.parse(String(launches[0].get("job_settings"))) as Record<string, unknown>;
+    expect(settings.CLOSESPIDER_PAGECOUNT).toBe(615);
+    expect(settings.SCRAPY_CLOUD_MAX_UNITS).toBe(1);
+  });
+
   it("cancels the active job and immediately advances the queued run", async () => {
     const db = new OperatorD1();
     let nextJob = 201;
@@ -246,7 +305,10 @@ describe("operator crawl control", () => {
     }));
     const service = new OperatorCrawlService(operatorEnv(db));
     const first = await service.create(findRequest("cancel-one"), "operator@example.test");
-    const second = await service.create(findRequest("cancel-two"), "operator@example.test");
+    const second = await service.create({
+      ...findRequest("cancel-two"),
+      keywords: ["insulated lunch box"]
+    }, "operator@example.test");
 
     await service.cancel(first.run.id, "operator@example.test");
 
@@ -291,6 +353,80 @@ describe("operator crawl control", () => {
     expect(duplicate.run.id).toBe(first.run.id);
     expect(db.runs).toHaveLength(1);
     expect(fetchMock.mock.calls.filter(([input]) => String(input).endsWith("/run.json"))).toHaveLength(1);
+  });
+
+  it("skips the same normalized search even when target and keyword formatting change", async () => {
+    const db = new OperatorD1();
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      if (String(input).includes("jobs/list.json")) return Response.json({ jobs: [{ state: "running" }] });
+      return Response.json({ status: "ok", jobid: "871778/1/302" });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const service = new OperatorCrawlService(operatorEnv(db));
+
+    const first = await service.create(findRequest("semantic-search-one"), "operator@example.test");
+    const duplicate = await service.create({
+      ...findRequest("semantic-search-two"),
+      keywords: ["  STAINLESS   STEEL BOTTLE  "],
+      targetSellerCount: 300,
+      maxResultPages: 13
+    }, "operator@example.test");
+
+    expect(duplicate).toMatchObject({
+      skipped: true,
+      skipReason: "duplicate_search",
+      duplicateOfRunId: first.run.id
+    });
+    expect(duplicate.run.id).toBe(first.run.id);
+    expect(db.runs).toHaveLength(1);
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).endsWith("/run.json"))).toHaveLength(1);
+  });
+
+  it("returns HTTP 200 rather than 201 when the create route skips an existing search", async () => {
+    const db = new OperatorD1();
+    const env = operatorEnv(db);
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
+      if (String(input).includes("jobs/list.json")) return Response.json({ jobs: [{ state: "running" }] });
+      return Response.json({ status: "ok", jobid: "871778/1/303" });
+    }));
+    await new OperatorCrawlService(env).create(findRequest("route-search-one"), "operator@example.test");
+
+    const response = await operatorCrawlResponse(new Request("https://api.example.test/v1/crawl-runs", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        ...findRequest("route-search-two"),
+        targetSellerCount: 200,
+        maxResultPages: 9
+      })
+    }), env, "operator@example.test");
+    const payload = await response.json() as { skipped?: boolean; duplicateOfRunId?: string };
+
+    expect(response.status).toBe(200);
+    expect(payload.skipped).toBe(true);
+    expect(payload.duplicateOfRunId).toBe(db.runs[0].id);
+  });
+
+  it("also skips an equivalent pre-migration search without a stored fingerprint", async () => {
+    const db = new OperatorD1();
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
+      if (String(input).includes("jobs/list.json")) return Response.json({ jobs: [{ state: "running" }] });
+      return Response.json({ status: "ok", jobid: "871778/1/304" });
+    }));
+    const service = new OperatorCrawlService(operatorEnv(db));
+    const first = await service.create(findRequest("legacy-search-one"), "operator@example.test");
+    db.runs[0].search_fingerprint = null;
+
+    const duplicate = await service.create({
+      ...findRequest("legacy-search-two"),
+      keywords: ["Stainless Steel Bottle"],
+      targetSellerCount: 200,
+      maxResultPages: 9
+    }, "operator@example.test");
+
+    expect(duplicate.skipped).toBe(true);
+    expect(duplicate.run.id).toBe(first.run.id);
+    expect(db.runs).toHaveLength(1);
   });
 
   it("retries a terminal run as a new audited one-unit request", async () => {
@@ -683,6 +819,26 @@ class OfficialDomainD1 implements D1Database {
           identity_confidence: 90,
           last_seen_at: "2026-08-01T00:00:00Z"
         }] : []) as T[]
+      }),
+      run: async () => ({ success: true })
+    };
+  }
+}
+
+class ManyOfficialDomainsD1 implements D1Database {
+  prepare(): D1PreparedStatement {
+    return {
+      bind: () => this.prepare(),
+      first: async <T>() => null as T | null,
+      all: async <T>() => ({
+        success: true,
+        results: Array.from({ length: 30 }, (_, index) => ({
+          id: `seller-${index}`,
+          canonical_name: `Official Seller ${index}`,
+          official_domain: `seller-${index}.example`,
+          identity_confidence: 100 - index,
+          last_seen_at: "2026-08-24T00:00:00Z"
+        })) as T[]
       }),
       run: async () => ({ success: true })
     };

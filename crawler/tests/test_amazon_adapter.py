@@ -21,6 +21,13 @@ from sellerintel.spiders.marketplace_seller import AmazonDiscoverySpider
 def test_non_success_amazon_responses_reach_the_policy_callback() -> None:
     assert AmazonDiscoverySpider.custom_settings["HTTPERROR_ALLOW_ALL"] is True
 
+
+def test_operator_sizing_accepts_the_largest_bounded_preset() -> None:
+    spider = configured_spider(target_sellers="300", max_result_pages="13")
+
+    assert spider.target_sellers == 300
+    assert spider.max_result_pages == 13
+
 FIXTURES = Path(__file__).parent / "fixtures" / "amazon"
 RUN_ID = "018f2d5e-7b3c-7a1d-8f2e-523456789abc"
 

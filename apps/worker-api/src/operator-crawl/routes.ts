@@ -27,7 +27,8 @@ export async function operatorCrawlResponse(
       }
       const length = Number(request.headers.get("content-length") ?? "0");
       if (length > 32_768) return errorResponse(413, "crawl_request_too_large", "Crawl request exceeds 32 KiB.");
-      return json(await service.create(await request.json(), actorId), 201);
+      const result = await service.create(await request.json(), actorId);
+      return json(result, result.skipped ? 200 : 201);
     }
     if (request.method === "GET" && url.pathname === "/v1/crawl-runs") {
       const limit = boundedInteger(url.searchParams.get("limit"), 50, 1, 100);

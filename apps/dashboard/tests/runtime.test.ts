@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 
 import { fetchWorkerApi, postWorkerApi, WorkerApiError, workerApiBaseUrl, workerApiUrl } from "../lib/api";
-import { validateCrawlForm } from "../lib/crawl-form";
+import { resultPageLimit, searchQueries, validateCrawlForm } from "../lib/crawl-form";
 import { dashboardNav, workerApiPaths } from "../lib/dashboard-data";
 import { runtimePanels } from "../lib/runtime";
 
@@ -60,24 +60,25 @@ describe("dashboard runtime configuration", () => {
     expect(source).toContain("sellerId");
   });
 
-  it("ships an operational New Crawl form with bounded custom targets and all modes", () => {
+  it("ships an operational New Crawl form with one seller target control and all modes", () => {
     const source = readFileSync(new URL("../app/crawls/new/page.tsx", import.meta.url), "utf8");
 
     expect(source).toContain('mode === "find_sellers"');
     expect(source).toContain('"resolve_seller"');
     expect(source).toContain('"known_websites"');
-    expect(source).toContain('list="target-seller-counts"');
-    expect(source).toContain('max="100"');
-    expect(source).toContain('min="1"');
+    expect(source).toContain('text="Seller information target"');
+    expect(source).toContain("SELLER_TARGET_OPTIONS.map");
     expect(source).toContain('<FieldLabel text="Keywords / product queries" />');
     expect(source).toContain('className="required-badge"');
-    expect(source).toContain('required type="number"');
+    expect(source).not.toContain("Amazon result pages");
+    expect(source).not.toContain("Official pages / seller");
+    expect(source).not.toContain("Crawl depth");
     expect(source).toContain("OPEN API SIGN-IN CHECK");
     expect(source).toContain("START CRAWL");
     expect(source).toContain("Existing seller ID (optional)");
     expect(source).toContain("Resolve Existing Seller");
     expect(source).toContain('"contact_form"');
-    expect(source).toContain("Maximum 100 official pages across the whole run.");
+    expect(source).toContain("Search already exists — skipped");
   });
 
   it("validates mode-specific required crawl fields before submission", () => {
@@ -86,24 +87,19 @@ describe("dashboard runtime configuration", () => {
       keywords: "",
       seedUrls: "",
       contacts: ["email"],
-      target: "10",
-      maxResultPages: "1",
-      maxOfficialPages: "6",
-      depth: "2"
+      target: "100"
     };
 
     expect(validateCrawlForm(base)).toContain("keyword or product query");
     expect(validateCrawlForm({ ...base, mode: "known_websites", keywords: "" })).toContain("HTTPS website URL");
-    expect(validateCrawlForm({ ...base, mode: "resolve_seller", target: "1" })).toContain("UUIDv7 ID");
+    expect(validateCrawlForm({ ...base, mode: "resolve_seller" })).toContain("UUIDv7 ID");
     expect(validateCrawlForm({
       ...base,
       mode: "resolve_seller",
-      target: "1",
       targetSellerId: "018f2d5e-7b3c-7a1d-8f2e-123456789abc"
     })).toBeNull();
     expect(validateCrawlForm({ ...base, keywords: "bottle", contacts: [] })).toContain("contact priority");
-    expect(validateCrawlForm({ ...base, keywords: "bottle", target: "101" })).toContain("1 to 100");
-    expect(validateCrawlForm({ ...base, keywords: "bottle", target: "20", maxOfficialPages: "6" })).toContain("100 pages");
+    expect(validateCrawlForm({ ...base, keywords: "bottle", target: "50" })).toContain("100, 200, or 300");
     expect(validateCrawlForm({
       ...base,
       mode: "known_websites",
@@ -111,6 +107,15 @@ describe("dashboard runtime configuration", () => {
       targetSellerId: "018f2d5e-7b3c-7a1d-8f2e-123456789abc"
     })).toContain("exactly one website URL");
     expect(validateCrawlForm({ ...base, keywords: "bottle" })).toBeNull();
+  });
+
+  it("derives enough bounded Amazon result pages from the seller target", () => {
+    expect(resultPageLimit(100, 1)).toBe(5);
+    expect(resultPageLimit(200, 1)).toBe(9);
+    expect(resultPageLimit(300, 1)).toBe(13);
+    expect(resultPageLimit(300, 5)).toBe(3);
+    expect(searchQueries(" Bottle  Rack\nbottle rack")).toEqual(["Bottle Rack"]);
+    expect(resultPageLimit(300, searchQueries("Bottle Rack\nbottle rack").length)).toBe(13);
   });
 
   it("uses the configured public Worker origin without exposing secrets", () => {

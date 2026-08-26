@@ -1,7 +1,7 @@
 # Seller Intelligence Platform — Zero-Cost Hybrid Runner Master Specification v2.0
 
 **Document status:** FROZEN FOR IMPLEMENTATION WITH SOLO MODE V1 AMENDMENT
-**Specification version:** 2.1.1
+**Specification version:** 2.1.2
 **Target builder:** OpenAI Codex  
 **Primary use:** Internal B2B product and supplier research  
 **Target throughput:** Up to 500 useful new or materially updated intelligence events per day  
@@ -13,6 +13,7 @@
 **Freeze date:** 28 July 2026  
 **Solo Mode amendment date:** 4 August 2026
 **Official-domain resolution refinement:** 24 August 2026
+**Operator crawl simplification refinement:** 26 August 2026
 **Change authority:** Architecture changes require an explicit specification amendment before code changes  
 
 ---
@@ -111,6 +112,37 @@ recovered authoritatively without starting a duplicate job; an unprovable outcom
 fails closed.
 Rollback is an application-code rollback or forward feature disable; accepted
 canonical, source, review, contact, and historical records are preserved.
+
+### Operator crawl simplification refinement
+
+The authenticated `find_sellers` form exposes one operational sizing control with
+presets for 100, 200, or 300 seller records. Amazon result-page count, official-site
+page count, and crawl depth are internal bounded settings rather than operator inputs.
+The result-page allowance is derived from the selected target and submitted keyword
+count using the public parser's 24-product page ceiling, with an absolute maximum of
+15 result pages per keyword. A target is a stop ceiling, not a collection guarantee;
+public result availability, repeated merchants, filters, cooldowns, robots policy,
+and explicit source blocks may produce fewer records.
+
+The 100-page official-enrichment cap remains unchanged and is independent of the
+Amazon identity target. At most 25 deterministic official-domain candidates may
+continue from one discovery run, no more than 25 verified sites (including domains
+declared by Amazon sellers) may enter enrichment, and each site receives at most
+four enrichment pages. Direct known-website and existing-seller modes retain the
+same total 100-page cap. All external work remains sequential on one Scrapy Cloud
+unit with paid services, Zyte API, provider switching, CAPTCHA bypass, and block
+evasion disabled.
+
+Equivalent Amazon searches are deduplicated before a run is created. Equivalence
+uses normalized keyword set, marketplace, country scope, and seller filters; target
+size and hidden technical budgets do not cause an already attempted search to run
+again. The API returns the existing audited run with an explicit duplicate-search
+skip result. An operator may use the existing audited retry action for a terminal
+run. Operations migration `0007_operator_search_deduplication.sql` adds only a
+nullable fingerprint and unique index; historical data remains immutable, and
+pre-migration rows are compared in application code. Rollback disables the new
+create-path check and uses a forward migration if the additive index or column ever
+needs to be retired; canonical and historical crawl data is never deleted.
 
 ---
 

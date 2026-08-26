@@ -18,6 +18,12 @@ run-level idempotency and audit evidence and must not be deleted during an
 application rollback. A prior Worker can run with the table present. Any future
 retention of these rows requires a documented forward retention migration.
 
+Operations migration `0007_operator_search_deduplication.sql` is additive. The
+nullable fingerprint contains no canonical seller/contact data, and a prior
+Worker can ignore both the column and its unique index. Roll application code
+back without deleting crawl runs. If the index must be retired, use a documented
+forward migration; preserve the fingerprint column and all audited run rows.
+
 Entity-resolution merges are rolled back with a new forward decision. Use
 `entity_resolution_decisions` and `seller_merge_redirects` metadata to restore
 source-seller links, mark the redirect rollback status, and write the rollback

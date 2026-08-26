@@ -154,6 +154,9 @@ export interface CreateCrawlRunRequest {
 export interface CrawlRunActionResponse {
   run: CrawlRunItem;
   queued: boolean;
+  skipped?: boolean;
+  skipReason?: "duplicate_search";
+  duplicateOfRunId?: string;
 }
 
 export interface CrawlRunDetailResponse {
