@@ -2,6 +2,13 @@
 
 ## Unreleased - Solo Mode v1 Implementation
 
+- Added a same-page New Crawl monitor after create or duplicate-search skip.
+  It resumes from a validated `runId` URL parameter, polls the authenticated
+  detail endpoint every five seconds only while non-terminal, shows elapsed
+  time, workflow stage, seller/enrichment/contact/request counts, warnings,
+  errors, and recent audited events, then renders the run-linked seller results
+  directly below the form. Contact values remain masked; polling never creates
+  or retries an operator run or adds a crawler unit.
 - Simplified Find Sellers sizing to one 100/200/300 seller-target field. Amazon
   result pages and crawl limits are now derived automatically, while official
   enrichment remains capped at 25 sites, four pages per site, and 100 pages per

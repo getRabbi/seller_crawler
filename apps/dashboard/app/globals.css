@@ -474,6 +474,144 @@ tbody tr:last-child td {
   text-transform: none;
 }
 
+.crawl-monitor {
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  padding: 16px;
+  scroll-margin-top: 18px;
+}
+
+.crawl-monitor .section-heading {
+  margin-bottom: 14px;
+}
+
+.crawl-stage-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.crawl-stage-row strong {
+  font-size: 16px;
+}
+
+.crawl-stage-row > span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.crawl-monitor progress {
+  width: 100%;
+  height: 10px;
+  margin: 10px 0 14px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  accent-color: var(--accent);
+}
+
+.crawl-monitor progress::-webkit-progress-bar {
+  border-radius: 999px;
+  background: #2b3b50;
+}
+
+.crawl-monitor progress::-webkit-progress-value {
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.crawl-monitor progress::-moz-progress-bar {
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.crawl-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
+  gap: 10px;
+}
+
+.crawl-metric-grid article {
+  min-height: 96px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #0b1626;
+  padding: 12px;
+}
+
+.crawl-metric-grid article > span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.crawl-metric-grid article > strong {
+  display: block;
+  margin-top: 9px;
+  font-size: 21px;
+}
+
+.crawl-monitor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.crawl-monitor-actions > span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.crawl-monitor > .state-block {
+  margin-top: 12px;
+}
+
+.crawl-events {
+  margin-top: 16px;
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+
+.crawl-events h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.crawl-events ol {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.crawl-events li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  border-left: 3px solid var(--line-strong);
+  padding-left: 10px;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.crawl-events time {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 .crawl-form {
   display: grid;
   gap: 14px;
@@ -750,6 +888,16 @@ tbody tr:last-child td {
 
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .crawl-stage-row,
+  .crawl-events li {
+    display: grid;
+  }
+
+  .crawl-stage-row > span,
+  .crawl-events time {
+    white-space: normal;
   }
 
   .form-card label.wide {

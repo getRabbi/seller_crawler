@@ -1,8 +1,19 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
+import * as React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 
+import { CrawlResults, CrawlRunMonitor } from "../components/crawl-run-monitor";
 import { fetchWorkerApi, postWorkerApi, WorkerApiError, workerApiBaseUrl, workerApiUrl } from "../lib/api";
 import { resultPageLimit, searchQueries, validateCrawlForm } from "../lib/crawl-form";
+import {
+  CRAWL_POLL_INTERVAL_MS,
+  crawlElapsedLabel,
+  crawlStageLabel,
+  crawlStageProgress,
+  isTerminalCrawlStatus,
+  isValidCrawlRunId
+} from "../lib/crawl-monitor";
 import { dashboardNav, workerApiPaths } from "../lib/dashboard-data";
 import { runtimePanels } from "../lib/runtime";
 
@@ -78,7 +89,141 @@ describe("dashboard runtime configuration", () => {
     expect(source).toContain("Existing seller ID (optional)");
     expect(source).toContain("Resolve Existing Seller");
     expect(source).toContain('"contact_form"');
+    expect(source).toContain("<CrawlRunMonitor");
+    expect(source).toContain("rememberRunId(created.run.id)");
+    expect(source).toContain('params.get("runId")');
     expect(source).toContain("Search already exists — skipped");
+  });
+
+  it("ships same-page live monitoring and terminal seller results", () => {
+    const source = readFileSync(new URL("../components/crawl-run-monitor.tsx", import.meta.url), "utf8");
+
+    expect(source).toContain("Live crawl progress");
+    expect(source).toContain("Auto-refreshing every");
+    expect(source).toContain("crawlElapsedLabel");
+    expect(source).toContain("Latest activity");
+    expect(source).toContain('data-testid="crawl-results-table"');
+    expect(source).toContain("OPEN IN SELLER DIRECTORY");
+    expect(source).toContain("Masked public contacts");
+  });
+
+  it("renders the active monitor and completed seller table", () => {
+    vi.stubGlobal("React", React);
+    const run = {
+      id: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
+      jobType: "amazon_identity_discovery",
+      zyteJobId: "871778/1/1",
+      startedAt: "2026-08-26T00:00:00.000Z",
+      finishedAt: null,
+      status: "running",
+      stage: "discovering",
+      requestsTotal: 20,
+      responsesSuccess: 18,
+      candidatesFound: 8,
+      recordsCreated: 8,
+      recordsUpdated: 0,
+      contactsVerified: 0,
+      blockedCount: 0,
+      errorCount: 0,
+      notes: null,
+      requestedSellerCount: 100,
+      discoveredSellers: 8,
+      enrichedSellers: 0,
+      contactsFound: 0,
+      requestedAt: "2026-08-26T00:00:00.000Z",
+      updatedAt: "2026-08-26T00:01:00.000Z"
+    };
+    const monitor = renderToStaticMarkup(React.createElement(CrawlRunMonitor, { runId: run.id, initialRun: run }));
+    const seller = {
+      id: "018f2d5e-7b3c-7a1d-8f2e-123456789abd",
+      canonicalName: "Acme Bottles",
+      legalName: "Acme Bottles Ltd",
+      countryCode: "BD",
+      province: "Dhaka",
+      city: "Dhaka",
+      officialDomain: "acme.example",
+      identityConfidence: 96,
+      qualityScore: 91,
+      status: "active",
+      firstSeenAt: "2026-08-26T00:00:00.000Z",
+      lastSeenAt: "2026-08-26T01:00:00.000Z",
+      updatedAt: "2026-08-26T01:00:00.000Z",
+      marketplace: "amazon.com",
+      marketplaceDisplayName: "Acme Store",
+      marketplaceProfileUrl: null,
+      manufacturerScore: 80,
+      traderScore: 20,
+      contactCount: 2,
+      contactTypes: ["email", "contact_form"],
+      duplicateStatus: null
+    };
+    const results = renderToStaticMarkup(React.createElement(CrawlResults, {
+      run: { ...run, status: "completed", finishedAt: "2026-08-26T01:02:03.000Z" },
+      sellers: [seller, { ...seller, marketplace: "amazon.co.uk" }]
+    }));
+
+    expect(monitor).toContain("Live crawl progress");
+    expect(monitor).toContain("Discovering seller identities");
+    expect(monitor).toContain("Sellers found");
+    expect(results).toContain("Crawl results (1)");
+    expect(results).toContain("Acme Bottles");
+    expect(results).toContain("acme.example");
+    expect(results).toContain("2 (email, contact form)");
+  });
+
+  it("classifies crawl stages, terminal states, and refresh-safe run IDs", () => {
+    const run = {
+      id: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
+      jobType: "amazon_identity_discovery",
+      zyteJobId: "871778/1/1",
+      startedAt: "2026-08-26T00:00:00.000Z",
+      finishedAt: null,
+      status: "running",
+      stage: "discovering",
+      requestsTotal: 20,
+      responsesSuccess: 18,
+      candidatesFound: 8,
+      recordsCreated: 8,
+      recordsUpdated: 0,
+      contactsVerified: 0,
+      blockedCount: 0,
+      errorCount: 0,
+      notes: null
+    };
+
+    expect(CRAWL_POLL_INTERVAL_MS).toBe(5_000);
+    expect(isTerminalCrawlStatus(run.status)).toBe(false);
+    expect(crawlStageLabel(run)).toBe("Discovering seller identities");
+    expect(crawlStageProgress(run)).toBe(35);
+    expect(crawlStageLabel({ ...run, status: "running", stage: "resolving" })).toBe("Resolving official websites");
+    expect(crawlStageProgress({ ...run, status: "enriching", stage: "enriching" })).toBe(80);
+    expect(isTerminalCrawlStatus("completed_with_warnings")).toBe(true);
+    expect(crawlStageProgress({ ...run, status: "completed", finishedAt: "2026-08-26T01:02:03.000Z" })).toBe(100);
+    expect(isValidCrawlRunId(run.id)).toBe(true);
+    expect(isValidCrawlRunId("not-a-run-id")).toBe(false);
+  });
+
+  it("shows elapsed run time live and freezes it at completion", () => {
+    const run = {
+      id: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
+      jobType: "amazon_identity_discovery",
+      zyteJobId: null,
+      startedAt: "2026-08-26T00:00:00.000Z",
+      finishedAt: null,
+      status: "running",
+      requestsTotal: 0,
+      responsesSuccess: 0,
+      candidatesFound: 0,
+      recordsCreated: 0,
+      recordsUpdated: 0,
+      contactsVerified: 0,
+      blockedCount: 0,
+      errorCount: 0,
+      notes: null
+    };
+
+    expect(crawlElapsedLabel(run, Date.parse("2026-08-26T00:02:09.000Z"))).toBe("2m 09s");
+    expect(crawlElapsedLabel({ ...run, status: "completed", finishedAt: "2026-08-26T01:02:03.000Z" }, Date.parse("2026-08-27T00:00:00.000Z"))).toBe("1h 02m 03s");
   });
 
   it("validates mode-specific required crawl fields before submission", () => {

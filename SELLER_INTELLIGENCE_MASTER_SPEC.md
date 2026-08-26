@@ -1,7 +1,7 @@
 # Seller Intelligence Platform — Zero-Cost Hybrid Runner Master Specification v2.0
 
 **Document status:** FROZEN FOR IMPLEMENTATION WITH SOLO MODE V1 AMENDMENT
-**Specification version:** 2.1.2
+**Specification version:** 2.1.3
 **Target builder:** OpenAI Codex  
 **Primary use:** Internal B2B product and supplier research  
 **Target throughput:** Up to 500 useful new or materially updated intelligence events per day  
@@ -14,6 +14,7 @@
 **Solo Mode amendment date:** 4 August 2026
 **Official-domain resolution refinement:** 24 August 2026
 **Operator crawl simplification refinement:** 26 August 2026
+**Operator crawl monitoring refinement:** 26 August 2026
 **Change authority:** Architecture changes require an explicit specification amendment before code changes  
 
 ---
@@ -143,6 +144,27 @@ nullable fingerprint and unique index; historical data remains immutable, and
 pre-migration rows are compared in application code. Rollback disables the new
 create-path check and uses a forward migration if the additive index or column ever
 needs to be retired; canonical and historical crawl data is never deleted.
+
+### Operator crawl monitoring refinement
+
+After create or duplicate-search skip, New Crawl keeps the selected run on the
+same page and reads the existing authenticated run-detail endpoint at a bounded
+interval. The current status and workflow stage, elapsed time, discovered and
+enriched seller counts, contact count, request success count, warnings, errors,
+and latest audited events remain visible until the run reaches a terminal state.
+The run identifier is retained in the page URL so an ordinary refresh resumes the
+same monitor instead of losing operator context or creating another run.
+
+When the run ends, the same page displays the seller snapshot already linked by
+`crawl_run_sellers`, including canonical identity, location, verified official
+domain, marketplace identity, masked contact summary, quality, and record status.
+Raw contact values remain excluded; reveal continues to require the existing
+authenticated, reason-audited contact flow. Failed, blocked, cooldown, or cancelled
+runs may show clearly labelled partial results. Polling stops at a terminal state,
+never creates or retries an operator run, and adds no database, provider, unit, or
+paid service. The existing detail service may idempotently advance an
+already-authorized run to its next sequential stage on the same unit. Rollback
+removes only the dashboard monitor; run data and history remain unchanged.
 
 ---
 

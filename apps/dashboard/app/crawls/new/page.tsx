@@ -7,8 +7,10 @@ import type {
 } from "@seller-intelligence/shared-types/dashboard";
 
 import { DashboardShell } from "../../../components/dashboard-shell";
+import { CrawlRunMonitor } from "../../../components/crawl-run-monitor";
 import { StateBlock } from "../../../components/status";
 import { postWorkerApi, WorkerApiError, workerApiUrl } from "../../../lib/api";
+import { isValidCrawlRunId } from "../../../lib/crawl-monitor";
 import {
   DEFAULT_CRAWL_DEPTH,
   lines,
@@ -56,6 +58,7 @@ export default function NewCrawlPage() {
   const [showApiSignIn, setShowApiSignIn] = useState(false);
   const [targetSellerId, setTargetSellerId] = useState("");
   const [targetSellerName, setTargetSellerName] = useState("");
+  const [monitoredRunId, setMonitoredRunId] = useState<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -69,7 +72,15 @@ export default function NewCrawlPage() {
       setTargetSellerId(sellerId);
       setTargetSellerName((params.get("sellerName") ?? "").slice(0, 200));
     }
+    const runId = params.get("runId") ?? "";
+    if (isValidCrawlRunId(runId)) setMonitoredRunId(runId);
   }, []);
+
+  useEffect(() => {
+    if (monitoredRunId) {
+      document.getElementById("crawl-run-progress")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [monitoredRunId]);
 
   function toggleContact(value: string) {
     setContacts((current) => current.includes(value)
@@ -140,7 +151,10 @@ export default function NewCrawlPage() {
     };
 
     try {
-      setResult(await postWorkerApi<CrawlRunActionResponse>("/v1/crawl-runs", payload));
+      const created = await postWorkerApi<CrawlRunActionResponse>("/v1/crawl-runs", payload);
+      setResult(created);
+      setMonitoredRunId(created.run.id);
+      rememberRunId(created.run.id);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The crawl could not be created.");
       setShowApiSignIn(
@@ -228,10 +242,23 @@ export default function NewCrawlPage() {
           <StateBlock detail={`Run ${result.run.id} is ${result.run.status}. ${result.queued ? "It will start when the one-unit slot is free." : mode === "resolve_seller" ? "Scrapy Cloud accepted exact-name domain verification; accepted domains continue to contact enrichment." : "Scrapy Cloud control accepted it. Seller discovery, conservative official-domain verification, and contact enrichment will run sequentially."}`} title="Crawl created" />
         )
       ) : null}
+      {monitoredRunId ? (
+        <CrawlRunMonitor
+          initialRun={result?.run.id === monitoredRunId ? result.run : null}
+          key={monitoredRunId}
+          runId={monitoredRunId}
+        />
+      ) : null}
     </DashboardShell>
   );
 }
 
 function FieldLabel({ text }: { text: string }) {
   return <span className="field-label">{text} <span className="required-badge">Required</span></span>;
+}
+
+function rememberRunId(runId: string) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("runId", runId);
+  window.history.replaceState(null, "", `${url.pathname}?${url.searchParams.toString()}`);
 }

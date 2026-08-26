@@ -125,6 +125,26 @@ the existing Access-protected operations policy, and application logs continue
 to exclude raw personal contacts. Free-tier impact is one 64-character value
 and one index entry per original search plus one indexed lookup per create.
 
+After a create response or duplicate-search skip, New Crawl monitors that run
+through the existing authenticated `GET /v1/crawl-runs/:id` route. It refreshes
+at most once every five seconds while the run is non-terminal and stops polling
+on `completed`, `completed_with_warnings`, `failed`, `blocked`, `cooldown`, or
+`cancelled`. The validated UUIDv7 `runId` stays in the page URL so a normal page
+refresh resumes status without submitting another create request. The monitor
+shows elapsed time, current stage, bounded counters, warnings/errors, and the
+latest five audited events. A terminal snapshot renders the run-linked sellers
+on the same page; unsuccessful terminal runs label stored rows as partial
+results.
+
+This monitor does not create, retry, or cancel an operator run, allocate an
+additional unit, or change provider selection, and it adds no migration or
+persistent quota. The existing detail service may idempotently advance the
+already-authorized run to its next sequential stage on the same unit. Run-detail
+reads reuse indexed run and run-to-seller keys. Seller contact output is limited
+to masked counts and types; raw contact reveal remains in the authenticated,
+reason-audited contact workflow. Rollback is a dashboard-code rollback only and
+preserves every operations, seller, contact, and history row.
+
 Amazon operator runs may add a sequential official-domain verification stage.
 It checks no more than two deterministic candidates per seller and 25 candidates
 per run, one homepage page per domain plus bounded robots and same-domain redirect
