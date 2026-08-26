@@ -1,5 +1,65 @@
 # Production Promotion Report
 
+## Operator crawl sizing and duplicate-search release - 2026-08-26
+
+Release code commit: `294a37f438e82101ccf1b253cc3be9d4245b8614`
+
+The operator crawl flow is promoted to staging and production. New Crawl now
+has one operational size choice: collect up to 100, 200, or 300 seller
+identities in one click. The API derives and enforces the discovery-page budget
+from that choice, while verified official-website enrichment remains capped at
+25 sites times four pages, or 100 official pages per run. Repeated searches use
+a normalized semantic fingerprint, return the existing original run with an
+`already completed/started` skip result, and do not allocate another crawler
+job. A seller target remains an upper bound because source availability, risk
+policy, blocks, and the requested filters can produce fewer sellers.
+
+### Immutable promotion evidence
+
+| Gate | Verified result |
+|---|---|
+| Git and CI | Release `294a37f438e82101ccf1b253cc3be9d4245b8614` pushed to `main`; GitHub CI Python run `32938268022` and CI Web run `32938268000` passed |
+| Local QA | 153 Python tests and 76 web tests passed; Ruff, mypy across 99 source files, ESLint, TypeScript, Bandit, pip-audit, and production npm audit passed; extractor coverage 95.03% against the 90% gate |
+| Production build | Next.js 15.5.22 production export generated all 11 static pages, including `/crawls/new` |
+| Container smoke | Image `seller-intelligence-crawler:operator-sizing-20260826` (`sha256:9b0fbad41749ea84513625b8044989e9924c5f71459312afe72c3dde0898354`) passed with `--network none`: eight fixture pages, four contacts, zero blocks/errors/spool writes |
+| Scrapy Cloud release | Project `871778`, immutable artifact `294a37f438e82101ccf1b253cc3be9d4245b8614`, four spiders, one-unit ceiling |
+| Scrapy Cloud smoke | Job `871778/2/9`, spider `solo_no_network_smoke`, exact release version, finished with the bounded `closespider_pagecount` reason; zero running jobs afterward |
+| Operations migration | `0007_operator_search_deduplication.sql` applied in staging and production; both report no pending migrations; production contains `search_fingerprint` and the partial unique index `ux_operator_crawl_search_fingerprint` |
+| Staging Worker | Version `92fa863e-1779-456e-8856-a77f2dc10393` at 100% with the release crawler artifact |
+| Staging Pages | Deployment `8761dd71-6939-4eb3-81b2-9d158b684525`, branch `main`, source `294a37f` |
+| Production Worker | Version `7c022ade-4b04-4cf9-ac33-7e669317a26d` with route `api.scalemyprints.com/*` and the release crawler artifact |
+| Production Pages | Deployment `ce06f957-be82-47b8-a6b6-ee6dca1f2542`, branch `main`, source `294a37f` |
+| Deployment boundary | Production health returns Access HTTP 302 unauthenticated; dashboard-origin API preflight returns 204; unsigned ingestion returns 400; production custom and preview New Crawl URLs both return Access HTTP 302 |
+
+Checksummed pre-migration backups were created and verified for all four D1
+partitions in each environment:
+
+- staging: `E:\seller_crawler\.sellerintel\backups\staging-20260826T063325Z\manifest.json`
+- production: `E:\seller_crawler\.sellerintel\backups\production-20260826T063121Z\manifest.json`
+
+Every Cloudflare mutation was guarded before execution and read back afterward
+against only `Uprightseo24@gmail.com's Account`, account ID
+`b63e426431b63ec9db33d7c421d01b42`. The forbidden account was not used. No
+secret value was printed or committed. The migration is additive and preserves
+canonical and historical rows. Contact masking, external-payload validation,
+idempotent writes, schema/parser version requirements, source-block stopping,
+and the no-CAPTCHA-bypass policy remain unchanged.
+
+Quota impact is bounded: there are still eight persistent D1 databases, the
+existing Student Scrapy Cloud project remains capped at one unit, and the only
+promotion job was the no-network smoke above. No live Amazon or official-site
+crawl was launched for deployment acceptance. Paid services, Zyte API, extra
+units, paid GitHub Actions crawling, credit runner, and automatic provider
+switching remain disabled; all paid budgets remain zero.
+
+Application rollback is to redeploy production Worker version
+`7a6a78a9-9a37-4220-b099-e95f7ccee77e`, Pages deployment
+`43be5a7d-a1fb-46d9-b426-e40bc92bfe68`, and crawler artifact
+`57266b132b94c15b1cf519939063555dc1ebe65d`. Keep migration `0007` and its
+fingerprints in place; any schema repair must be a forward migration. Use the
+checksummed production backup only for a documented disaster-recovery event,
+never as a normal application rollback.
+
 ## Contact enrichment hardening promotion — 2026-08-23
 
 Release code commit: `51feb4f99e934addc184b01bb172e589eb998874`
