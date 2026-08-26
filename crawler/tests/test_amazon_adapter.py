@@ -240,6 +240,33 @@ def test_429_stops_amazon_adapter_and_persists_retry_after_cooldown() -> None:
     assert spider._blocked is True
 
 
+def test_retry_exhausted_503_stops_amazon_and_persists_temporary_cooldown() -> None:
+    spider = configured_spider()
+    response = html_response(
+        "https://www.amazon.com/s?k=fixture",
+        "Service unavailable",
+        status=503,
+        meta={"query": "fixture", "result_page": 1, "observed_at": "2026-08-17T00:00:00Z"},
+    )
+
+    batches = list(spider.parse_search(response))
+
+    assert len(batches) == 1
+    source = batches[0]["sources"][0]  # type: ignore[index]
+    registry = batches[0]["source_registry"][0]  # type: ignore[index]
+    run = batches[0]["crawl_runs"][0]  # type: ignore[index]
+    assert source["http_status"] == 503
+    assert source["status"] == "cooldown"
+    assert source["next_allowed_at"] == "2026-08-17T01:00:00Z"
+    assert registry["adapter_name"] == "amazon:amazon.com"
+    assert registry["blocked_until"] == "2026-08-17T01:00:00Z"
+    assert run["status"] == "cooldown"
+    assert run["error_count"] == 1
+    assert spider._blocked is True
+    assert spider.crawler.stats is not None
+    assert spider.crawler.stats.get_value("sellerintel/temporary_unavailable_count") == 1
+
+
 def configured_spider(**kwargs: str) -> AmazonDiscoverySpider:
     settings = Settings(
         {

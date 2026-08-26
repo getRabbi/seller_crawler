@@ -13,7 +13,11 @@ export default [
       "coverage/**",
       "dist/**",
       ".sellerintel/**",
-      "**/.wrangler/**"
+      "**/.wrangler/**",
+      "**/.pytest_cache/**",
+      "**/.mypy_cache/**",
+      "**/.ruff_cache/**",
+      "**/.pytest-tmp-*/**"
     ]
   },
   js.configs.recommended,

@@ -145,6 +145,45 @@ to masked counts and types; raw contact reveal remains in the authenticated,
 reason-audited contact workflow. Rollback is a dashboard-code rollback only and
 preserves every operations, seller, contact, and history row.
 
+### Amazon temporary-unavailability cooldown
+
+An Amazon search/product/seller response that is still HTTP 503 after Scrapy's
+single bounded retry is terminal for that stage. The crawler records versioned
+source evidence with `status=cooldown`, upserts
+`source_registry.adapter_name=amazon:<marketplace>`, and sets `blocked_until` to
+at least one hour after observation. A valid longer `Retry-After` header wins,
+up to the existing seven-day safety maximum. The completion record stays
+`cooldown`; it is not converted to a successful zero-result run or an explicit
+source block.
+
+Before Amazon discovery starts, both the Worker queue pump and the crawler's
+signed authorization preflight read that same registry key. During an active
+cooldown the Worker records `amazon_temporarily_unavailable`, includes the ISO
+retry timestamp, releases any internal slot, and makes no Scrapy Cloud launch.
+The dashboard renders this as a warning and labels zero rows as an incomplete
+discovery. Historical runs that contain `crawler_errors` plus zero discovered
+sellers are explained similarly without altering their persisted audit rows.
+
+Operational response:
+
+1. Do not repeatedly press Retry before the displayed timestamp; the API will
+   audit the retry but will not launch external work.
+2. After the timestamp, use the existing authenticated Retry action once.
+3. If the source returns an explicit block/CAPTCHA/403/429 instead, retain the
+   existing longer policy stop and do not rotate a provider, proxy, cookie, or
+   credential.
+4. Investigate ingestion or Scrapy Cloud control failures separately; they are
+   not source availability and retain their existing error codes.
+
+Security review: the change adds no credential, cookie, browser, CAPTCHA, or
+contact-data path. Logs and UI contain only status codes, marketplace, run IDs,
+and cooldown timestamps. Quota impact is one idempotent source/source-registry
+upsert for a retry-exhausted 503 and fewer external launches while cooldown is
+active; D1 schema and the one-unit/zero-paid-service limits are unchanged.
+Rollback deploys the prior Worker/dashboard/crawler artifacts. Existing cooldown
+rows should normally expire; changing one early requires an audited operations
+procedure. Canonical and historical records must not be deleted.
+
 Amazon operator runs may add a sequential official-domain verification stage.
 It checks no more than two deterministic candidates per seller and 25 candidates
 per run, one homepage page per domain plus bounded robots and same-domain redirect

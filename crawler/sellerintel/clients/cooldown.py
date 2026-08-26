@@ -79,10 +79,11 @@ class CooldownClient:
         self,
         domain: str,
         *,
+        adapter: str = "official_site",
         timestamp: str | None = None,
         nonce: str | None = None,
     ) -> CooldownDecision:
-        query = urlencode({"adapter": "official_site", "domain": domain})
+        query = urlencode({"adapter": adapter, "domain": domain})
         url = f"{self.endpoint_url}?{query}"
         checked_at = timestamp or datetime.now(UTC).isoformat().replace("+00:00", "Z")
         request_nonce = nonce or secrets.token_urlsafe(24)

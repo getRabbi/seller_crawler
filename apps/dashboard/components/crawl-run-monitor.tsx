@@ -10,9 +10,12 @@ import type {
 
 import {
   CRAWL_POLL_INTERVAL_MS,
+  crawlActivityMessage,
+  crawlEmptyResultsMessage,
   crawlElapsedLabel,
   crawlStageLabel,
   crawlStageProgress,
+  crawlWarningMessages,
   isSuccessfulCrawlStatus,
   isTerminalCrawlStatus
 } from "../lib/crawl-monitor";
@@ -103,10 +106,19 @@ export function CrawlRunMonitor({ runId, initialRun = null }: CrawlRunMonitorPro
   const stageProgress = crawlStageProgress(run);
   const latestEvents = (detail?.events ?? []).slice(-5).reverse();
   const showResults = terminal && hasFetched && !error;
+  const warningMessages = crawlWarningMessages(run);
+  const cooldownWarning = run.errorCode === "amazon_temporarily_unavailable";
+  const monitorTone = successful && warningMessages.length === 0
+    ? "good"
+    : run.status === "cooldown"
+      ? "warn"
+      : terminal
+        ? "danger"
+        : "warn";
 
   return (
     <>
-      <section className={`crawl-monitor tone-${successful ? "good" : terminal ? "danger" : "warn"}`} data-testid="crawl-run-monitor" id="crawl-run-progress">
+      <section className={`crawl-monitor tone-${monitorTone}`} data-testid="crawl-run-monitor" id="crawl-run-progress">
         <div className="section-heading">
           <div>
             <p className="eyebrow">Run {run.id}</p>
@@ -139,9 +151,9 @@ export function CrawlRunMonitor({ runId, initialRun = null }: CrawlRunMonitorPro
         </div>
 
         {error ? <MonitorError error={error} onRetry={refreshNow} /> : null}
-        {run.errorMessage ? <StateBlock title={run.errorCode ?? "Crawl error"} detail={run.errorMessage} tone="danger" /> : null}
-        {run.warnings?.map((warning, index) => (
-          <StateBlock detail={warning} key={`${index}-${warning}`} title="Crawl warning" tone="warn" />
+        {run.errorMessage && !cooldownWarning ? <StateBlock title={run.errorCode ?? "Crawl error"} detail={run.errorMessage} tone="danger" /> : null}
+        {warningMessages.map((warning) => (
+          <StateBlock detail={warning.detail} key={warning.code} title={warning.title} tone="warn" />
         ))}
 
         {latestEvents.length ? (
@@ -150,7 +162,7 @@ export function CrawlRunMonitor({ runId, initialRun = null }: CrawlRunMonitorPro
             <ol>
               {latestEvents.map((event) => (
                 <li key={event.id}>
-                  <span>{event.message || event.eventType.replaceAll("_", " ")}</span>
+                  <span>{crawlActivityMessage(run, event.message, event.eventType)}</span>
                   <time dateTime={event.createdAt}>{formatTimestamp(event.createdAt)}</time>
                 </li>
               ))}
@@ -195,7 +207,12 @@ function MonitorError({ error, onRetry }: { error: WorkerApiError; onRetry: () =
 }
 
 export function CrawlResults({ run, sellers }: { run: CrawlRunItem; sellers: SellerListItem[] }) {
-  const partial = !isSuccessfulCrawlStatus(run.status);
+  const partial = !isSuccessfulCrawlStatus(run.status)
+    || (run.warnings ?? []).some((warning) => [
+      "crawler_errors",
+      "amazon_temporarily_unavailable",
+      "source_blocked"
+    ].includes(warning));
   const rows = uniqueSellers(sellers);
   return (
     <TableShell
@@ -232,7 +249,7 @@ export function CrawlResults({ run, sellers }: { run: CrawlRunItem; sellers: Sel
       ) : (
         <StateBlock
           title="No seller results"
-          detail={partial ? "This run ended before it stored a seller result." : "The crawl completed but no seller matched the selected filters and source policies."}
+          detail={crawlEmptyResultsMessage(run)}
           tone={partial ? "warn" : "neutral"}
         />
       )}

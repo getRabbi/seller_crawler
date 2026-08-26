@@ -14,6 +14,7 @@ class OperatorD1 implements D1Database {
   readonly runSellers: Row[] = [];
   readonly runContacts: Row[] = [];
   readonly crawlerRuns: Row[] = [];
+  readonly sourceRegistry: Row[] = [];
 
   prepare(query: string): D1PreparedStatement {
     return new OperatorStatement(this, query);
@@ -163,6 +164,9 @@ class OperatorStatement implements D1PreparedStatement {
     }
     if (query.includes("FROM crawl_runs WHERE id = ?")) {
       return this.state.crawlerRuns.filter((item) => item.id === this.values[0]).slice(0, 1);
+    }
+    if (query.includes("FROM source_registry WHERE adapter_name = ?")) {
+      return this.state.sourceRegistry.filter((item) => item.adapter_name === this.values[0]).slice(0, 1);
     }
     if (query.includes("SELECT o.*") && query.includes("FROM operator_crawl_runs o")) {
       return this.state.runs.map((run) => ({ ...run, total_count: this.state.runs.length }));
@@ -447,6 +451,59 @@ describe("operator crawl control", () => {
     expect(retried.run.status).toBe("running");
     expect(db.runs.find((run) => run.id === retried.run.id)?.retry_of_run_id).toBe(first.run.id);
     expect(db.runs.filter((run) => run.active_unit_slot === 1)).toHaveLength(1);
+  });
+
+  it("ends a new Amazon run in cooldown without launching an external job", async () => {
+    const db = new OperatorD1();
+    db.sourceRegistry.push({
+      adapter_name: "amazon:amazon.com",
+      blocked_until: "2099-08-26T10:00:00.000Z"
+    });
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const service = new OperatorCrawlService(operatorEnv(db));
+
+    const created = await service.create(findRequest("amazon-cooldown-active"), "operator@example.test");
+
+    expect(created.run.status).toBe("cooldown");
+    expect(created.run.errorCode).toBe("amazon_temporarily_unavailable");
+    expect(created.run.errorMessage).toContain("2099-08-26T10:00:00.000Z");
+    expect(created.run.warnings).toEqual(["amazon_temporarily_unavailable"]);
+    expect(db.runs[0].active_unit_slot).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("maps a retry-exhausted Amazon 503 outcome to cooldown without website warnings", async () => {
+    const db = new OperatorD1();
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL | Request) => {
+      if (String(input).includes("jobs/list.json")) {
+        return Response.json({ jobs: [{ state: "finished", close_reason: "finished" }] });
+      }
+      return Response.json({ status: "ok", jobid: "871778/1/450" });
+    }));
+    const service = new OperatorCrawlService(operatorEnv(db));
+    const created = await service.create(findRequest("amazon-503-outcome"), "operator@example.test");
+    db.sourceRegistry.push({
+      adapter_name: "amazon:amazon.com",
+      blocked_until: "2099-08-26T11:00:00.000Z"
+    });
+    db.crawlerRuns.push({
+      id: created.run.id,
+      status: "cooldown",
+      contacts_verified: 0,
+      blocked_count: 0,
+      error_count: 1
+    });
+
+    await service.pump();
+
+    expect(db.runs[0].status).toBe("cooldown");
+    expect(db.runs[0].error_code).toBe("amazon_temporarily_unavailable");
+    expect(JSON.parse(String(db.runs[0].warnings_json))).toEqual([
+      "amazon_temporarily_unavailable"
+    ]);
+    expect(String(db.runs[0].warnings_json)).not.toContain("official_website_unavailable");
+    expect(db.runs[0].active_unit_slot).toBeNull();
   });
 
   it("hands a discovered credible official domain to enrichment on the same unit", async () => {

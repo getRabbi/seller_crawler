@@ -1,7 +1,7 @@
 # Seller Intelligence Platform — Zero-Cost Hybrid Runner Master Specification v2.0
 
 **Document status:** FROZEN FOR IMPLEMENTATION WITH SOLO MODE V1 AMENDMENT
-**Specification version:** 2.1.3
+**Specification version:** 2.1.4
 **Target builder:** OpenAI Codex  
 **Primary use:** Internal B2B product and supplier research  
 **Target throughput:** Up to 500 useful new or materially updated intelligence events per day  
@@ -15,6 +15,7 @@
 **Official-domain resolution refinement:** 24 August 2026
 **Operator crawl simplification refinement:** 26 August 2026
 **Operator crawl monitoring refinement:** 26 August 2026
+**Amazon temporary-unavailability refinement:** 26 August 2026
 **Change authority:** Architecture changes require an explicit specification amendment before code changes  
 
 ---
@@ -165,6 +166,30 @@ never creates or retries an operator run, and adds no database, provider, unit, 
 paid service. The existing detail service may idempotently advance an
 already-authorized run to its next sequential stage on the same unit. Rollback
 removes only the dashboard monitor; run data and history remain unchanged.
+
+### Amazon temporary-unavailability refinement
+
+An Amazon HTTP 503 that remains after the adapter's single bounded retry is a
+temporary source outage, not a successful zero-result discovery and not an explicit
+policy block. The discovery adapter stops cleanly, stores versioned source evidence,
+and persists a one-hour `amazon:<marketplace>` cooldown in the existing
+`source_registry`. A valid longer `Retry-After` value is honored. The signed
+preflight must check that same Amazon registry key; the Worker also checks it before
+claiming or launching an external unit, so retries during the active cooldown end in
+an audited `cooldown` state without creating another Scrapy Cloud job.
+
+The operator run uses the structured warning `amazon_temporarily_unavailable`,
+includes the retry-after timestamp when available, and does not add
+`official_website_unavailable` when discovery could not obtain seller identities.
+The dashboard translates structured warning codes into operator-facing explanations
+and distinguishes source unavailability from a genuine empty filtered result.
+
+This behavior does not bypass CAPTCHA, rotate a proxy or provider, change request
+identity, increase concurrency, allocate another unit, or enable a paid service. It
+uses the current source registry and ingestion contracts, so no database migration is
+required. Rollback restores the previous application and crawler artifacts; persisted
+cooldowns may be allowed to expire naturally or be changed only through an audited
+retention/operations procedure, and canonical or historical data is never deleted.
 
 ---
 

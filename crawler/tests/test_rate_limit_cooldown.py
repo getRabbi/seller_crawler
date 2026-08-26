@@ -29,15 +29,17 @@ class CooldownTransport:
     def __init__(self, response: CooldownHttpResponse) -> None:
         self.response = response
         self.headers: Mapping[str, str] = {}
+        self.url = ""
 
     def get(
         self,
-        _url: str,
+        url: str,
         *,
         headers: Mapping[str, str],
         timeout_seconds: float,
     ) -> CooldownHttpResponse:
         assert timeout_seconds > 0
+        self.url = url
         self.headers = headers
         return self.response
 
@@ -59,6 +61,14 @@ def test_retry_after_seconds_honors_delta_and_http_date() -> None:
 
     assert retry_after_seconds(delta, now=now) == 120
     assert retry_after_seconds(dated, now=now) == 300
+
+    unavailable = SyntheticResponse(
+        "https://example.test",
+        503,
+        "",
+        {"Retry-After": "7200"},
+    )
+    assert retry_after_seconds(unavailable, now=now) == 7200
 
 
 def test_429_stops_domain_and_emits_persistent_cooldown_batch() -> None:
@@ -175,3 +185,25 @@ def test_cooldown_client_sends_required_signed_crawler_headers() -> None:
     assert transport.headers["X-SI-Timestamp"] == "2026-08-17T00:00:00Z"
     assert transport.headers["X-SI-Nonce"] == "deterministic-test-nonce"
     assert transport.headers["X-SI-Signature"]
+
+
+def test_cooldown_client_can_check_the_amazon_registry_key() -> None:
+    transport = CooldownTransport(
+        CooldownHttpResponse(200, b'{"allowed":false,"blocked_until":"2026-08-17T01:00:00Z"}')
+    )
+    client = CooldownClient(
+        "https://api.example.test/v1/crawl/authorize",
+        "test-secret",
+        transport,
+    )
+
+    decision = client.check(
+        "amazon.com",
+        adapter="amazon",
+        timestamp="2026-08-17T00:00:00Z",
+        nonce="amazon-cooldown-test-nonce",
+    )
+
+    assert decision.allowed is False
+    assert "adapter=amazon" in transport.url
+    assert "domain=amazon.com" in transport.url

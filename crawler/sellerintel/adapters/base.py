@@ -194,7 +194,7 @@ def retry_after_seconds(
     default_seconds: int = 3_600,
     maximum_seconds: int = 604_800,
 ) -> int:
-    if response.status != 429:
+    if response.status not in {429, 503}:
         return default_seconds
     value = next(
         (

@@ -112,9 +112,17 @@ class SignedIngestionPipeline:
         stats = spider.crawler.stats
         blocked = _stat_int(stats.get_value("sellerintel/blocked_count")) if stats else 0
         errors = _stat_int(stats.get_value("sellerintel/error_count")) if stats else 0
+        cooldown = (
+            _stat_int(stats.get_value("sellerintel/temporary_unavailable_count"))
+            + _stat_int(stats.get_value("sellerintel/cooldown_preflight_count"))
+            if stats
+            else 0
+        )
         status = "completed"
         if blocked:
             status = "paused_by_policy"
+        elif cooldown:
+            status = "cooldown"
         elif errors or self._spooled or self._rejected:
             status = "completed_with_errors"
         finished_at = _utc_now()

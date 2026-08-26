@@ -78,15 +78,27 @@ describe("signed source cooldown authorization", () => {
     expect(missingAgent.status).toBe(403);
     expect((await missingAgent.json()).error.code).toBe("crawler_user_agent_required");
   });
+
+  it("authorizes Amazon against its marketplace cooldown key", async () => {
+    const db = new CooldownD1(new Date(Date.now() + 120_000).toISOString());
+    const response = await cooldownAuthorizationResponse(
+      await signedRequest("amazon.com", "amazon"),
+      { INGESTION_HMAC_SECRET: secret, OPS_DB: db }
+    );
+
+    expect(response.status).toBe(200);
+    expect((await response.json()).allowed).toBe(false);
+    expect(db.calls.some((call) => call.values.includes("amazon:amazon.com"))).toBe(true);
+  });
 });
 
-async function signedRequest(domain: string): Promise<Request> {
+async function signedRequest(domain: string, adapter = "official_site"): Promise<Request> {
   const timestamp = new Date().toISOString();
   const nonce = "cooldown-deterministic-test-nonce";
   const emptyHash = await sha256Hex(new Uint8Array());
   const signature = await hmacSha256Hex(secret, `${timestamp}.${nonce}.${emptyHash}`);
   return new Request(
-    `https://api.example.test/v1/crawl/authorize?adapter=official_site&domain=${domain}`,
+    `https://api.example.test/v1/crawl/authorize?adapter=${adapter}&domain=${domain}`,
     {
       headers: {
         "user-agent": "seller-intelligence-crawler/1.0",

@@ -48,6 +48,7 @@ MAX_AMAZON_RESULT_PAGES = 15
 MAX_TARGET_SELLERS = 300
 MAX_PRODUCTS_PER_SEARCH_PAGE = 24
 AMAZON_BLOCK_COOLDOWN_SECONDS = 604_800
+AMAZON_UNAVAILABLE_COOLDOWN_SECONDS = 3_600
 AMAZON_RUNTIME_SETTING_KEYS = (
     "RUNNER_MODE",
     "LIVE_CRAWL_ENABLED",
@@ -186,10 +187,13 @@ class AmazonDiscoverySpider(scrapy.Spider):
 
     def _initial_requests(self) -> Iterable[Request]:
         if self._cooldown_client is not None:
-            decision = self._cooldown_client.check(self.marketplace.code)
+            decision = self._cooldown_client.check(
+                self.marketplace.code,
+                adapter="amazon",
+            )
             if not decision.allowed:
                 self._blocked = True
-                self._inc_stat("sellerintel/blocked_count")
+                self._inc_stat("sellerintel/cooldown_preflight_count")
                 self.logger.warning(
                     "Amazon marketplace remains in cooldown marketplace=%s blocked_until=%s",
                     self.marketplace.code,
@@ -204,6 +208,9 @@ class AmazonDiscoverySpider(scrapy.Spider):
             return
         if is_blocked_response(_ResponseAdapter(response)):
             yield self._block_batch(response, source_type="amazon_search")
+            return
+        if response.status == 503:
+            yield self._temporary_unavailable_batch(response, source_type="amazon_search")
             return
         if not _successful_text(response):
             self._inc_stat("sellerintel/error_count")
@@ -232,6 +239,9 @@ class AmazonDiscoverySpider(scrapy.Spider):
             return
         if is_blocked_response(_ResponseAdapter(response)):
             yield self._block_batch(response, source_type="amazon_product")
+            return
+        if response.status == 503:
+            yield self._temporary_unavailable_batch(response, source_type="amazon_product")
             return
         if not _successful_text(response):
             self._inc_stat("sellerintel/error_count")
@@ -269,6 +279,9 @@ class AmazonDiscoverySpider(scrapy.Spider):
             return
         if is_blocked_response(_ResponseAdapter(response)):
             yield self._block_batch(response, source_type="amazon_seller")
+            return
+        if response.status == 503:
+            yield self._temporary_unavailable_batch(response, source_type="amazon_seller")
             return
         if not _successful_text(response):
             self._inc_stat("sellerintel/error_count")
@@ -461,6 +474,84 @@ class AmazonDiscoverySpider(scrapy.Spider):
                         started_at=observed_at,
                         status="paused_by_policy",
                         blocked_count=1,
+                        notes=f"Amazon marketplace cooldown persisted until {blocked_until}.",
+                    )
+                ],
+            ).as_payload()
+        )
+
+    def _temporary_unavailable_batch(
+        self,
+        response: Response,
+        *,
+        source_type: str,
+    ) -> dict[str, object]:
+        self._blocked = True
+        self._inc_stat("sellerintel/temporary_unavailable_count")
+        self._inc_stat("sellerintel/error_count")
+        observed_at = self._observed_at(response)
+        observed = _parse_datetime(observed_at)
+        cooldown_seconds = max(
+            AMAZON_UNAVAILABLE_COOLDOWN_SECONDS,
+            retry_after_seconds(
+                _ResponseAdapter(response),
+                now=observed,
+                default_seconds=AMAZON_UNAVAILABLE_COOLDOWN_SECONDS,
+            ),
+        )
+        blocked_until = (observed + timedelta(seconds=cooldown_seconds)).isoformat().replace(
+            "+00:00", "Z"
+        )
+        source = amazon_source_record(
+            url=response.url,
+            seller_id=None,
+            source_type=source_type,
+            http_status=response.status,
+            page_title=None,
+            evidence_snippet=(
+                "Amazon public source remained temporarily unavailable after one bounded retry."
+            ),
+            html="",
+            observed_at=observed_at,
+            status="cooldown",
+            next_allowed_at=blocked_until,
+        )
+        registry = SourceRegistryRecord(
+            adapter_name=f"amazon:{self.marketplace.code}",
+            source_family="marketplace",
+            enabled=True,
+            risk_level="high",
+            robots_policy="obey",
+            terms_review_status="approved",
+            daily_request_budget=self.max_result_pages * len(self.keywords),
+            concurrency_per_domain=1,
+            minimum_delay_seconds=8.0,
+            blocked_until=blocked_until,
+            parser_version=AMAZON_PARSER_VERSION,
+            last_failure_at=observed_at,
+            operator_notes=(
+                "Temporary HTTP 503 after one bounded retry; no bypass or provider "
+                "rotation attempted."
+            ),
+        )
+        if self.crawler.engine:
+            self.crawler.engine.close_spider(self, reason="amazon_temporarily_unavailable")
+        return dict(
+            IngestionBatch(
+                schema_version=1,
+                parser_version=AMAZON_PARSER_VERSION,
+                crawl_run_id=self.crawl_run_id,
+                batch_number=_batch_number(f"temporary-unavailable:{self.marketplace.code}"),
+                generated_at=observed_at,
+                sources=[source],
+                source_registry=[registry],
+                crawl_runs=[
+                    CrawlRunRecord(
+                        id=self.crawl_run_id,
+                        job_type=self.job_type,
+                        started_at=observed_at,
+                        status="cooldown",
+                        error_count=1,
                         notes=f"Amazon marketplace cooldown persisted until {blocked_until}.",
                     )
                 ],

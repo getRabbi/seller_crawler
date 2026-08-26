@@ -485,6 +485,15 @@ export class OperatorCrawlService {
       .prepare("SELECT * FROM operator_crawl_runs WHERE status = 'queued' ORDER BY requested_at, id LIMIT 1")
       .first<OperatorRunRow>();
     if (!queued) return;
+    const queuedCooldownUntil = await this.amazonCooldownUntil(queued);
+    if (queuedCooldownUntil) {
+      await this.transitionToAmazonCooldown(
+        queued,
+        queuedCooldownUntil,
+        "Amazon cooldown is still active; no Scrapy Cloud job was launched."
+      );
+      return;
+    }
     const now = new Date().toISOString();
     await this.db
       .prepare(
@@ -632,6 +641,14 @@ export class OperatorCrawlService {
         "source_blocked",
         "The source returned an explicit access challenge or policy block.",
         ["source_blocked"]
+      );
+      return;
+    }
+    if (outcome?.status === "cooldown") {
+      await this.transitionToAmazonCooldown(
+        run,
+        await this.amazonCooldownUntil(run),
+        "Amazon returned HTTP 503 after one bounded retry; the source cooldown was recorded."
       );
       return;
     }
@@ -787,6 +804,15 @@ export class OperatorCrawlService {
         true,
         "launch_outcome_unknown",
         "Retry as a new audited crawl after confirming no Scrapy Cloud job remains active."
+      );
+      return;
+    }
+    const cooldownUntil = await this.amazonCooldownUntil(run);
+    if (cooldownUntil) {
+      await this.transitionToAmazonCooldown(
+        run,
+        cooldownUntil,
+        "Amazon cooldown became active before launch; no Scrapy Cloud job was created."
       );
       return;
     }
@@ -1152,6 +1178,45 @@ export class OperatorCrawlService {
       )
       .run();
     await this.event(run.id, status, actorId, run.status, status, message);
+  }
+
+  private async amazonCooldownUntil(run: OperatorRunRow): Promise<string | null> {
+    if (
+      run.mode !== "find_sellers" ||
+      run.stage !== "discovering" && run.stage !== "queued" ||
+      !run.marketplace
+    ) {
+      return null;
+    }
+    const row = await this.db
+      .prepare("SELECT blocked_until FROM source_registry WHERE adapter_name = ? LIMIT 1")
+      .bind(`amazon:${run.marketplace}`)
+      .first<{ blocked_until: string | null }>();
+    const blockedUntil = row?.blocked_until ?? null;
+    return blockedUntil && Number.isFinite(Date.parse(blockedUntil)) && Date.parse(blockedUntil) > Date.now()
+      ? blockedUntil
+      : null;
+  }
+
+  private async transitionToAmazonCooldown(
+    run: OperatorRunRow,
+    blockedUntil: string | null,
+    eventMessage: string
+  ): Promise<void> {
+    const retryDetail = blockedUntil
+      ? ` Retry after ${blockedUntil}.`
+      : " Retry only after the persisted source cooldown expires.";
+    await this.transition(
+      run,
+      "cooldown",
+      "cooldown",
+      null,
+      eventMessage,
+      true,
+      "amazon_temporarily_unavailable",
+      `Amazon is temporarily unavailable.${retryDetail} No bypass or provider rotation was attempted.`,
+      mergedWarnings(run, "amazon_temporarily_unavailable")
+    );
   }
 
   private async event(

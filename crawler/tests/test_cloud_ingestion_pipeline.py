@@ -111,6 +111,25 @@ def test_pipeline_uses_spider_stage_metadata_for_amazon_completion() -> None:
     assert completion.crawl_runs[0].job_type == "amazon_discovery"
 
 
+def test_pipeline_preserves_temporary_source_cooldown_as_terminal_status() -> None:
+    submitter = FakeSubmitter()
+    spider = configured_spider()
+    pipeline = SignedIngestionPipeline(
+        submitter,
+        started_at="2026-08-04T00:00:00Z",
+        crawler=spider.crawler,
+    )
+    assert spider.crawler.stats is not None
+    spider.crawler.stats.set_value("sellerintel/temporary_unavailable_count", 1)
+    spider.crawler.stats.set_value("sellerintel/error_count", 1)
+
+    pipeline.close_spider()
+
+    completion = submitter.batches[-1]
+    assert completion.crawl_runs[0].status == "cooldown"
+    assert completion.crawl_runs[0].error_count == 1
+
+
 def test_pipeline_fails_closed_when_ingestion_settings_are_missing() -> None:
     crawler = Crawler(Spider, Settings())
 

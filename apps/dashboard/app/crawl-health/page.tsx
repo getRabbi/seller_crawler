@@ -9,6 +9,7 @@ import { StatusPill, TableShell } from "../../components/status";
 import { workerApiPaths } from "../../lib/dashboard-data";
 import { useApiResource } from "../../lib/use-api-resource";
 import { postWorkerApi } from "../../lib/api";
+import { crawlWarningMessages } from "../../lib/crawl-monitor";
 
 export default function CrawlHealthPage() {
   const result = useApiResource<ListResponse<CrawlRunItem>>(
@@ -56,7 +57,7 @@ export default function CrawlHealthPage() {
                   <td>{run.contactsFound ?? run.contactsVerified}</td>
                   <td>{new Date(run.startedAt).toLocaleString()}</td>
                   <td>{duration(run)}</td>
-                  <td><div className="row-actions">{["queued","starting","launching","running","resolving","enriching","ingesting"].includes(run.status) ? <button onClick={() => void action(run, "cancel")} type="button">Cancel</button> : null}{["failed","blocked","cooldown","cancelled"].includes(run.status) ? <button onClick={() => void action(run, "retry")} type="button">Retry</button> : null}<Link href={`/sellers?source_run=${run.id}`}>View results</Link></div>{run.errorMessage ? <small>{run.errorMessage}</small> : null}{run.warnings?.map((warning) => <small key={warning}>{warning}</small>)}</td>
+                  <td><div className="row-actions">{["queued","starting","launching","running","resolving","enriching","ingesting"].includes(run.status) ? <button onClick={() => void action(run, "cancel")} type="button">Cancel</button> : null}{["failed","blocked","cooldown","cancelled"].includes(run.status) ? <button onClick={() => void action(run, "retry")} type="button">Retry</button> : null}<Link href={`/sellers?source_run=${run.id}`}>View results</Link></div>{run.errorMessage && run.errorCode !== "amazon_temporarily_unavailable" ? <small>{run.errorMessage}</small> : null}{crawlWarningMessages(run).map((warning) => <small key={warning.code}>{warning.title}: {warning.detail}</small>)}</td>
                 </tr>
               ))}
             </tbody>

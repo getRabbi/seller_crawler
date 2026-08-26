@@ -2,6 +2,15 @@
 
 ## Unreleased - Solo Mode v1 Implementation
 
+- Classified an Amazon HTTP 503 that remains after the single bounded retry as
+  temporary source unavailability instead of a successful empty discovery.
+  The crawler now persists a one-hour (or longer `Retry-After`) marketplace
+  cooldown, the signed preflight reads the correct `amazon:<marketplace>` key,
+  and the Worker ends retries during that window without launching a Scrapy
+  Cloud job. The dashboard shows an actionable Amazon cooldown/retry message,
+  removes the misleading official-website warning, and also explains historical
+  zero-result crawler failures without rewriting their audit history. No bypass,
+  proxy/provider rotation, extra unit, paid service, or migration was added.
 - Added a same-page New Crawl monitor after create or duplicate-search skip.
   It resumes from a validated `runId` URL parameter, polls the authenticated
   detail endpoint every five seconds only while non-terminal, shows elapsed

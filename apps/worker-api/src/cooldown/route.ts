@@ -5,6 +5,7 @@ import type { RuntimeEnv } from "../validation/startup";
 
 const CRAWLER_USER_AGENT = "seller-intelligence-crawler/1.0";
 const DOMAIN_PATTERN = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+const COOLDOWN_ADAPTERS = new Set(["official_site", "amazon"]);
 
 export function isCooldownRoute(pathname: string): boolean {
   return pathname === "/v1/crawl/authorize";
@@ -40,7 +41,7 @@ export async function cooldownAuthorizationResponse(
   const url = new URL(request.url);
   const adapter = url.searchParams.get("adapter") ?? "";
   const domain = (url.searchParams.get("domain") ?? "").trim().toLowerCase();
-  if (adapter !== "official_site" || !DOMAIN_PATTERN.test(domain)) {
+  if (!COOLDOWN_ADAPTERS.has(adapter) || !DOMAIN_PATTERN.test(domain)) {
     return errorResponse("invalid_cooldown_source", "Cooldown source is invalid.", 400);
   }
   const operations = new OperationsRepository(env.OPS_DB);
@@ -50,12 +51,12 @@ export async function cooldownAuthorizationResponse(
   const now = new Date();
   await operations.recordIngestionNonce({
     nonce,
-    idempotencyKey: `cooldown:${domain}:${nonce}`,
+    idempotencyKey: `cooldown:${adapter}:${domain}:${nonce}`,
     requestHash: await sha256Hex(new Uint8Array()),
     createdAt: now.toISOString(),
     expiresAt: new Date(now.getTime() + 86_400_000).toISOString()
   });
-  const blockedUntil = await operations.getSourceBlockedUntil(`official_site:${domain}`);
+  const blockedUntil = await operations.getSourceBlockedUntil(`${adapter}:${domain}`);
   const allowed = !blockedUntil || Date.parse(blockedUntil) <= now.getTime();
   return jsonResponse({ allowed, blocked_until: allowed ? null : blockedUntil }, 200);
 }

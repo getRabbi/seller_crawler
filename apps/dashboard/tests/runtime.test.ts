@@ -8,9 +8,12 @@ import { fetchWorkerApi, postWorkerApi, WorkerApiError, workerApiBaseUrl, worker
 import { resultPageLimit, searchQueries, validateCrawlForm } from "../lib/crawl-form";
 import {
   CRAWL_POLL_INTERVAL_MS,
+  crawlActivityMessage,
+  crawlEmptyResultsMessage,
   crawlElapsedLabel,
   crawlStageLabel,
   crawlStageProgress,
+  crawlWarningMessages,
   isTerminalCrawlStatus,
   isValidCrawlRunId
 } from "../lib/crawl-monitor";
@@ -224,6 +227,70 @@ describe("dashboard runtime configuration", () => {
 
     expect(crawlElapsedLabel(run, Date.parse("2026-08-26T00:02:09.000Z"))).toBe("2m 09s");
     expect(crawlElapsedLabel({ ...run, status: "completed", finishedAt: "2026-08-26T01:02:03.000Z" }, Date.parse("2026-08-27T00:00:00.000Z"))).toBe("1h 02m 03s");
+  });
+
+  it("explains Amazon cooldowns and does not present them as zero-match results", () => {
+    const run = {
+      id: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
+      jobType: "amazon_identity_discovery",
+      zyteJobId: "871778/1/9",
+      startedAt: "2026-08-26T08:08:20.000Z",
+      finishedAt: "2026-08-26T08:09:41.000Z",
+      status: "cooldown",
+      stage: "cooldown",
+      requestsTotal: 3,
+      responsesSuccess: 3,
+      candidatesFound: 0,
+      recordsCreated: 0,
+      recordsUpdated: 0,
+      contactsVerified: 0,
+      blockedCount: 0,
+      errorCount: 1,
+      notes: null,
+      discoveredSellers: 0,
+      warnings: ["amazon_temporarily_unavailable"],
+      errorCode: "amazon_temporarily_unavailable",
+      errorMessage: "Amazon is temporarily unavailable. Retry after 2026-08-26T09:09:41Z."
+    };
+
+    expect(crawlWarningMessages(run)).toEqual([expect.objectContaining({
+      title: "Amazon temporarily unavailable",
+      detail: expect.stringContaining("Retry after")
+    })]);
+    expect(crawlEmptyResultsMessage(run)).toContain("discovery did not complete");
+    expect(crawlStageProgress(run)).toBe(35);
+  });
+
+  it("hides the misleading website warning on historical zero-result crawler failures", () => {
+    const run = {
+      id: "018f2d5e-7b3c-7a1d-8f2e-123456789abc",
+      jobType: "amazon_identity_discovery",
+      zyteJobId: "871778/3/9",
+      startedAt: "2026-08-26T08:08:20.000Z",
+      finishedAt: "2026-08-26T08:09:41.000Z",
+      status: "completed_with_warnings",
+      requestsTotal: 3,
+      responsesSuccess: 3,
+      candidatesFound: 0,
+      recordsCreated: 0,
+      recordsUpdated: 0,
+      contactsVerified: 0,
+      blockedCount: 0,
+      errorCount: 1,
+      notes: null,
+      discoveredSellers: 0,
+      warnings: ["crawler_errors", "official_website_unavailable"]
+    };
+
+    expect(crawlWarningMessages(run).map((warning) => warning.title)).toEqual([
+      "Seller discovery request failed"
+    ]);
+    expect(crawlEmptyResultsMessage(run)).toContain("not a confirmed zero-match result");
+    expect(crawlActivityMessage(
+      run,
+      "Amazon discovery completed; no credible official website was available for enrichment.",
+      "completed_with_warnings"
+    )).toContain("ended after source request errors");
   });
 
   it("validates mode-specific required crawl fields before submission", () => {
